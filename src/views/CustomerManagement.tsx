@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import { Customer, CustomerStatus, VerificationStatus } from '../types';
+import { compressImage } from '../utils/compressor';
 import {
   Search,
   Plus,
@@ -36,6 +37,22 @@ export default function CustomerManagement() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressedDataUrl = await compressImage(file, 300, 0.6);
+      setter(compressedDataUrl);
+    } catch (err) {
+      console.error("Error compressing image:", err);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setter(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // New Customer State Form
   const [newCust, setNewCust] = useState({
     fullName: '',
@@ -59,6 +76,11 @@ export default function CustomerManagement() {
   });
 
   const [uploadedDoc, setUploadedDoc] = useState(false);
+  const [aadhaarFront, setAadhaarFront] = useState('');
+  const [aadhaarBack, setAadhaarBack] = useState('');
+  const [panCard, setPanCard] = useState('');
+  const [rentAgreement, setRentAgreement] = useState('');
+  const [selfie, setSelfie] = useState('');
 
   // Integrated checkout states
   const [rentImmediately, setRentImmediately] = useState(false);
@@ -66,6 +88,8 @@ export default function CustomerManagement() {
   const [duration, setDuration] = useState<number>(3);
   const [discountType, setDiscountType] = useState<'flat' | 'percent'>('flat');
   const [discount, setDiscount] = useState<number>(0);
+  const [depDiscountType, setDepDiscountType] = useState<'flat' | 'percent'>('flat');
+  const [depDiscount, setDepDiscount] = useState<number>(0);
   const [coupon, setCoupon] = useState('');
 
   // Calculations for onboarding checkout preview
@@ -82,28 +106,40 @@ export default function CustomerManagement() {
     : discount;
 
   const totalRentNet = Math.max(100, cartRent - discountAmt);
-  const checkoutTotal = cartDeposit + totalRentNet;
+
+  const depositDiscountAmt = depDiscountType === 'percent'
+    ? Math.round(cartDeposit * (depDiscount / 100))
+    : depDiscount;
+
+  const netDepositVal = Math.max(0, cartDeposit - depositDiscountAmt);
+  const checkoutTotal = netDepositVal + totalRentNet;
 
   const handleCreateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCust.fullName || !newCust.mobileNumber) return;
+    if (rentImmediately && !rentAgreement) {
+      alert("⚠️ You must upload the Rent Agreement to proceed with instant checkout!");
+      return;
+    }
 
     const checkoutCart = rentImmediately && selectedAssets.length > 0 ? {
       items: selectedAssets.map(id => ({ assetId: id })),
       durationMonths: duration,
       discountType: discountType,
       discountValue: discount,
+      depositDiscountType: depDiscountType,
+      depositDiscountValue: depDiscount,
       couponCode: coupon || undefined,
     } : undefined;
 
     addCustomer({
       ...newCust,
       documents: {
-        aadhaarFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        aadhaarBack: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        rentAgreement: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        selfie: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        aadhaarFront: aadhaarFront || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
+        aadhaarBack: aadhaarBack || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
+        panCard: panCard || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
+        rentAgreement: rentAgreement || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
+        selfie: selfie || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
       }
     }, checkoutCart);
 
@@ -129,11 +165,18 @@ export default function CustomerManagement() {
       landlordId: '',
     });
     setUploadedDoc(false);
+    setAadhaarFront('');
+    setAadhaarBack('');
+    setPanCard('');
+    setRentAgreement('');
+    setSelfie('');
     setRentImmediately(false);
     setSelectedAssets([]);
     setDuration(3);
     setDiscount(0);
     setDiscountType('flat');
+    setDepDiscount(0);
+    setDepDiscountType('flat');
     setCoupon('');
     setShowAddForm(false);
   };
@@ -584,19 +627,98 @@ export default function CustomerManagement() {
                 </div>
               </div>
 
-              {/* Document upload simulator */}
-              <div className="space-y-2">
-                <span className="text-slate-400 block font-medium">Upload KYC Documents</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setUploadedDoc(true)}
-                    className={`flex-1 py-2 text-[10px] rounded-lg border font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
-                      uploadedDoc ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'border-slate-800 text-slate-400 hover:bg-slate-900/50'
-                    }`}
-                  >
-                    {uploadedDoc ? '✔️ KYC Images Uploaded' : '📁 Attach Aadhaar, PAN & selfie'}
-                  </button>
+              {/* Document uploads */}
+              <div className="space-y-3">
+                <span className="text-slate-400 block font-medium">Upload Customer Documents</span>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {/* Aadhaar Front */}
+                  <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl space-y-1.5 flex flex-col justify-between">
+                    <label className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Aadhaar Front</label>
+                    {aadhaarFront ? (
+                      <div className="relative h-16 w-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+                        <img src={aadhaarFront} alt="Aadhaar Front" className="h-full w-auto object-cover" />
+                        <button type="button" onClick={() => setAadhaarFront('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                        <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setAadhaarFront)} />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Aadhaar Back */}
+                  <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl space-y-1.5 flex flex-col justify-between">
+                    <label className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Aadhaar Back</label>
+                    {aadhaarBack ? (
+                      <div className="relative h-16 w-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+                        <img src={aadhaarBack} alt="Aadhaar Back" className="h-full w-auto object-cover" />
+                        <button type="button" onClick={() => setAadhaarBack('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                        <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setAadhaarBack)} />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* PAN Card */}
+                  <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl space-y-1.5 flex flex-col justify-between">
+                    <label className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">PAN Card</label>
+                    {panCard ? (
+                      <div className="relative h-16 w-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+                        <img src={panCard} alt="PAN Card" className="h-full w-auto object-cover" />
+                        <button type="button" onClick={() => setPanCard('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                        <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setPanCard)} />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Rent Agreement - Mandatory for checkouts */}
+                  <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl space-y-1.5 flex flex-col justify-between col-span-2">
+                    <label className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">
+                      Rent Agreement {rentImmediately && <span className="text-rose-500 font-extrabold">* (Required)</span>}
+                    </label>
+                    {rentAgreement ? (
+                      <div className="relative h-16 w-full bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-center gap-1.5 px-3">
+                        <span className="text-emerald-400 text-lg">📄</span>
+                        <div className="flex-1 overflow-hidden">
+                          <span className="text-[9px] font-bold text-emerald-300 block truncate">Agreement Attached</span>
+                          <span className="text-[8px] text-slate-400 block truncate font-mono">agreement.pdf</span>
+                        </div>
+                        <button type="button" onClick={() => setRentAgreement('')} className="p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
+                      </div>
+                    ) : (
+                      <label className={`h-16 w-full border border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                        rentImmediately ? 'border-rose-500/40 hover:border-rose-500 bg-rose-500/5' : 'border-slate-800 hover:border-indigo-500/50 bg-slate-950/60'
+                      }`}>
+                        <span className="text-[9px] text-slate-500 font-bold">📄 Upload Rent Agreement</span>
+                        <span className="text-[8px] text-slate-600 block">(PDF or Image)</span>
+                        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileChange(e, setRentAgreement)} />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Selfie */}
+                  <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl space-y-1.5 flex flex-col justify-between">
+                    <label className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Selfie / Photo</label>
+                    {selfie ? (
+                      <div className="relative h-16 w-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
+                        <img src={selfie} alt="Selfie" className="h-full w-auto object-cover" />
+                        <button type="button" onClick={() => setSelfie('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                        <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setSelfie)} />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -674,12 +796,11 @@ export default function CustomerManagement() {
                         <option value={12}>12 Months</option>
                       </select>
                     </div>
-
-                    {/* Discount Input & Toggle */}
+                                     {/* Discount Input & Toggle */}
                     <div className="grid grid-cols-2 gap-2 text-[10px]">
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <label className="text-slate-400">Discount Amount</label>
+                          <label className="text-slate-400">Rent Discount</label>
                           <button
                             type="button"
                             onClick={() => {
@@ -714,19 +835,62 @@ export default function CustomerManagement() {
                       </div>
                     </div>
 
+                    {/* Deposit Discount Input & Toggle */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div className="space-y-1 col-span-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-slate-400">Deposit Discount</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDepDiscount(0);
+                              setDepDiscountType(depDiscountType === 'flat' ? 'percent' : 'flat');
+                            }}
+                            className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold uppercase focus:outline-none cursor-pointer"
+                          >
+                            Toggle {depDiscountType === 'flat' ? '%' : '₹'}
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1 text-slate-500 font-semibold">{depDiscountType === 'flat' ? '₹' : '%'}</span>
+                          <input
+                            type="number"
+                            value={depDiscount || ''}
+                            onChange={(e) => setDepDiscount(Number(e.target.value))}
+                            className="pl-5 w-full rounded py-0.5 bg-slate-900 border border-slate-800 text-slate-200"
+                            placeholder={depDiscountType === 'flat' ? 'Flat' : 'Percent'}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Calculations Summary */}
                     <div className="pt-2 border-t border-slate-800 space-y-1 font-mono text-[10px]">
                       <div className="flex justify-between text-slate-400">
-                        <span>Total Security Deposit:</span>
+                        <span>Gross Security Deposit:</span>
                         <span>₹{cartDeposit}</span>
                       </div>
-                      <div className="flex justify-between text-slate-400">
+                      {depDiscount > 0 && (
+                        <div className="flex justify-between text-rose-400">
+                          <span>Deposit Discount:</span>
+                          <span>
+                            -{depDiscountType === 'flat' ? '₹' : ''}
+                            {depDiscount}
+                            {depDiscountType === 'percent' ? '%' : ''} (₹{depositDiscountAmt})
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-slate-300 font-bold">
+                        <span>Net Security Deposit:</span>
+                        <span>₹{netDepositVal}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400 pt-1 border-t border-slate-800/40">
                         <span>Monthly Rent (Gross):</span>
                         <span>₹{cartRent}</span>
                       </div>
                       {discount > 0 && (
                         <div className="flex justify-between text-rose-400">
-                          <span>Discount Applied:</span>
+                          <span>Rent Discount:</span>
                           <span>
                             -{discountType === 'flat' ? '₹' : ''}
                             {discount}

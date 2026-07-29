@@ -110,6 +110,10 @@ export interface RentalOrder {
   startDate: string;
   endDate: string;
   totalDeposit: number;
+  depositDiscountAmount?: number;
+  depositDiscountType?: 'flat' | 'percent';
+  depositDiscountValue?: number;
+  netDeposit?: number;
   totalMonthlyRent: number;
   discountAmount: number;
   discountType: 'flat' | 'percent';
@@ -134,6 +138,8 @@ export interface Invoice {
   billingPeriod: string; // e.g. "July 2026"
   dueDate: string;
   depositAmount: number;
+  depositDiscount?: number;
+  netDeposit?: number;
   rentalCharges: number;
   lateFee: number;
   discount: number;

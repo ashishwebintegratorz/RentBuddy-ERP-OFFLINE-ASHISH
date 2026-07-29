@@ -73,6 +73,8 @@ interface RentBuddyState {
       durationMonths: number;
       discountType: 'flat' | 'percent';
       discountValue: number;
+      depositDiscountType?: 'flat' | 'percent';
+      depositDiscountValue?: number;
       couponCode?: string;
     }
   ) => void;
@@ -91,6 +93,8 @@ interface RentBuddyState {
     durationMonths: number;
     discountType: 'flat' | 'percent';
     discountValue: number;
+    depositDiscountType?: 'flat' | 'percent';
+    depositDiscountValue?: number;
     couponCode?: string;
   }) => RentalOrder;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
@@ -403,8 +407,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         cities.forEach(city => {
           const wList = warehouses[city];
           mockCategories.forEach((cat, index) => {
-            // Add 1 or 2 items per category in each city
-            const count = city === 'Indore (Head Office)' ? 2 : 1;
+            // Add 1 or 6 items per category in each city
+            const count = city === 'Indore (Head Office)' ? 6 : 1;
             for (let i = 0; i < count; i++) {
               const id = `RB-${cat.name.replace(/\s+/g, '').toUpperCase()}-${String(assetCounter).padStart(4, '0')}`;
               const warehouse = wList[i % wList.length];
@@ -926,6 +930,16 @@ export const useRentBuddyStore = create<RentBuddyState>()(
 
           const netMonthlyRent = Math.max(100, totalMonthlyRent - discountAmount);
 
+          let depositDiscountAmount = 0;
+          const depType = checkoutData.depositDiscountType || 'flat';
+          const depVal = checkoutData.depositDiscountValue || 0;
+          if (depType === 'percent') {
+            depositDiscountAmount = Math.round(totalDeposit * (depVal / 100));
+          } else {
+            depositDiscountAmount = depVal;
+          }
+          const netDeposit = Math.max(0, totalDeposit - depositDiscountAmount);
+
           const orderId = genId('RB-ORD');
           const newOrder: RentalOrder = {
             id: orderId,
@@ -937,6 +951,10 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             startDate: new Date().toISOString().split('T')[0],
             endDate: new Date(Date.now() + checkoutData.durationMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             totalDeposit,
+            depositDiscountAmount,
+            depositDiscountType: depType,
+            depositDiscountValue: depVal,
+            netDeposit,
             totalMonthlyRent,
             discountAmount: discountAmount,
             discountType: checkoutData.discountType,
@@ -962,13 +980,15 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             billingPeriod: 'Initial Rent & Deposit Hold',
             dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             depositAmount: totalDeposit,
+            depositDiscount: depositDiscountAmount,
+            netDeposit: netDeposit,
             rentalCharges: netMonthlyRent,
             lateFee: 0,
             discount: discountAmount,
             discountType: checkoutData.discountType,
             discountValue: checkoutData.discountValue,
             couponCode: checkoutData.couponCode,
-            totalAmount: totalDeposit + netMonthlyRent,
+            totalAmount: netDeposit + netMonthlyRent,
             status: 'Pending',
             createdAt: new Date().toISOString(),
           };
@@ -1758,6 +1778,105 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             }
           } catch (err: any) {
             console.warn("MongoDB Atlas offline, falling back to offline LocalStorage cache:", err.message);
+          }
+
+          // Indore auto-migration: ensure Indore inventory has at least 6 items per category
+          const currentInventory = get().inventory || [];
+          const indoreCount = currentInventory.filter((a: any) => a.city === 'Indore (Head Office)').length;
+          if (indoreCount < 60) {
+            console.log("Auto-migrating: Indore inventory count is low. Generating additional assets...");
+            const mockCategories = [
+              { name: 'Sofa', deposit: 1500, price: 600, brand: 'Sleepwell', model: '3-Seater Comfort' },
+              { name: 'Bed', deposit: 2500, price: 900, brand: 'Godrej Interio', model: 'Queen Size Wooden' },
+              { name: 'Mattress', deposit: 1000, price: 400, brand: 'Kurl-On', model: 'Ortho 6-inch' },
+              { name: 'Dining Table', deposit: 2000, price: 700, brand: 'Urban Ladder', model: '4-Seater Glass' },
+              { name: 'Chair', deposit: 500, price: 200, brand: 'Featherlite', model: 'Ergonomic Mesh Office' },
+              { name: 'Wardrobe', deposit: 2500, price: 800, brand: 'Godrej Interio', model: '2-Door Steel Almirah' },
+              { name: 'Refrigerator', deposit: 3500, price: 1100, brand: 'LG', model: 'Single Door 190L' },
+              { name: 'Washing Machine', deposit: 4000, price: 1200, brand: 'Samsung', model: 'Fully Automatic 6.5kg' },
+              { name: 'Study Table', deposit: 800, price: 300, brand: 'IKEA', model: 'Micke Desks' },
+              { name: 'TV Unit', deposit: 1500, price: 500, brand: 'Wakefit', model: 'Wall Mounted unit' },
+            ];
+
+            const updatedInventory = [...currentInventory];
+            const existingIds = new Set(updatedInventory.map((a: any) => a.id));
+            let nextCounter = 1;
+            const getUniqueId = (catName: string) => {
+              const prefix = `RB-${catName.replace(/\s+/g, '').toUpperCase()}-`;
+              while (true) {
+                const id = `${prefix}${String(nextCounter).padStart(4, '0')}`;
+                nextCounter++;
+                if (!existingIds.has(id)) {
+                  existingIds.add(id);
+                  return id;
+                }
+              }
+            };
+
+            const warehouses = ['Indore Bypass Warehouse', 'Indore Main Depot'];
+
+            mockCategories.forEach((cat) => {
+              const currentCatIndoreCount = updatedInventory.filter(
+                (a: any) => a.city === 'Indore (Head Office)' && a.category === cat.name
+              ).length;
+              const targetCount = 6;
+              const diff = targetCount - currentCatIndoreCount;
+
+              for (let i = 0; i < diff; i++) {
+                const id = getUniqueId(cat.name);
+                const warehouse = warehouses[i % warehouses.length];
+                const conditionOptions: ('Excellent' | 'Good' | 'Fair' | 'Poor')[] = ['Excellent', 'Good', 'Fair'];
+                const condition = conditionOptions[Math.floor(Math.random() * conditionOptions.length)];
+
+                let status: AssetStatus = 'Available';
+                const rand = Math.random();
+                if (rand < 0.1) status = 'Under Repair';
+                else if (rand < 0.15) status = 'Lost';
+                else if (rand < 0.35) status = 'Rented';
+
+                const ageMonths = Math.floor(Math.random() * 24) + 1;
+                const cost = cat.deposit * 5;
+                const rentals = status === 'Rented' ? Math.floor(Math.random() * 5) + 1 : Math.floor(Math.random() * 4);
+                const revenue = rentals * cat.price * (Math.floor(Math.random() * 6) + 2);
+
+                updatedInventory.push({
+                  id,
+                  barcode: id,
+                  qrCode: `${id}-QR`,
+                  category: cat.name,
+                  brand: cat.brand,
+                  model: cat.model,
+                  purchaseDate: new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                  purchaseCost: cost,
+                  currentValue: Math.max(1000, cost - ageMonths * 100),
+                  securityDeposit: cat.deposit,
+                  monthlyRentalPrice: cat.price,
+                  warehouse,
+                  city: 'Indore (Head Office)',
+                  rackNumber: `RACK-${Math.floor(Math.random() * 10) + 1}-${String.fromCharCode(
+                    65 + Math.floor(Math.random() * 6)
+                  )}`,
+                  status,
+                  lifecycle: {
+                    purchasedDate: new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    revenueEarned: revenue,
+                    repairCost: status === 'Under Repair' ? 1200 : Math.floor(Math.random() * 2000),
+                    currentCondition: condition,
+                    totalRentalsCount: rentals,
+                  },
+                });
+              }
+            });
+
+            set({
+              inventory: updatedInventory,
+              expectedVsActualAudit: {
+                ...get().expectedVsActualAudit,
+                expectedCount: updatedInventory.length,
+                actualCount: updatedInventory.length,
+              },
+            });
+            console.log(`Auto-migration complete. Indore inventory count is now ${updatedInventory.filter((a: any) => a.city === 'Indore (Head Office)').length} items.`);
           }
         }
       };

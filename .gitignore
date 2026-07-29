@@ -21,4 +21,6 @@ dist-ssr
 .env
 .env.*
 .env.local
+inspect-db.js
+
 

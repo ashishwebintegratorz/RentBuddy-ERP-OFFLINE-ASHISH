@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import type { Asset, AssetStatus } from '../types';
+import { compressImage } from '../utils/compressor';
 import {
   Search,
   Plus,
@@ -55,28 +56,20 @@ export default function InventoryManagement() {
     'TV Unit',
   ];
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          // Convert input image to high-quality lossless WebP
-          const webpData = canvas.toDataURL('image/webp', 1.0);
-          setNewAsset(prev => ({ ...prev, imageUrl: webpData }));
-        }
+    try {
+      const compressedDataUrl = await compressImage(file, 300, 0.6);
+      setNewAsset(prev => ({ ...prev, imageUrl: compressedDataUrl }));
+    } catch (err) {
+      console.error("Error compressing image:", err);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewAsset(prev => ({ ...prev, imageUrl: reader.result as string }));
       };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleCreateAsset = (e: React.FormEvent) => {

@@ -18,6 +18,7 @@ import FinancePortal from './views/FinancePortal';
 import ReportsCenter from './views/ReportsCenter';
 import Login from './views/Login';
 import Settings from './views/Settings';
+import Quotations from './views/Quotations';
 
 import { useRentBuddyStore } from './store/rentBuddyStore';
 
@@ -91,6 +92,8 @@ function App() {
         return <ReportsCenter />;
       case 'settings':
         return <Settings />;
+      case 'quotations':
+        return <Quotations />;
       default:
         return <Dashboard setView={setView} />;
     }

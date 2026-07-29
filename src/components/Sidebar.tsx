@@ -18,6 +18,7 @@ import {
   MapPin,
   Shield,
   Settings,
+  FileText,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -64,6 +65,7 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
     { id: 'packages', label: 'Rental Bundles', icon: Gift, roles: ['Super Admin', 'Operations Manager'] },
     { id: 'finance', label: 'Finance Portal', icon: CreditCard, roles: ['Super Admin', 'Operations Manager', 'Finance'] },
     { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet, roles: ['Super Admin', 'Operations Manager', 'Read-only Auditor'] },
+    { id: 'quotations', label: 'Quotations', icon: FileText, roles: ['*'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['*'] },
   ];
 

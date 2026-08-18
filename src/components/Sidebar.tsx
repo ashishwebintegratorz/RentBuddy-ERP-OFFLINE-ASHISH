@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
-import type { UserRole, CityName } from '../types';
+import type { UserRole } from '../types';
+import rentBuddyLogo from '../assets/rentbuddy1.png';
 import {
   LayoutDashboard,
   Users,
@@ -35,7 +36,6 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
     setRole,
     setCity,
     expectedVsActualAudit,
-    notifications,
     currentUser,
     logout
   } = useRentBuddyStore();
@@ -60,6 +60,7 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
     { id: 'pos', label: 'Point of Sale (POS)', icon: ShoppingCart, roles: ['Super Admin', 'Operations Manager', 'Customer Support'] },
     { id: 'orders', label: 'Rental Orders', icon: ShieldCheck, roles: ['Super Admin', 'Operations Manager', 'Finance'] },
     { id: 'logistics', label: 'Logistics Tasks', icon: Truck, roles: ['Super Admin', 'Operations Manager', 'Logistics Team'] },
+    { id: 'logistic-docs', label: 'Logistic Driver Documents', icon: ShieldCheck, roles: ['Super Admin', 'Operations Manager', 'Logistics Team'] },
     { id: 'inspection', label: 'Quality Inspection', icon: ClipboardCheck, roles: ['Super Admin', 'Operations Manager', 'Warehouse Manager'] },
     { id: 'repair', label: 'Repairs & Vendors', icon: Wrench, roles: ['Super Admin', 'Operations Manager', 'Repair Team'] },
     { id: 'packages', label: 'Rental Bundles', icon: Gift, roles: ['Super Admin', 'Operations Manager'] },
@@ -75,30 +76,30 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
   );
 
   return (
-    <aside className="w-64 flex-shrink-0 glass-panel border-r border-slate-800/80 flex flex-col h-full z-10">
-      {/* Brand Header */}
-      <div className="p-5 border-b border-slate-800/60 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <span className="font-bold text-white text-lg tracking-wider">R</span>
+    <aside className="w-64 flex-shrink-0 glass-panel border-r border-slate-800/80 flex flex-col h-full z-10 select-none">
+      {/* Brand Header with RentBuddy Official Logo */}
+      <div className="p-4 border-b border-slate-800/60 flex items-center gap-3 bg-gradient-to-r from-red-950/20 via-transparent to-transparent">
+        <div className="w-10 h-10 rounded-xl bg-white/95 p-1 flex items-center justify-center shadow-lg shadow-red-600/25 border border-red-500/30 overflow-hidden shrink-0">
+          <img src={rentBuddyLogo} alt="RentBuddy Logo" className="w-full h-full object-contain" />
         </div>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-1">
-            RentBuddy <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded font-mono">ERP</span>
+        <div className="min-w-0">
+          <h1 className="text-sm font-black tracking-tight text-white flex items-center gap-1.5 truncate">
+            RentBuddy <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-mono font-bold shadow-sm">ERP</span>
           </h1>
-          <p className="text-[11px] text-slate-400">Offline Asset Lifecycle</p>
+          <p className="text-[10px] text-slate-400 font-medium truncate">Offline Fleet & Asset Suite</p>
         </div>
       </div>
 
       {/* User Profile Card & Logout */}
       {currentUser && (
-        <div className="mx-4 mt-4 p-3 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex items-center justify-between gap-2.5">
+        <div className="mx-3 mt-3 p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-xl flex items-center justify-between gap-2">
           <div className="min-w-0">
             <h4 className="text-[11px] font-bold text-white truncate">{currentUser.fullName}</h4>
             <p className="text-[9px] text-slate-400 truncate">@{currentUser.username}</p>
           </div>
           <button
             onClick={() => logout()}
-            className="text-[9px] text-rose-400 hover:text-rose-300 font-extrabold px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
+            className="text-[9px] text-red-400 hover:text-red-300 font-bold px-2 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 rounded-lg transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
           >
             Logout
           </button>
@@ -106,17 +107,17 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
       )}
 
       {/* Role & City Selector Widget */}
-      <div className="p-4 role-city-widget space-y-3">
+      <div className="p-3.5 role-city-widget space-y-2.5">
         {/* Role Selection */}
         <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
-            <Shield className="w-3 h-3 text-indigo-400" />
+          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-red-400" />
             Switch User Role
           </label>
           <select
             value={currentUserRole}
             onChange={(e) => setRole(e.target.value as UserRole)}
-            className="w-full text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer role-select-box transition-all"
+            className="w-full text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer role-select-box transition-all focus:border-red-500"
           >
             {roles.map((role) => (
               <option key={role} value={role} className="role-option-item">
@@ -128,9 +129,9 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
 
         {/* City Selection */}
         <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+          <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <MapPin className="w-3 h-3 text-emerald-400" />
+              <MapPin className="w-3 h-3 text-red-400" />
               City Context
             </span>
           </label>
@@ -142,7 +143,7 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
                 title={city}
                 className={`text-[10px] py-1.5 px-1 rounded-lg border transition-all text-center truncate ${
                   currentCity === city
-                    ? 'city-btn-active font-bold shadow-sm shadow-emerald-500/5'
+                    ? 'city-btn-active font-bold shadow-sm shadow-red-500/10'
                     : 'city-btn-inactive font-medium'
                 }`}
               >
@@ -153,7 +154,7 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
 
           {/* Add City Input for Super Admin */}
           {(currentUserRole === 'Super Admin' || currentUserRole === 'Operations Manager') && (
-            <div className="mt-2.5 pt-2.5 border-t border-slate-800/40">
+            <div className="mt-2 pt-2 border-t border-slate-800/40">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -171,11 +172,11 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
                   type="text"
                   name="newCityName"
                   placeholder="+ Add new city..."
-                  className="flex-1 bg-slate-950/60 border border-slate-800/80 rounded px-2 py-1 text-[10px] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/60"
+                  className="flex-1 bg-slate-950/60 border border-slate-800/80 rounded px-2 py-1 text-[10px] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500/60"
                 />
                 <button
                   type="submit"
-                  className="bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-500/30 text-indigo-300 text-[10px] font-medium px-2 py-1 rounded transition-colors"
+                  className="bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-300 text-[10px] font-medium px-2 py-1 rounded transition-colors"
                 >
                   Add
                 </button>
@@ -185,8 +186,8 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation Menu */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+      {/* Navigation Menu with Red/Black & White/Red Brand Styling */}
+      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -194,16 +195,16 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => setView(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? 'bg-indigo-500/15 text-indigo-300 border-l-2 border-indigo-500 font-medium pl-2.5'
-                  : 'text-slate-300 hover:bg-slate-800/30 hover:text-slate-100 pl-3'
+                  ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md shadow-red-900/30 font-bold border border-red-400/30'
+                  : 'text-slate-300 hover:bg-red-500/10 hover:text-red-400 font-medium'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
-              <span>{item.label}</span>
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+              <span className="truncate">{item.label}</span>
               {item.id === 'dashboard' && expectedVsActualAudit.fraudAlertCount > 0 && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-rose-500 pulse-glow-rose"></span>
+                <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
               )}
             </button>
           );
@@ -211,12 +212,12 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
       </nav>
 
       {/* Footer System Status */}
-      <div className="p-4 border-t border-slate-800/60 bg-slate-950/40 space-y-2">
-        <div className="flex items-center justify-between text-xs text-slate-400">
+      <div className="p-3.5 border-t border-slate-800/60 bg-slate-950/40 space-y-1.5">
+        <div className="flex items-center justify-between text-[11px] text-slate-400">
           <span>Database Integrity:</span>
           {expectedVsActualAudit.fraudAlertCount > 0 ? (
-            <span className="text-rose-400 font-semibold flex items-center gap-1">
-              <AlertOctagon className="w-3.5 h-3.5 animate-bounce" /> Compromised
+            <span className="text-red-400 font-semibold flex items-center gap-1">
+              <AlertOctagon className="w-3.5 h-3.5 animate-bounce" /> Flagged
             </span>
           ) : (
             <span className="text-emerald-400 font-semibold flex items-center gap-1">
@@ -225,7 +226,7 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
           )}
         </div>
         {expectedVsActualAudit.fraudAlertCount > 0 && (
-          <div className="text-[10px] text-rose-300/80 bg-rose-500/10 border border-rose-500/20 rounded p-1.5 font-mono text-center">
+          <div className="text-[10px] text-red-300 bg-red-500/10 border border-red-500/20 rounded p-1 font-mono text-center">
             {expectedVsActualAudit.fraudAlertCount} Fraud Alert{expectedVsActualAudit.fraudAlertCount > 1 ? 's' : ''} Active
           </div>
         )}

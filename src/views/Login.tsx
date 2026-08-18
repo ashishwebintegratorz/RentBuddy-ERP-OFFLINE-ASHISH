@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
+import rentBuddyLogo from '../assets/rentbuddy1.png';
 import { Lock, User, Eye, EyeOff, ShieldCheck, KeyRound, Fingerprint } from 'lucide-react';
 
 export default function Login() {
@@ -26,8 +27,8 @@ export default function Login() {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
           gain.gain.setValueAtTime(0.08, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
           osc.connect(gain);
@@ -40,44 +41,44 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-[#0b0f19] relative overflow-hidden font-sans select-none antialiased p-4">
-      {/* Background glowing gradient spheres */}
-      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="min-h-screen w-screen flex items-center justify-center bg-[#07090e] relative overflow-hidden font-sans select-none antialiased p-4">
+      {/* Background glowing gradient spheres with brand red */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-red-600/10 rounded-full blur-[140px] pointer-events-none"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-rose-600/10 rounded-full blur-[140px] pointer-events-none"></div>
 
-      <div className="w-full max-w-[440px] bg-[#161c24]/90 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_40px_rgba(0,171,85,0.05)] relative z-10 transition-all">
+      <div className="w-full max-w-[440px] bg-[#11151f]/95 backdrop-blur-xl border border-slate-800/90 rounded-3xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_40px_rgba(225,29,72,0.08)] relative z-10 transition-all">
         
         {/* Header Logo */}
         <div className="flex flex-col items-center text-center space-y-3 mb-8">
-          <div className="w-14 h-14 bg-gradient-to-tr from-[#005249] to-[#00ab55] rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-950/40 relative">
-            <Lock className="w-6 h-6 text-emerald-300" />
-            <div className="absolute -top-1 -right-1 bg-emerald-400 w-3 h-3 rounded-full border-2 border-[#161c24] animate-ping"></div>
-            <div className="absolute -top-1 -right-1 bg-emerald-400 w-3 h-3 rounded-full border-2 border-[#161c24]"></div>
+          <div className="w-16 h-16 bg-white/95 rounded-2xl p-2 flex items-center justify-center shadow-xl shadow-red-950/50 border border-red-500/30 relative">
+            <img src={rentBuddyLogo} alt="RentBuddy Logo" className="w-full h-full object-contain" />
+            <div className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full border-2 border-[#11151f] animate-ping"></div>
+            <div className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full border-2 border-[#11151f]"></div>
           </div>
           <div>
             <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center justify-center gap-1.5">
-              RentBuddy <span className="text-[#00ab55] font-mono text-xs px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/25 rounded-md font-bold uppercase tracking-wider">ERP v2</span>
+              RentBuddy <span className="text-white font-mono text-xs px-2 py-0.5 bg-red-600 border border-red-500 rounded-md font-bold uppercase tracking-wider">ERP v2</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-1 font-medium">
-              Enterprise Rental Logistics & Asset Analytics Portal
+              Enterprise Rental Logistics & Fleet Management Portal
             </p>
           </div>
         </div>
 
         {/* Security Warning banner */}
-        <div className="mb-6 bg-slate-900/50 border border-slate-800 rounded-xl p-3.5 flex gap-3 items-start">
-          <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+        <div className="mb-6 bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 flex gap-3 items-start">
+          <ShieldCheck className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <h4 className="text-[11px] font-bold text-slate-200">High-Security Environment</h4>
             <p className="text-[10px] text-slate-400 leading-normal font-medium">
-              Rate-limited endpoints with bcrypt hash validations protect this console against brute-force attacks.
+              Secured with bcrypt verification and rate-limited offline & cloud sync engines.
             </p>
           </div>
         </div>
 
         {/* Error Notification banner */}
         {loginError && (
-          <div className="mb-6 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl p-3 text-[11px] font-semibold text-center leading-normal animate-shake">
+          <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 text-[11px] font-semibold text-center leading-normal">
             ⚠️ {loginError}
           </div>
         )}
@@ -87,7 +88,7 @@ export default function Login() {
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Username</label>
             <div className="relative group">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 group-focus-within:text-red-400 transition-colors">
                 <User className="w-4.5 h-4.5" />
               </span>
               <input
@@ -96,7 +97,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter admin username"
-                className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 focus:border-[#00ab55] rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[#00ab55]/30 transition-all font-sans"
+                className="w-full pl-10 pr-4 py-3 bg-slate-950/70 border border-slate-800 hover:border-slate-700/80 focus:border-red-500 rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-red-500/30 transition-all font-sans"
               />
             </div>
           </div>
@@ -105,10 +106,10 @@ export default function Login() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Password</label>
-              <a href="#" className="text-[10px] font-bold text-indigo-400 hover:underline">Forgot?</a>
+              <a href="#" className="text-[10px] font-bold text-red-400 hover:underline">Forgot?</a>
             </div>
             <div className="relative group">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 group-focus-within:text-red-400 transition-colors">
                 <KeyRound className="w-4.5 h-4.5" />
               </span>
               <input
@@ -117,7 +118,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full pl-10 pr-10 py-3 bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 focus:border-[#00ab55] rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[#00ab55]/30 transition-all font-mono"
+                className="w-full pl-10 pr-10 py-3 bg-slate-950/70 border border-slate-800 hover:border-slate-700/80 focus:border-red-500 rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-red-500/30 transition-all font-mono"
               />
               <button
                 type="button"
@@ -132,7 +133,7 @@ export default function Login() {
           {/* Remember Me */}
           <div className="flex items-center justify-between pt-1">
             <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-[11px] font-semibold">
-              <input type="checkbox" defaultChecked className="rounded border-slate-800 text-[#00ab55] focus:ring-0 focus:ring-offset-0 bg-slate-950 w-4 h-4 cursor-pointer" />
+              <input type="checkbox" defaultChecked className="rounded border-slate-800 text-red-600 focus:ring-0 focus:ring-offset-0 bg-slate-950 w-4 h-4 cursor-pointer" />
               Remember device
             </label>
             <span className="text-[10px] text-slate-400 font-medium">Session logs: 24h</span>
@@ -142,7 +143,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#00ab55] hover:bg-[#008f44] text-white text-xs font-bold py-3.5 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-950/20 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-extrabold py-3.5 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-red-950/40 cursor-pointer flex items-center justify-center gap-2 border border-red-500/30"
           >
             {loading ? (
               <div className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin"></div>
@@ -153,14 +154,14 @@ export default function Login() {
         </form>
 
         {/* Demo Credentials Tip box */}
-        <div className="mt-6 border border-dashed border-emerald-500/20 bg-emerald-500/5 rounded-xl p-3.5 text-center space-y-1">
+        <div className="mt-6 border border-dashed border-red-500/30 bg-red-500/5 rounded-xl p-3.5 text-center space-y-1">
           <p className="text-[10px] text-slate-400 font-medium">Default Administrator Credentials:</p>
-          <div className="text-[11px] font-bold text-emerald-400 font-mono select-all">
+          <div className="text-[11px] font-bold text-red-400 font-mono select-all">
             Username: admin <span className="text-slate-500 font-sans mx-1">|</span> Password: RentbuddySecure2026!
           </div>
         </div>
 
-        {/* Mock OAuth Providers */}
+        {/* Biometric / SSO */}
         <div className="mt-6 pt-6 border-t border-slate-800/80 flex flex-col items-center space-y-3">
           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Or access with</span>
           <div className="grid grid-cols-2 gap-3.5 w-full">
@@ -180,7 +181,7 @@ export default function Login() {
               type="button"
               className="bg-slate-900/60 hover:bg-slate-900 text-slate-300 text-[10px] font-bold py-2.5 px-4 rounded-xl border border-slate-800 flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:scale-[1.01]"
             >
-              <Fingerprint className="w-3.5 h-3.5 text-[#00ab55]" /> Biometric
+              <Fingerprint className="w-3.5 h-3.5 text-red-500" /> Biometric
             </button>
           </div>
         </div>

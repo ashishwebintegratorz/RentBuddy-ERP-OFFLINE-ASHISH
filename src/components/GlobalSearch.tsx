@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
-import { Search, X, Users, Box, CreditCard, ShieldAlert, ArrowRight } from 'lucide-react';
+import { Search, X, Users, Box, CreditCard, ShieldAlert } from 'lucide-react';
 
 interface GlobalSearchProps {
   isOpen: boolean;
@@ -9,7 +9,7 @@ interface GlobalSearchProps {
 }
 
 export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSearchProps) {
-  const { customers, inventory, invoices, orders, repairs } = useRentBuddyStore();
+  const { customers, inventory, invoices, orders } = useRentBuddyStore();
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -72,7 +72,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
       <div className="w-[600px] glass-panel border border-slate-800/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[500px]">
         {/* Search header input */}
         <div className="p-4 border-b border-slate-800/80 flex items-center gap-3">
-          <Search className="w-5 h-5 text-indigo-400" />
+          <Search className="w-5 h-5 text-red-500" />
           <input
             ref={inputRef}
             type="text"
@@ -83,7 +83,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
           />
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-900/50"
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-900/50 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -105,7 +105,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
               {/* Category: Customers */}
               {results.customers.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider flex items-center gap-1.5">
+                  <div className="text-[10px] uppercase font-bold text-red-400 tracking-wider flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5" />
                     Customers ({results.customers.length})
                   </div>
@@ -117,10 +117,10 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
                           onNavigate('customers', c.id);
                           onClose();
                         }}
-                        className="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/10 hover:bg-slate-800/40 hover:border-slate-700/80 transition-all flex items-center justify-between text-slate-300 text-xs cursor-pointer group"
+                        className="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/10 hover:bg-red-950/20 hover:border-red-500/30 transition-all flex items-center justify-between text-slate-300 text-xs cursor-pointer group"
                       >
                         <div>
-                          <div className="font-semibold text-white group-hover:text-indigo-300 transition-colors">{c.fullName}</div>
+                          <div className="font-semibold text-white group-hover:text-red-400 transition-colors">{c.fullName}</div>
                           <div className="text-[10px] text-slate-500 font-mono mt-0.5">{c.id} | {c.mobileNumber} | {c.email}</div>
                         </div>
                         <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 uppercase tracking-wider font-semibold">
@@ -155,7 +155,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
                           </div>
                           <div className="text-[10px] text-slate-500 font-mono mt-0.5">ID: {a.id} | Barcode: {a.barcode} | Rack: {a.rackNumber}</div>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-400 uppercase tracking-wider font-semibold">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/15 text-red-400 uppercase tracking-wider font-semibold">
                           {a.status}
                         </span>
                       </button>
@@ -197,7 +197,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
               {/* Category: Invoices */}
               {results.invoices.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-[10px] uppercase font-bold text-rose-400 tracking-wider flex items-center gap-1.5">
+                  <div className="text-[10px] uppercase font-bold text-red-400 tracking-wider flex items-center gap-1.5">
                     <CreditCard className="w-3.5 h-3.5" />
                     Invoices ({results.invoices.length})
                   </div>
@@ -212,11 +212,11 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
                         className="w-full text-left p-2.5 rounded-xl border border-slate-800 bg-slate-900/10 hover:bg-slate-800/40 hover:border-slate-700/80 transition-all flex items-center justify-between text-slate-300 text-xs cursor-pointer group"
                       >
                         <div>
-                          <div className="font-semibold text-white group-hover:text-rose-300 transition-colors">Invoice {i.id}</div>
+                          <div className="font-semibold text-white group-hover:text-red-400 transition-colors">Invoice {i.id}</div>
                           <div className="text-[10px] text-slate-500 font-mono mt-0.5">Customer: {i.customerName} | Period: {i.billingPeriod} | Total: ₹{i.totalAmount}</div>
                         </div>
                         <span className={`text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-semibold ${
-                          i.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'
+                          i.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
                         }`}>
                           {i.status}
                         </span>
@@ -232,7 +232,7 @@ export default function GlobalSearch({ isOpen, onClose, onNavigate }: GlobalSear
         {/* Footer shortcuts */}
         <div className="p-3 bg-slate-950/60 border-t border-slate-800/80 text-[10px] text-slate-500 flex justify-between">
           <span>Use <strong>Enter</strong> to select, <strong>ESC</strong> to close.</span>
-          <span>RentBuddy Search Core v1.0</span>
+          <span>RentBuddy Search Core v2.0</span>
         </div>
       </div>
     </div>

@@ -147,7 +147,7 @@ export default function Quotations() {
       <div className="flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <FileText className="w-5.5 h-5.5 text-indigo-400" />
+            <FileText className="w-5.5 h-5.5 text-red-400" />
             Estimate & Quotation Portal
           </h1>
           <p className="text-xs text-slate-400 font-medium">
@@ -163,7 +163,7 @@ export default function Quotations() {
             
             {/* Header info */}
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded bg-indigo-500/10"><Plus className="w-4.5 h-4.5 text-indigo-400" /></div>
+              <div className="p-2 rounded bg-red-500/10"><Plus className="w-4.5 h-4.5 text-red-400" /></div>
               <div>
                 <h3 className="text-sm font-bold text-white">Create New Quotation</h3>
                 <p className="text-[10px] text-slate-400 font-medium">Configure customer lead details and rental terms</p>
@@ -243,7 +243,7 @@ export default function Quotations() {
 
             {/* Custom Product Creator Form */}
             <div className="p-3.5 bg-slate-950/40 rounded-xl border border-slate-900 space-y-3 pt-2">
-              <span className="font-bold text-indigo-400 block uppercase tracking-wider text-[9px]">Add Custom Item (Manual Add)</span>
+              <span className="font-bold text-red-400 block uppercase tracking-wider text-[9px]">Add Custom Item (Manual Add)</span>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
@@ -278,7 +278,7 @@ export default function Quotations() {
                 type="button"
                 onClick={handleAddCustomItem}
                 disabled={!customName}
-                className="w-full py-1 bg-indigo-600/25 hover:bg-indigo-600/45 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                className="w-full py-1 bg-red-600/25 hover:bg-red-600/45 border border-red-500/20 text-red-300 text-[10px] font-bold rounded-lg transition-all cursor-pointer disabled:opacity-40"
               >
                 + Add Custom Item
               </button>
@@ -296,10 +296,10 @@ export default function Quotations() {
                       key={asset.id}
                       type="button"
                       onClick={() => handleAddCatalogItem(asset)}
-                      className="text-left p-2 bg-slate-950 hover:bg-indigo-950/20 border border-slate-850 rounded-xl text-[10px] text-slate-300 flex justify-between items-center transition-colors cursor-pointer"
+                      className="text-left p-2 bg-slate-950 hover:bg-red-950/20 border border-slate-850 rounded-xl text-[10px] text-slate-300 flex justify-between items-center transition-colors cursor-pointer"
                     >
                       <span className="truncate flex-1 font-semibold">{asset.brand} {asset.category}</span>
-                      <span className="font-mono text-indigo-400 pl-1 text-[9px]">₹{asset.monthlyRentalPrice}</span>
+                      <span className="font-mono text-red-400 pl-1 text-[9px]">₹{asset.monthlyRentalPrice}</span>
                     </button>
                   ))}
                 </div>
@@ -319,7 +319,7 @@ export default function Quotations() {
                         </span>
                         <div className="flex items-center gap-2">
                           <span className={`text-[8px] px-1 py-0.5 rounded font-mono font-bold ${
-                            item.isCustom ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-850 text-slate-400'
+                            item.isCustom ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-slate-850 text-slate-400'
                           }`}>
                             {item.id}
                           </span>
@@ -370,7 +370,7 @@ export default function Quotations() {
                       setRentDiscount(0);
                       setRentDiscountType(rentDiscountType === 'flat' ? 'percent' : 'flat');
                     }}
-                    className="text-[9px] text-indigo-400 font-bold focus:outline-none cursor-pointer"
+                    className="text-[9px] text-red-400 font-bold focus:outline-none cursor-pointer"
                   >
                     Use {rentDiscountType === 'flat' ? '%' : '₹'}
                   </button>
@@ -396,7 +396,7 @@ export default function Quotations() {
                       setDepDiscount(0);
                       setDepDiscountType(depDiscountType === 'flat' ? 'percent' : 'flat');
                     }}
-                    className="text-[9px] text-indigo-400 font-bold focus:outline-none cursor-pointer"
+                    className="text-[9px] text-red-400 font-bold focus:outline-none cursor-pointer"
                   >
                     Use {depDiscountType === 'flat' ? '%' : '₹'}
                   </button>
@@ -439,7 +439,7 @@ export default function Quotations() {
                 <div className="flex gap-2">
                   <button
                     onClick={handlePrint}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                    className="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     Print / Save PDF
@@ -459,7 +459,7 @@ export default function Quotations() {
                 <div className="flex justify-between items-start border-b border-slate-800/80 pb-6 print:border-slate-300">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center print:from-indigo-600 print:to-purple-700">
+                      <div className="w-9 h-9 bg-gradient-to-tr from-red-500 to-purple-600 rounded-xl flex items-center justify-center print:from-red-600 print:to-purple-700">
                         <span className="font-extrabold text-white text-lg font-mono">R</span>
                       </div>
                       <div>
@@ -495,7 +495,7 @@ export default function Quotations() {
                   <div className="space-y-1 text-right">
                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">HUB SCOPE</span>
                     <div className="text-xs font-extrabold text-white print:text-slate-900">{generatedQuotation.customer.city}</div>
-                    <div className="text-[10px] text-slate-400 font-medium print:text-slate-600">⌛ Quotation Term: <span className="text-indigo-400 font-bold print:text-indigo-700">{generatedQuotation.duration} Months</span></div>
+                    <div className="text-[10px] text-slate-400 font-medium print:text-slate-600">⌛ Quotation Term: <span className="text-red-400 font-bold print:text-red-700">{generatedQuotation.duration} Months</span></div>
                   </div>
                 </div>
 
@@ -575,7 +575,7 @@ export default function Quotations() {
                         </span>
                       </div>
                     )}
-                    <div className="flex justify-between text-indigo-400 font-bold border-b border-slate-800 pb-1.5 print:text-indigo-700 print:border-slate-200">
+                    <div className="flex justify-between text-red-400 font-bold border-b border-slate-800 pb-1.5 print:text-red-700 print:border-slate-200">
                       <span>Net Monthly Rent Charges:</span>
                       <span>₹{generatedQuotation.netMonthlyRent}</span>
                     </div>

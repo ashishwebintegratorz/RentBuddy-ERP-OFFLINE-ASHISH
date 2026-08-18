@@ -17,6 +17,10 @@ import {
   AssetStatus,
   OrderStatus,
   InspectionResult,
+  LogisticsDriver,
+  DriverDocuments,
+  LogisticsDriverStatus,
+  DriverVehicleType,
 } from '../types';
 
 interface RentBuddyState {
@@ -36,6 +40,7 @@ interface RentBuddyState {
   auditLogs: AuditLog[];
   notifications: SystemNotification[];
   cities: CityName[];
+  drivers: LogisticsDriver[];
   
   // Authentication State
   token: string | null;
@@ -129,6 +134,15 @@ interface RentBuddyState {
   // Packages Actions
   addPackage: (pkg: Omit<RentalPackage, 'id'>) => void;
 
+  // Logistics Driver & KYC Actions
+  addDriver: (driver: Omit<LogisticsDriver, 'id' | 'createdAt'>) => void;
+  updateDriver: (id: string, updates: Partial<LogisticsDriver>) => void;
+  updateDriverStatus: (id: string, status: LogisticsDriverStatus, notes?: string) => void;
+  verifyDriverDocument: (id: string, docKey: keyof DriverDocuments, verified: boolean) => void;
+  verifyAllDriverDocuments: (id: string, status: VerificationStatus, notes?: string) => void;
+  toggleBlockDriver: (id: string, isBlocked: boolean, reason?: string) => void;
+  updateDriverDocuments: (id: string, documents: Partial<DriverDocuments>) => void;
+
   // Notification Actions
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
@@ -219,6 +233,7 @@ const syncToDatabase = (state: any) => {
         repairs: state.repairs,
         auditLogs: state.auditLogs,
         notifications: state.notifications,
+        drivers: state.drivers,
         cities: state.cities,
         currentCity: state.currentCity,
         currentUserRole: state.currentUserRole,
@@ -678,6 +693,222 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           }
         ];
 
+        // Logistics Drivers & KYC Documents
+        const mockDrivers: LogisticsDriver[] = [
+          {
+            id: 'DRV-8801',
+            fullName: 'Ramesh Verma',
+            phone: '9826012345',
+            alternatePhone: '9826099999',
+            email: 'ramesh.verma.logistics@gmail.com',
+            city: 'Indore (Head Office)',
+            vehicleType: 'Mini Truck / Tata Ace',
+            vehicleNumber: 'MP-09-AB-8840',
+            status: 'Active',
+            verificationStatus: 'Verified',
+            joiningDate: '2025-11-10',
+            totalDelivered: 48,
+            pendingDeliveries: 2,
+            deadlineOverdue: 0,
+            rating: 4.9,
+            currentLocation: 'Palasia, Indore Hub',
+            isBlocked: false,
+            verificationNotes: 'All transport and identity documents verified by Fleet Admin.',
+            createdAt: '2025-11-10T10:00:00.000Z',
+            documents: {
+              profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300',
+              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              licenseNumber: 'MP09-2018-0049210',
+              licenseExpiry: '2034-08-15',
+              licenseVerified: true,
+              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              aadhaarNumber: '7821 4452 9018',
+              aadhaarVerified: true,
+              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              panNumber: 'ABCVP4492K',
+              panVerified: true,
+              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              vehicleNumber: 'MP-09-AB-8840',
+              rcVerified: true,
+              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              insuranceExpiry: '2027-04-20',
+              insuranceVerified: true,
+              policeVerificationDoc: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              policeVerified: true,
+            }
+          },
+          {
+            id: 'DRV-8802',
+            fullName: 'Sunil Rathore',
+            phone: '9755123456',
+            alternatePhone: '9755998877',
+            email: 'sunil.rathore.deliveries@gmail.com',
+            city: 'Indore (Head Office)',
+            vehicleType: 'Pickup 3-Wheeler',
+            vehicleNumber: 'MP-09-GF-4512',
+            status: 'Active',
+            verificationStatus: 'Verified',
+            joiningDate: '2026-01-15',
+            totalDelivered: 34,
+            pendingDeliveries: 1,
+            deadlineOverdue: 0,
+            rating: 4.8,
+            currentLocation: 'Vijay Nagar, Indore',
+            isBlocked: false,
+            verificationNotes: 'Approved for 3-Wheeler Intra-City Logistics.',
+            createdAt: '2026-01-15T09:30:00.000Z',
+            documents: {
+              profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300',
+              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              licenseNumber: 'MP09-2020-0081293',
+              licenseExpiry: '2036-12-01',
+              licenseVerified: true,
+              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              aadhaarNumber: '4412 8890 3215',
+              aadhaarVerified: true,
+              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              panNumber: 'DFGPR9912M',
+              panVerified: true,
+              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              vehicleNumber: 'MP-09-GF-4512',
+              rcVerified: true,
+              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              insuranceExpiry: '2026-11-30',
+              insuranceVerified: true,
+            }
+          },
+          {
+            id: 'DRV-8803',
+            fullName: 'Deepak Sharma',
+            phone: '9425098765',
+            email: 'deepak.bhopal.driver@yahoo.com',
+            city: 'Bhopal',
+            vehicleType: 'Large Van',
+            vehicleNumber: 'MP-04-CZ-7890',
+            status: 'Pending Verification',
+            verificationStatus: 'Pending',
+            joiningDate: '2026-08-14',
+            totalDelivered: 0,
+            pendingDeliveries: 0,
+            deadlineOverdue: 0,
+            rating: 5.0,
+            currentLocation: 'MP Nagar, Bhopal Depot',
+            isBlocked: false,
+            verificationNotes: 'Newly registered. Awaiting Aadhaar back side re-upload.',
+            createdAt: '2026-08-14T11:20:00.000Z',
+            documents: {
+              profilePhoto: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=300',
+              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              licenseNumber: 'MP04-2022-0099412',
+              licenseExpiry: '2038-03-10',
+              licenseVerified: true,
+              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              aadhaarNumber: '9901 2234 5567',
+              aadhaarVerified: false,
+              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              panNumber: 'JKLPS7781N',
+              panVerified: true,
+              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              vehicleNumber: 'MP-04-CZ-7890',
+              rcVerified: true,
+              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              insuranceExpiry: '2027-01-15',
+              insuranceVerified: true,
+            }
+          },
+          {
+            id: 'DRV-8804',
+            fullName: 'Imran Khan',
+            phone: '9893456789',
+            email: 'imran.khan.surat@gmail.com',
+            city: 'Surat',
+            vehicleType: 'Bike / 2-Wheeler',
+            vehicleNumber: 'GJ-05-XY-1204',
+            status: 'Blocked',
+            verificationStatus: 'Rejected',
+            joiningDate: '2025-12-01',
+            totalDelivered: 12,
+            pendingDeliveries: 0,
+            deadlineOverdue: 3,
+            rating: 3.2,
+            currentLocation: 'Ring Road, Surat',
+            isBlocked: true,
+            blockedReason: 'Failed return pickups repeatedly & Driving License expired.',
+            verificationNotes: 'Blocked due to policy violations and invalid DL.',
+            createdAt: '2025-12-01T08:00:00.000Z',
+            documents: {
+              profilePhoto: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300',
+              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              licenseNumber: 'GJ05-2015-0012894',
+              licenseExpiry: '2025-05-10',
+              licenseVerified: false,
+              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              aadhaarNumber: '3310 9981 4423',
+              aadhaarVerified: true,
+              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              panNumber: 'IKLMN1122Q',
+              panVerified: true,
+              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              vehicleNumber: 'GJ-05-XY-1204',
+              rcVerified: true,
+              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              insuranceExpiry: '2025-08-01',
+              insuranceVerified: false,
+            }
+          },
+          {
+            id: 'DRV-8805',
+            fullName: 'Ajay Parmar',
+            phone: '9724123890',
+            email: 'ajay.parmar.ahmedabad@gmail.com',
+            city: 'Ahmedabad',
+            vehicleType: 'E-Loader / Electric Trike',
+            vehicleNumber: 'GJ-01-EE-9081',
+            status: 'Active',
+            verificationStatus: 'Verified',
+            joiningDate: '2026-02-01',
+            totalDelivered: 62,
+            pendingDeliveries: 3,
+            deadlineOverdue: 0,
+            rating: 4.95,
+            currentLocation: 'SG Highway, Ahmedabad',
+            isBlocked: false,
+            verificationNotes: 'EV Fleet Partner. All Green Logistics clearances approved.',
+            createdAt: '2026-02-01T10:15:00.000Z',
+            documents: {
+              profilePhoto: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300',
+              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              licenseNumber: 'GJ01-2019-0099124',
+              licenseExpiry: '2035-09-20',
+              licenseVerified: true,
+              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+              aadhaarNumber: '8876 1123 4490',
+              aadhaarVerified: true,
+              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              panNumber: 'APQPR8821Z',
+              panVerified: true,
+              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              vehicleNumber: 'GJ-01-EE-9081',
+              rcVerified: true,
+              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
+              insuranceExpiry: '2027-06-18',
+              insuranceVerified: true,
+              policeVerificationDoc: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+              policeVerified: true,
+            }
+          }
+        ];
+
         return {
           currentUserRole: 'Super Admin' as UserRole,
           currentCity: 'Indore (Head Office)' as CityName,
@@ -695,6 +926,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           packages: initialPackages,
           auditLogs: mockAuditLogs,
           notifications: mockNotifications,
+          drivers: mockDrivers,
           fraudAlerts: [],
           expectedVsActualAudit: {
             expectedCount: mockAssets.length,
@@ -1470,6 +1702,242 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           set((state) => ({ packages: [...state.packages, newPkg] }));
         },
 
+        // Logistics Driver & KYC Actions
+        addDriver: (driverData) => {
+          const driverId = genId('DRV');
+          const newDriver: LogisticsDriver = {
+            ...driverData,
+            id: driverId,
+            status: driverData.status || 'Pending Verification',
+            verificationStatus: driverData.verificationStatus || 'Pending',
+            totalDelivered: 0,
+            pendingDeliveries: 0,
+            deadlineOverdue: 0,
+            rating: 5.0,
+            isBlocked: false,
+            createdAt: new Date().toISOString(),
+          };
+
+          set((state) => {
+            const audit: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `Fleet Admin (${state.currentUserRole})`,
+              city: newDriver.city,
+              action: 'Driver Onboarding',
+              category: 'COMPLIANCE',
+              severity: 'INFO',
+              details: `Onboarded new logistics driver ${newDriver.fullName} (${driverId}) with vehicle ${newDriver.vehicleNumber}.`,
+            };
+
+            const notif: SystemNotification = {
+              id: genId('NOT'),
+              title: 'Driver Onboarded',
+              message: `New driver ${newDriver.fullName} (${driverId}) registered for ${newDriver.city}. Verification pending.`,
+              type: 'info',
+              timestamp: new Date().toISOString(),
+              read: false,
+              city: newDriver.city,
+            };
+
+            return {
+              drivers: [newDriver, ...state.drivers],
+              auditLogs: [audit, ...state.auditLogs],
+              notifications: [notif, ...state.notifications],
+            };
+          });
+        },
+
+        updateDriver: (id, updates) => {
+          set((state) => ({
+            drivers: state.drivers.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+          }));
+        },
+
+        updateDriverStatus: (id, status, notes) => {
+          set((state) => {
+            const target = state.drivers.find((d) => d.id === id);
+            if (!target) return {};
+
+            const audit: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `Fleet Admin (${state.currentUserRole})`,
+              city: target.city,
+              action: 'Driver Status Updated',
+              category: 'COMPLIANCE',
+              severity: status === 'Blocked' ? 'WARNING' : 'INFO',
+              details: `Driver ${target.fullName} (${id}) status changed to "${status}". Notes: ${notes || 'N/A'}`,
+            };
+
+            return {
+              drivers: state.drivers.map((d) =>
+                d.id === id
+                  ? {
+                      ...d,
+                      status,
+                      verificationNotes: notes !== undefined ? notes : d.verificationNotes,
+                      isBlocked: status === 'Blocked' || status === 'Suspended',
+                    }
+                  : d
+              ),
+              auditLogs: [audit, ...state.auditLogs],
+            };
+          });
+        },
+
+        verifyDriverDocument: (id, docKey, verified) => {
+          set((state) => {
+            return {
+              drivers: state.drivers.map((d) => {
+                if (d.id !== id) return d;
+                const docs = { ...d.documents, [docKey]: verified };
+                const allVerified = docs.licenseVerified && docs.aadhaarVerified && docs.panVerified && docs.rcVerified && docs.insuranceVerified;
+                return {
+                  ...d,
+                  documents: docs,
+                  verificationStatus: allVerified ? 'Verified' : 'Pending',
+                  status: allVerified ? 'Active' : d.status,
+                };
+              }),
+            };
+          });
+        },
+
+        verifyAllDriverDocuments: (id, status, notes) => {
+          set((state) => {
+            const target = state.drivers.find((d) => d.id === id);
+            if (!target) return {};
+
+            const isVerified = status === 'Verified';
+            const audit: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `Fleet KYC Team (${state.currentUserRole})`,
+              city: target.city,
+              action: isVerified ? 'Driver KYC Approved' : 'Driver KYC Rejected',
+              category: 'COMPLIANCE',
+              severity: isVerified ? 'INFO' : 'WARNING',
+              details: `KYC verification for driver ${target.fullName} (${id}) marked as "${status}". Notes: ${notes || 'N/A'}`,
+            };
+
+            const notif: SystemNotification = {
+              id: genId('NOT'),
+              title: isVerified ? 'Driver Verified' : 'Driver KYC Flagged',
+              message: `Driver ${target.fullName} (${id}) KYC documents marked as ${status}.`,
+              type: isVerified ? 'success' : 'error',
+              timestamp: new Date().toISOString(),
+              read: false,
+              city: target.city,
+            };
+
+            return {
+              drivers: state.drivers.map((d) => {
+                if (d.id !== id) return d;
+                return {
+                  ...d,
+                  verificationStatus: status,
+                  status: isVerified ? 'Active' : status === 'Rejected' ? 'Suspended' : d.status,
+                  verificationNotes: notes || d.verificationNotes,
+                  documents: {
+                    ...d.documents,
+                    licenseVerified: isVerified,
+                    aadhaarVerified: isVerified,
+                    panVerified: isVerified,
+                    rcVerified: isVerified,
+                    insuranceVerified: isVerified,
+                    policeVerified: isVerified,
+                  },
+                };
+              }),
+              auditLogs: [audit, ...state.auditLogs],
+              notifications: [notif, ...state.notifications],
+            };
+          });
+        },
+
+        toggleBlockDriver: (id, isBlocked, reason) => {
+          set((state) => {
+            const target = state.drivers.find((d) => d.id === id);
+            if (!target) return {};
+
+            const audit: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `Super Admin (${state.currentUserRole})`,
+              city: target.city,
+              action: isBlocked ? 'Driver Blocked' : 'Driver Unblocked',
+              category: 'COMPLIANCE',
+              severity: isBlocked ? 'CRITICAL' : 'INFO',
+              details: isBlocked
+                ? `Driver ${target.fullName} (${id}) was BLOCKED from accepting deliveries. Reason: ${reason || 'Administrative restriction'}`
+                : `Driver ${target.fullName} (${id}) was UNBLOCKED and restored to active fleet status.`,
+            };
+
+            const notif: SystemNotification = {
+              id: genId('NOT'),
+              title: isBlocked ? 'Driver Suspended / Blocked' : 'Driver Restored',
+              message: isBlocked
+                ? `Driver ${target.fullName} (${id}) has been BLOCKED: ${reason || 'Policy breach'}`
+                : `Driver ${target.fullName} (${id}) unblocked successfully.`,
+              type: isBlocked ? 'error' : 'success',
+              timestamp: new Date().toISOString(),
+              read: false,
+              city: target.city,
+            };
+
+            return {
+              drivers: state.drivers.map((d) =>
+                d.id === id
+                  ? {
+                      ...d,
+                      isBlocked,
+                      blockedReason: isBlocked ? reason || 'Administrative decision' : '',
+                      status: isBlocked ? 'Blocked' : 'Active',
+                    }
+                  : d
+              ),
+              auditLogs: [audit, ...state.auditLogs],
+              notifications: [notif, ...state.notifications],
+            };
+          });
+        },
+
+        updateDriverDocuments: (id, updatedDocs) => {
+          set((state) => {
+            const target = state.drivers.find((d) => d.id === id);
+            if (!target) return {};
+
+            const audit: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `Fleet Admin (${state.currentUserRole})`,
+              city: target.city,
+              action: 'Driver Documents Updated',
+              category: 'COMPLIANCE',
+              severity: 'INFO',
+              details: `Updated document records and KYC files for driver ${target.fullName} (${id}).`,
+            };
+
+            return {
+              drivers: state.drivers.map((d) =>
+                d.id === id
+                  ? {
+                      ...d,
+                      documents: { ...d.documents, ...updatedDocs },
+                    }
+                  : d
+              ),
+              auditLogs: [audit, ...state.auditLogs],
+            };
+          });
+        },
+
         markNotificationRead: (id) => {
           set((state) => ({
             notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
@@ -1751,6 +2219,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                     repairs: localState.repairs,
                     auditLogs: localState.auditLogs,
                     notifications: localState.notifications,
+                    drivers: localState.drivers,
                     cities: localState.cities,
                     currentCity: localState.currentCity,
                     currentUserRole: localState.currentUserRole,
@@ -1769,6 +2238,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 repairs: db.repairs,
                 auditLogs: db.auditLogs,
                 notifications: db.notifications,
+                drivers: db.drivers && db.drivers.length > 0 ? db.drivers : get().drivers,
                 cities: db.cities || get().cities,
                 currentCity: db.currentCity || get().currentCity,
                 currentUserRole: db.currentUserRole || get().currentUserRole,

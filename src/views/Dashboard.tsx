@@ -102,7 +102,7 @@ export default function Dashboard({ setView }: DashboardProps) {
         <div>
           <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
             RentBuddy Real-Time Monitor
-            <span className="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono font-medium">
+            <span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-mono font-medium">
               V1.2.0
             </span>
           </h2>
@@ -190,10 +190,10 @@ export default function Dashboard({ setView }: DashboardProps) {
         {/* Right Feature Slide Card */}
         <div className="bg-[#161c24] rounded-3xl p-6 relative overflow-hidden flex flex-col justify-end min-h-[220px] text-white shadow-xl border border-slate-800">
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent z-10"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-slate-950 to-slate-950 z-0"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-500/20 via-slate-950 to-slate-950 z-0"></div>
 
           <div className="z-20 space-y-2">
-            <span className="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+            <span className="text-[9px] bg-red-500/20 text-red-300 border border-red-500/25 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
               FEATURED UTILITY
             </span>
             <h3 className="text-base font-extrabold tracking-tight">
@@ -205,7 +205,7 @@ export default function Dashboard({ setView }: DashboardProps) {
             <div className="pt-2">
               <button
                 onClick={() => setView('barcode')}
-                className="text-[10px] text-indigo-400 font-bold hover:underline cursor-pointer flex items-center gap-1 bg-transparent border-none p-0 text-left z-20 relative"
+                className="text-[10px] text-red-400 font-bold hover:underline cursor-pointer flex items-center gap-1 bg-transparent border-none p-0 text-left z-20 relative"
               >
                 Go to Scanning Portal &rarr;
               </button>
@@ -218,11 +218,11 @@ export default function Dashboard({ setView }: DashboardProps) {
         {/* Row 1 */}
         <div
           onClick={() => setView('customers')}
-          className="glass-card card-indigo p-4 rounded-2xl flex flex-col justify-between min-h-[100px] cursor-pointer hover:scale-[1.02] transition-all"
+          className="glass-card card-red p-4 rounded-2xl flex flex-col justify-between min-h-[100px] cursor-pointer hover:scale-[1.02] transition-all"
         >
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold uppercase tracking-wider">Total Customers</span>
-            <div className="p-1 rounded bg-indigo-500/10"><Users className="w-4 h-4 text-indigo-400" /></div>
+            <div className="p-1 rounded bg-red-500/10"><Users className="w-4 h-4 text-red-400" /></div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-white font-mono tracking-tight">{totalCustomers}</span>
@@ -262,15 +262,15 @@ export default function Dashboard({ setView }: DashboardProps) {
 
         <div
           onClick={() => setView('orders')}
-          className="glass-card card-indigo p-4 rounded-2xl flex flex-col justify-between min-h-[100px] cursor-pointer hover:scale-[1.02] transition-all"
+          className="glass-card card-red p-4 rounded-2xl flex flex-col justify-between min-h-[100px] cursor-pointer hover:scale-[1.02] transition-all"
         >
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold uppercase tracking-wider">Assets Rented ({currentCity})</span>
-            <div className="p-1 rounded bg-indigo-500/10"><TrendingUp className="w-4 h-4 text-indigo-400" /></div>
+            <div className="p-1 rounded bg-red-500/10"><TrendingUp className="w-4 h-4 text-red-400" /></div>
           </div>
           <div className="mt-2 flex items-baseline justify-between w-full">
             <span className="text-3xl font-extrabold text-white font-mono tracking-tight">{assetsRented}</span>
-            <span className="text-xs bg-indigo-500/15 text-indigo-400 px-2 py-0.5 rounded-lg font-bold font-mono border border-indigo-500/20">
+            <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded-lg font-bold font-mono border border-red-500/20">
               {totalAssets > 0 ? Math.round((assetsRented / totalAssets) * 100) : 0}% Util
             </span>
           </div>
@@ -395,11 +395,11 @@ export default function Dashboard({ setView }: DashboardProps) {
         {/* Row 4 */}
         <div
           onClick={() => setView('finance')}
-          className="glass-card card-indigo p-4 rounded-2xl flex flex-col justify-between min-h-[100px] cursor-pointer hover:scale-[1.02] transition-all"
+          className="glass-card card-red p-4 rounded-2xl flex flex-col justify-between min-h-[100px] cursor-pointer hover:scale-[1.02] transition-all"
         >
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold uppercase tracking-wider">Security Deposits Held</span>
-            <div className="p-1 rounded bg-indigo-500/10"><Briefcase className="w-4 h-4 text-indigo-400" /></div>
+            <div className="p-1 rounded bg-red-500/10"><Briefcase className="w-4 h-4 text-red-400" /></div>
           </div>
           <div className="mt-2 flex items-baseline gap-1">
             <span className="text-xs text-slate-400 font-bold font-mono">₹</span>
@@ -505,7 +505,7 @@ export default function Dashboard({ setView }: DashboardProps) {
               {/* May */}
               <rect x="65" y="10" width="8" height="40" rx="2" fill="rgba(168, 85, 247, 0.7)" />
               {/* Jun */}
-              <rect x="80" y="5" width="8" height="45" rx="2" fill="rgba(168, 85, 247, 0.9)" className="glow-border-indigo" />
+              <rect x="80" y="5" width="8" height="45" rx="2" fill="rgba(168, 85, 247, 0.9)" className="glow-border-red" />
             </svg>
             <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[9px] text-slate-500 font-mono">
               <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
@@ -530,14 +530,14 @@ export default function Dashboard({ setView }: DashboardProps) {
                 cy="18"
                 r="15.915"
                 fill="none"
-                stroke="url(#indigoGrad)"
+                stroke="url(#redGrad)"
                 strokeDasharray={`${totalAssets > 0 ? Math.round((assetsRented / totalAssets) * 100) : 0}, 100`}
                 strokeWidth="3.2"
                 strokeLinecap="round"
                 className="transition-all duration-1000"
               />
               <defs>
-                <linearGradient id="indigoGrad" x1="0" y1="0" x2="1" y2="1">
+                <linearGradient id="redGrad" x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0%" stopColor="#818cf8" />
                   <stop offset="100%" stopColor="#ec4899" />
                 </linearGradient>
@@ -592,7 +592,7 @@ export default function Dashboard({ setView }: DashboardProps) {
                 <span className="font-mono">42 Rents</span>
               </div>
               <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 w-[85%] rounded-full"></div>
+                <div className="h-full bg-red-500 w-[85%] rounded-full"></div>
               </div>
             </div>
             <div className="space-y-1">
@@ -601,7 +601,7 @@ export default function Dashboard({ setView }: DashboardProps) {
                 <span className="font-mono">29 Rents</span>
               </div>
               <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 w-[62%] rounded-full"></div>
+                <div className="h-full bg-red-500 w-[62%] rounded-full"></div>
               </div>
             </div>
             <div className="space-y-1">
@@ -635,7 +635,7 @@ export default function Dashboard({ setView }: DashboardProps) {
               <circle cx="16" cy="16" r="12" fill="none" stroke="#a855f7" strokeWidth="5" strokeDasharray="10, 100" strokeDashoffset="-90" />
             </svg>
             <div className="absolute bottom-1.5 left-1 right-1 flex justify-between text-[8px] font-semibold">
-              <span className="text-indigo-400 font-mono">IND HO 55%</span>
+              <span className="text-red-400 font-mono">IND HO 55%</span>
               <span className="text-emerald-400 font-mono">BHO 20%</span>
               <span className="text-amber-400 font-mono">SUR 15%</span>
               <span className="text-purple-400 font-mono">AHM 10%</span>
@@ -698,7 +698,7 @@ export default function Dashboard({ setView }: DashboardProps) {
               <button
                 onClick={() => setSelectedAuditTab('kpis')}
                 className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer ${
-                  selectedAuditTab === 'kpis' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+                  selectedAuditTab === 'kpis' ? 'text-red-400 border-red-500' : 'text-slate-500 border-transparent hover:text-slate-300'
                 }`}
               >
                 expected vs Actual Audit
@@ -821,13 +821,13 @@ export default function Dashboard({ setView }: DashboardProps) {
         {/* Right Column: AI Insights Engine */}
         <div className="glass-panel p-5 rounded-2xl space-y-4 relative overflow-hidden border border-slate-850">
           {/* Subtle neon indicator for AI */}
-          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl pointer-events-none"></div>
 
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
               <Cpu className="w-4 h-4" /> RentBuddy AI Insights
             </h3>
-            <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-semibold">
+            <span className="text-[9px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-mono font-semibold">
               Future Ready
             </span>
           </div>
@@ -842,14 +842,14 @@ export default function Dashboard({ setView }: DashboardProps) {
               <p className="text-[11px] text-slate-300 leading-normal">
                 Critical shortage of <strong>Wardrobes</strong> predicted in <strong>Bhopal Warehouse A</strong> by next weekend due to seasonal demand shift.
               </p>
-              <div className="text-[10px] text-indigo-400 flex items-center gap-1 cursor-pointer hover:underline font-semibold pt-1">
+              <div className="text-[10px] text-red-400 flex items-center gap-1 cursor-pointer hover:underline font-semibold pt-1">
                 Recommend Transfer <ArrowRight className="w-3 h-3" />
               </div>
             </div>
 
             {/* Insight 2: Warehouse Transfer recommendation */}
-            <div className="p-3 rounded-xl bg-indigo-900/10 border border-indigo-500/20 hover:border-indigo-500/40 transition-all space-y-1.5">
-              <div className="flex justify-between items-center text-[10px] font-bold text-indigo-400">
+            <div className="p-3 rounded-xl bg-red-900/10 border border-red-500/20 hover:border-red-500/40 transition-all space-y-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold text-red-400">
                 <span>💡 REDISTRIBUTION OPTIMIZER</span>
                 <span className="text-emerald-400">Save ₹15,000</span>
               </div>

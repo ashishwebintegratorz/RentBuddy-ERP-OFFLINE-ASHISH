@@ -41,6 +41,8 @@ const UserSchema = new mongoose.Schema({
   city: { type: String, required: true }
 });
 
+const DriverSchema = new mongoose.Schema({ id: String, fullName: String, phone: String, alternatePhone: String, email: String, city: String, vehicleType: String, vehicleNumber: String, status: String, verificationStatus: String, joiningDate: String, totalDelivered: Number, pendingDeliveries: Number, deadlineOverdue: Number, rating: Number, documents: Object, isBlocked: Boolean, blockedReason: String, verificationNotes: String, createdAt: String }, { strict: false });
+
 // Mongoose Models
 const Asset = mongoose.model('Asset', AssetSchema);
 const Customer = mongoose.model('Customer', CustomerSchema);
@@ -51,6 +53,7 @@ const Log = mongoose.model('Log', LogSchema);
 const Notif = mongoose.model('Notif', NotifSchema);
 const Config = mongoose.model('Config', ConfigSchema);
 const User = mongoose.model('User', UserSchema);
+const Driver = mongoose.model('Driver', DriverSchema);
 
 // Connection logic with credentials failover
 async function connectDB() {
@@ -210,6 +213,7 @@ app.get('/api/load', authenticateToken, async (req, res) => {
     const repairs = await Repair.find({});
     const logs = await Log.find({});
     const notifications = await Notif.find({});
+    const drivers = await Driver.find({});
     
     // Config values
     const citiesConfig = await Config.findOne({ key: 'cities' });
@@ -227,6 +231,7 @@ app.get('/api/load', authenticateToken, async (req, res) => {
         repairs: repairs || [],
         auditLogs: logs || [],
         notifications: notifications || [],
+        drivers: drivers || [],
         cities: citiesConfig ? citiesConfig.value : null,
         currentCity: currentCityConfig ? currentCityConfig.value : null,
         currentUserRole: currentUserRoleConfig ? currentUserRoleConfig.value : null,
@@ -251,6 +256,7 @@ app.post('/api/sync', authenticateToken, async (req, res) => {
       repairs,
       auditLogs,
       notifications,
+      drivers,
       cities,
       currentCity,
       currentUserRole,
@@ -286,6 +292,10 @@ app.post('/api/sync', authenticateToken, async (req, res) => {
       await Notif.deleteMany({});
       if (notifications.length > 0) await Notif.insertMany(notifications);
     }
+    if (drivers) {
+      await Driver.deleteMany({});
+      if (drivers.length > 0) await Driver.insertMany(drivers);
+    }
 
     // Update config keys
     if (cities) {
@@ -302,6 +312,101 @@ app.post('/api/sync', authenticateToken, async (req, res) => {
     }
 
     res.json({ success: true, message: 'Database state synchronized successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ==========================================
+// Logistics Driver & Documents REST API
+// ==========================================
+app.get('/api/logistics/drivers', authenticateToken, async (req, res) => {
+  try {
+    if (!isMongoConnected) {
+      return res.json({ success: true, drivers: [] });
+    }
+    const drivers = await Driver.find({});
+    res.json({ success: true, drivers });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/logistics/drivers', authenticateToken, async (req, res) => {
+  try {
+    const driverData = req.body;
+    if (!driverData.fullName || !driverData.phone) {
+      return res.status(400).json({ success: false, message: 'Full name and phone are required' });
+    }
+    if (isMongoConnected) {
+      const driver = new Driver(driverData);
+      await driver.save();
+    }
+    res.json({ success: true, message: 'Driver onboarded successfully', driver: driverData });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/logistics/drivers/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    if (isMongoConnected) {
+      await Driver.findOneAndUpdate({ id }, { $set: updates }, { upsert: true });
+    }
+    res.json({ success: true, message: 'Driver updated successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/logistics/drivers/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, verificationStatus, verificationNotes } = req.body;
+    if (isMongoConnected) {
+      await Driver.findOneAndUpdate(
+        { id },
+        { $set: { status, verificationStatus, verificationNotes } }
+      );
+    }
+    res.json({ success: true, message: 'Driver status updated successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/logistics/drivers/:id/block', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isBlocked, blockedReason } = req.body;
+    if (isMongoConnected) {
+      await Driver.findOneAndUpdate(
+        { id },
+        { 
+          $set: { 
+            isBlocked, 
+            blockedReason: isBlocked ? blockedReason : '', 
+            status: isBlocked ? 'Blocked' : 'Active' 
+          } 
+        }
+      );
+    }
+    res.json({ success: true, message: isBlocked ? 'Driver blocked' : 'Driver unblocked' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.put('/api/logistics/drivers/:id/documents', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { documents } = req.body;
+    if (isMongoConnected) {
+      await Driver.findOneAndUpdate({ id }, { $set: { documents } });
+    }
+    res.json({ success: true, message: 'Driver documents updated' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

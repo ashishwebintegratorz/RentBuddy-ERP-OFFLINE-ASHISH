@@ -10,7 +10,7 @@
   }
 
   body {
-    background-color: #0b0f19;
+    background-color: #07090e;
     color: #cbd5e1;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
@@ -20,36 +20,36 @@
 
 /* Glassmorphism effects */
 .glass-panel {
-  background: rgba(13, 18, 30, 0.75);
+  background: rgba(11, 15, 25, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .glass-panel-light {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .glass-card {
-  background: linear-gradient(135deg, rgba(20, 27, 45, 0.75) 0%, rgba(13, 17, 30, 0.85) 100%);
+  background: linear-gradient(135deg, rgba(17, 22, 34, 0.85) 0%, rgba(10, 13, 20, 0.95) 100%);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
-  box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.1);
+  border-color: rgba(225, 29, 72, 0.35);
+  box-shadow: 0 10px 30px -10px rgba(225, 29, 72, 0.15);
   transform: translateY(-2px);
 }
 
-/* Neon glow details */
-.glow-border-indigo {
-  box-shadow: 0 0 15px -3px rgba(99, 102, 241, 0.3);
-  border-color: rgba(99, 102, 241, 0.4);
+/* Red & Brand Glow details */
+.glow-border-red {
+  box-shadow: 0 0 15px -3px rgba(225, 29, 72, 0.35);
+  border-color: rgba(225, 29, 72, 0.5);
 }
 
 .glow-border-emerald {
@@ -74,20 +74,20 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(10, 10, 15, 0.5);
+  background: rgba(8, 10, 15, 0.6);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.2);
+  background: rgba(225, 29, 72, 0.3);
   border-radius: 9999px;
   transition: background 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(225, 29, 72, 0.6);
 }
 
-/* Scroll-driven reveals (fallback helper) */
+/* Scroll-driven reveals */
 .reveal-on-scroll {
   animation: reveal linear both;
   animation-timeline: view();
@@ -117,14 +117,14 @@
   }
 }
 
-.pulse-glow-indigo {
+.pulse-glow-red {
   animation: pulse-glow 2s infinite ease-in-out;
-  box-shadow: 0 0 20px 2px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 20px 2px rgba(225, 29, 72, 0.4);
 }
 
 /* Gradient text */
-.text-gradient-purple {
-  background: linear-gradient(135deg, #c084fc 0%, #6366f1 100%);
+.text-gradient-red {
+  background: linear-gradient(135deg, #fb7185 0%, #e11d48 50%, #be123c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -158,8 +158,8 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+  border-color: rgba(225, 29, 72, 0.6);
+  box-shadow: 0 0 10px rgba(225, 29, 72, 0.2);
 }
 
 /* Pulse animation for scanner */
@@ -180,7 +180,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ==========================================================================
-   LIGHT THEME OVERRIDES AND COLOR VARIABLES MAPPING SYSTEM (DashQ/Minimal STYLE)
+   LIGHT THEME OVERRIDES (White, Slate & Red Brand Palette)
    ========================================================================== */
 
 html.light {
@@ -188,38 +188,55 @@ html.light {
 }
 
 html.light body {
-  background-color: #f9fafb !important; /* Soft minimal grey/blue background */
-  color: #637381 !important; /* Clean muted grey-blue body text */
+  background-color: #f8fafc !important; /* Clean Crisp Light background */
+  color: #334155 !important; /* High-readability charcoal body text */
 }
 
 /* App root container background */
-html.light .bg-\[\#0b0f19\] {
-  background-color: #f9fafb !important;
+html.light .bg-\[\#0b0f19\],
+html.light .bg-\[\#07090e\] {
+  background-color: #f8fafc !important;
 }
 
 html.light .text-slate-200 {
-  color: #637381 !important; /* Soft navy-grey contrast */
+  color: #334155 !important;
 }
 
-/* Glassmorphism overrides for Light Mode (DashQ Flat UI Style) */
+html.light .text-slate-300 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.light .text-white {
+  color: #0f172a !important; /* Bold headers in crisp charcoal */
+}
+
+/* Glassmorphism overrides for Light Mode */
 html.light .glass-panel {
   background: #ffffff !important;
   backdrop-filter: none !important;
-  border: 1px solid rgba(145, 158, 171, 0.12) !important;
-  box-shadow: none !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03) !important;
 }
 
 html.light .glass-card {
   background: #ffffff !important;
   backdrop-filter: none !important;
-  border: 1px solid rgba(145, 158, 171, 0.16) !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
   border-radius: 16px !important;
 }
 
 html.light .glass-card:hover {
-  border-color: rgba(145, 158, 171, 0.24) !important;
-  box-shadow: 0 12px 24px -4px rgba(145, 158, 171, 0.12) !important;
+  border-color: rgba(225, 29, 72, 0.35) !important;
+  box-shadow: 0 12px 24px -4px rgba(225, 29, 72, 0.08) !important;
   transform: translateY(-1px);
 }
 
@@ -229,370 +246,117 @@ html.light .bg-slate-900 {
 }
 
 html.light .bg-slate-950 {
-  background-color: #f4f6f8 !important; /* Clean light background */
+  background-color: #f1f5f9 !important;
 }
 
-html.light .bg-slate-950\/40 {
-  background-color: rgba(244, 246, 248, 0.6) !important;
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/80 {
+  background-color: #f8fafc !important;
 }
 
-html.light .bg-slate-900\/50 {
-  background-color: rgba(255, 255, 255, 0.8) !important;
-}
-
-html.light .bg-slate-900\/40 {
-  background-color: rgba(255, 255, 255, 0.7) !important;
-}
-
-html.light .bg-indigo-950\/20 {
-  background-color: rgba(0, 171, 85, 0.08) !important; /* Soft Emerald highlight */
-}
-
-html.light .bg-indigo-900\/10 {
-  background-color: rgba(0, 171, 85, 0.05) !important;
-}
-
-html.light .bg-purple-950\/20 {
-  background-color: rgba(140, 82, 255, 0.08) !important;
-}
-
-html.light .bg-slate-950\/30 {
-  background-color: rgba(244, 246, 248, 0.5) !important;
-}
-
-html.light .bg-purple-950\/10 {
-  background-color: rgba(140, 82, 255, 0.05) !important;
-}
-
-html.light .bg-emerald-950\/20 {
-  background-color: rgba(0, 171, 85, 0.08) !important;
-}
-
-html.light .bg-rose-950\/20 {
-  background-color: rgba(255, 77, 79, 0.08) !important;
-}
-
-html.light .bg-amber-950\/20 {
-  background-color: rgba(255, 159, 67, 0.08) !important;
-}
-
-/* Sidebar overrides matching screenshot (App highlight green) */
-html.light .bg-indigo-500\/15 {
-  background-color: rgba(0, 171, 85, 0.08) !important; /* Soft light-green menu highlight */
-}
-
-html.light .text-indigo-300 {
-  color: #00ab55 !important; /* Dark green for selected item text */
-  font-weight: 600 !important;
-}
-
-html.light .border-indigo-500 {
-  border-color: #00ab55 !important;
-}
-
-html.light .text-slate-300 {
-  color: #637381 !important; /* Sidebar text */
-}
-
-html.light .text-slate-300:hover {
-  background-color: rgba(145, 158, 171, 0.08) !important;
-  color: #212b36 !important;
-}
-
-/* Text overrides */
-html.light .text-white {
-  color: #212b36 !important; /* Soft dark navy-grey headings */
-}
-
-html.light .text-slate-100 {
-  color: #212b36 !important; /* Soft dark navy-grey text */
-}
-
-html.light .text-slate-300 {
-  color: #637381 !important;
-}
-
-html.light .text-slate-400 {
-  color: #919eab !important; /* Clean muted grey-blue labels */
-}
-
-html.light .text-slate-500 {
-  color: #919eab !important;
-}
-
-html.light .text-indigo-400 {
-  color: #00ab55 !important; /* Primary Brand Accent (Green) */
-}
-
-html.light .text-purple-400 {
-  color: #8c52ff !important;
-}
-
-html.light .text-emerald-400 {
-  color: #118d57 !important; /* Darker green for contrast */
-}
-
-html.light .text-amber-400 {
-  color: #b76e00 !important;
-}
-
-html.light .text-rose-400 {
-  color: #b71d18 !important;
-}
-
-html.light .text-orange-400 {
-  color: #b76e00 !important;
-}
-
-html.light .text-cyan-400 {
-  color: #00cfc8 !important;
-}
-
-/* Borders mapping */
-html.light .border-slate-800 {
-  border-color: rgba(145, 158, 171, 0.12) !important; /* clean light border */
-}
-
-html.light .border-slate-800\/80 {
-  border-color: rgba(145, 158, 171, 0.1) !important;
-}
-
-html.light .border-slate-900 {
-  border-color: rgba(145, 158, 171, 0.16) !important;
-}
-
-html.light .border-slate-700\/20 {
-  border-color: rgba(145, 158, 171, 0.1) !important;
-}
-
-html.light .border-indigo-500\/20 {
-  border-color: rgba(0, 171, 85, 0.15) !important;
-}
-
-html.light .border-indigo-500\/25 {
-  border-color: rgba(0, 171, 85, 0.2) !important;
-}
-
-html.light .border-purple-500\/25 {
-  border-color: rgba(140, 82, 255, 0.25) !important;
-}
-
-html.light .border-emerald-500\/20 {
-  border-color: rgba(0, 171, 85, 0.15) !important;
-}
-
-html.light .border-rose-500\/25 {
-  border-color: rgba(255, 77, 79, 0.25) !important;
-}
-
-html.light .border-amber-500\/20 {
-  border-color: rgba(255, 159, 67, 0.2) !important;
-}
-
-/* Custom forms overrides */
-html.light input, html.light select, html.light textarea {
-  background: #ffffff !important;
-  border: 1px solid rgba(145, 158, 171, 0.2) !important;
-  color: #212b36 !important;
-}
-
-html.light input:focus, html.light select:focus, html.light textarea:focus {
-  background: #ffffff !important;
-  border-color: #00ab55 !important;
-  box-shadow: 0 0 0 2px rgba(0, 171, 85, 0.15) !important;
-}
-
-/* Sidebar overrides */
-html.light .bg-slate-950\/20 {
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/40,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/70,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/90 {
   background-color: #ffffff !important;
 }
 
-/* Scrollbars overrides */
-html.light ::-webkit-scrollbar-track {
-  background: #eef1f6;
+html.light .bg-slate-800,
+html.light .bg-slate-800\/40,
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/90 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
 }
 
-html.light ::-webkit-scrollbar-thumb {
-  background: rgba(90, 102, 241, 0.25);
+html.light .border-slate-800,
+html.light .border-slate-800\/40,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/80,
+html.light .border-slate-700,
+html.light .border-slate-700\/40,
+html.light .border-slate-700\/50,
+html.light .border-slate-700\/60 {
+  border-color: #e2e8f0 !important;
 }
 
-html.light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(90, 102, 241, 0.55);
+/* Red / Brand Active elements in Light Mode */
+html.light .bg-red-500\/10,
+html.light .bg-rose-500\/10,
+html.light .bg-indigo-500\/10 {
+  background-color: #fef2f2 !important;
 }
 
-/* Interactive elements */
-html.light .bg-indigo-600 {
-  background-color: #5a66f1 !important; /* DashQ primary */
+html.light .border-red-500\/20,
+html.light .border-rose-500\/20,
+html.light .border-indigo-500\/20 {
+  border-color: #fecaca !important;
 }
 
-html.light .bg-indigo-600:hover {
-  background-color: #4954d6 !important;
+html.light .text-red-400,
+html.light .text-rose-400,
+html.light .text-indigo-400 {
+  color: #dc2626 !important;
 }
 
-html.light .bg-rose-600 {
-  background-color: #ff4d4f !important; /* DashQ danger */
+/* Light Mode Input, Textarea & Select */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
-html.light .bg-rose-600:hover {
-  background-color: #e03b3d !important;
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  background-color: #ffffff !important;
+  border-color: #e11d48 !important;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12) !important;
 }
 
-/* ==========================================================================
-   COLORFUL KPI CARDS DESIGN SYSTEM (DARK & LIGHT VARIANTS)
-   ========================================================================== */
-
-.glass-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Card variants */
-.card-indigo {
-  border-top: 3px solid rgba(99, 102, 241, 0.55) !important;
-  box-shadow: 0 4px 15px -3px rgba(99, 102, 241, 0.08) !important;
-}
-.card-indigo:hover {
-  border-top-color: rgba(99, 102, 241, 1) !important;
-  box-shadow: 0 12px 25px -5px rgba(99, 102, 241, 0.25) !important;
-}
-
-.card-emerald {
-  border-top: 3px solid rgba(16, 185, 129, 0.55) !important;
-  box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.08) !important;
-}
-.card-emerald:hover {
-  border-top-color: rgba(16, 185, 129, 1) !important;
-  box-shadow: 0 12px 25px -5px rgba(16, 185, 129, 0.25) !important;
-}
-
-.card-amber {
-  border-top: 3px solid rgba(245, 158, 11, 0.55) !important;
-  box-shadow: 0 4px 15px -3px rgba(245, 158, 11, 0.08) !important;
-}
-.card-amber:hover {
-  border-top-color: rgba(245, 158, 11, 1) !important;
-  box-shadow: 0 12px 25px -5px rgba(245, 158, 11, 0.25) !important;
-}
-
-.card-rose {
-  border-top: 3px solid rgba(244, 63, 94, 0.55) !important;
-  box-shadow: 0 4px 15px -3px rgba(244, 63, 94, 0.08) !important;
-}
-.card-rose:hover {
-  border-top-color: rgba(244, 63, 94, 1) !important;
-  box-shadow: 0 12px 25px -5px rgba(244, 63, 94, 0.25) !important;
-}
-
-.card-purple {
-  border-top: 3px solid rgba(168, 85, 247, 0.55) !important;
-  box-shadow: 0 4px 15px -3px rgba(168, 85, 247, 0.08) !important;
-}
-.card-purple:hover {
-  border-top-color: rgba(168, 85, 247, 1) !important;
-  box-shadow: 0 12px 25px -5px rgba(168, 85, 247, 0.25) !important;
-}
-
-.card-cyan {
-  border-top: 3px solid rgba(6, 182, 212, 0.55) !important;
-  box-shadow: 0 4px 15px -3px rgba(6, 182, 212, 0.08) !important;
-}
-.card-cyan:hover {
-  border-top-color: rgba(6, 182, 212, 1) !important;
-  box-shadow: 0 12px 25px -5px rgba(6, 182, 212, 0.25) !important;
-}
-
-/* Light mode specific variants adjustments */
-html.light .card-indigo {
-  border-top-color: #5a66f1 !important;
-  box-shadow: 0 4px 12px rgba(90, 102, 241, 0.05) !important;
-}
-html.light .card-indigo:hover {
-  box-shadow: 0 10px 20px rgba(90, 102, 241, 0.12) !important;
-}
-
-html.light .card-emerald {
-  border-top-color: #2ecd7a !important;
-  box-shadow: 0 4px 12px rgba(46, 205, 122, 0.05) !important;
-}
-html.light .card-emerald:hover {
-  box-shadow: 0 10px 20px rgba(46, 205, 122, 0.12) !important;
-}
-
-html.light .card-amber {
-  border-top-color: #ff9f43 !important;
-  box-shadow: 0 4px 12px rgba(255, 159, 67, 0.05) !important;
-}
-html.light .card-amber:hover {
-  box-shadow: 0 10px 20px rgba(255, 159, 67, 0.12) !important;
-}
-
-html.light .card-rose {
-  border-top-color: #ff4d4f !important;
-  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.05) !important;
-}
-html.light .card-rose:hover {
-  box-shadow: 0 10px 20px rgba(255, 77, 79, 0.12) !important;
-}
-
-html.light .card-purple {
-  border-top-color: #8c52ff !important;
-  box-shadow: 0 4px 12px rgba(140, 82, 255, 0.05) !important;
-}
-html.light .card-purple:hover {
-  box-shadow: 0 10px 20px rgba(140, 82, 255, 0.12) !important;
-}
-
-html.light .card-cyan {
-  border-top-color: #00cfc8 !important;
-  box-shadow: 0 4px 12px rgba(0, 207, 200, 0.05) !important;
-}
-html.light .card-cyan:hover {
-  box-shadow: 0 10px 20px rgba(0, 207, 200, 0.12) !important;
-}
-
-/* Typography and readability tweaks */
-.tracking-tight {
-  letter-spacing: -0.025em;
-}
-
-.tracking-wide {
-  letter-spacing: 0.025em;
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
 }
 
 /* Sidebar selector widgets and dropdown overrides */
 .role-city-widget {
-  background: rgba(13, 18, 30, 0.4) !important;
+  background: rgba(10, 13, 22, 0.5) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 html.light .role-city-widget {
-  background: #f9fafb !important; /* Minimal light background */
-  border-bottom: 1px solid rgba(145, 158, 171, 0.12) !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
 }
 
-/* Dropdown styling */
 .role-select-box {
-  background: rgba(20, 27, 45, 0.8) !important;
+  background: rgba(17, 22, 34, 0.9) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: #cbd5e1 !important;
 }
 
 html.light .role-select-box {
   background: #ffffff !important;
-  border: 1px solid rgba(145, 158, 171, 0.2) !important;
-  color: #212b36 !important;
-  box-shadow: 0 2px 8px rgba(145, 158, 171, 0.04) !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
 .role-option-item {
-  background-color: #131722;
+  background-color: #0f131d;
   color: #cbd5e1;
 }
 
 html.light .role-option-item {
   background-color: #ffffff;
-  color: #212b36;
+  color: #0f172a;
 }
 
 /* City buttons */
@@ -602,32 +366,28 @@ html.light .role-option-item {
   background: transparent !important;
 }
 .city-btn-inactive:hover {
-  background: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   color: #ffffff !important;
 }
 
 html.light .city-btn-inactive {
-  border-color: rgba(145, 158, 171, 0.2) !important;
-  color: #637381 !important;
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
   background: #ffffff !important;
 }
 html.light .city-btn-inactive:hover {
-  background: #f4f6f8 !important;
-  color: #212b36 !important;
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
 .city-btn-active {
-  background: rgba(16, 185, 129, 0.1) !important;
-  border-color: rgba(16, 185, 129, 0.3) !important;
-  color: #10b981 !important;
+  background: rgba(225, 29, 72, 0.15) !important;
+  border-color: rgba(225, 29, 72, 0.4) !important;
+  color: #f43f5e !important;
 }
 
 html.light .city-btn-active {
-  background: rgba(0, 171, 85, 0.08) !important;
-  border-color: rgba(0, 171, 85, 0.24) !important;
-  color: #00ab55 !important;
+  background: #fff1f2 !important;
+  border-color: #fda4af !important;
+  color: #e11d48 !important;
 }
-
-
-
-

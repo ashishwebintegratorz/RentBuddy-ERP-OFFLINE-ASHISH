@@ -106,7 +106,7 @@ export default function ReportsCenter() {
       <div className="glass-panel p-4 rounded-2xl flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-            <FileSpreadsheet className="w-4 h-4 text-indigo-400" /> Export Reports Center
+            <FileSpreadsheet className="w-4 h-4 text-red-400" /> Export Reports Center
           </h2>
           <p className="text-[11px] text-slate-400 mt-0.5">Simulate actual database query extracts. Export logs and financial telemetry to physical CSV tables.</p>
         </div>
@@ -140,7 +140,7 @@ export default function ReportsCenter() {
         {/* Card 2 */}
         <div className="glass-card p-5 rounded-2xl flex flex-col justify-between h-[200px] border border-slate-800">
           <div className="space-y-2">
-            <FileText className="w-8 h-8 text-indigo-400" />
+            <FileText className="w-8 h-8 text-red-400" />
             <h4 className="font-bold text-white text-sm">Inventory Ledger</h4>
             <p className="text-slate-400 text-[11px]">Asset barcodes, rack placements, depreciated values and warehouse logs.</p>
           </div>

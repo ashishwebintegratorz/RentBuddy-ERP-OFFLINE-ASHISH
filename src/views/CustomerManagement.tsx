@@ -205,7 +205,7 @@ export default function CustomerManagement() {
       case 'VIP':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">VIP</span>;
       case 'Verified':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Verified</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">Verified</span>;
       case 'Defaulter':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Defaulter</span>;
       case 'High Risk':
@@ -259,7 +259,7 @@ export default function CustomerManagement() {
             </select>
             <button
               onClick={() => setShowAddForm(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/10"
+              className="bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg shadow-red-600/10"
             >
               <Plus className="w-4 h-4" /> Add Customer
             </button>
@@ -285,7 +285,7 @@ export default function CustomerManagement() {
                   key={c.id}
                   onClick={() => setSelectedCustomerId(c.id)}
                   className={`hover:bg-slate-800/15 cursor-pointer transition-colors ${
-                    selectedCustomerId === c.id ? 'bg-indigo-900/5' : ''
+                    selectedCustomerId === c.id ? 'bg-red-900/5' : ''
                   }`}
                 >
                   <td className="p-4">
@@ -322,7 +322,7 @@ export default function CustomerManagement() {
                         e.stopPropagation();
                         setSelectedCustomerId(c.id);
                       }}
-                      className="text-indigo-400 hover:text-indigo-300 font-semibold text-[11px]"
+                      className="text-red-400 hover:text-red-300 font-semibold text-[11px]"
                     >
                       Inspect Profile
                     </button>
@@ -389,7 +389,7 @@ export default function CustomerManagement() {
             <h5 className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Addresses</h5>
             <div className="space-y-2">
               <div className="p-2 rounded bg-slate-900/30 border border-slate-800/40">
-                <span className="font-semibold block text-[10px] text-indigo-400">Current Address</span>
+                <span className="font-semibold block text-[10px] text-red-400">Current Address</span>
                 <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.currentAddress}</span>
               </div>
               <div className="p-2 rounded bg-slate-900/30 border border-slate-800/40">
@@ -409,16 +409,16 @@ export default function CustomerManagement() {
             {/* Document link simulations */}
             <div className="grid grid-cols-2 gap-2 text-[10px]">
               <a href={selectedCustomer.documents.aadhaarFront} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-indigo-400" /> Aadhaar Front
+                <FileText className="w-3 h-3 text-red-400" /> Aadhaar Front
               </a>
               <a href={selectedCustomer.documents.aadhaarBack} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-indigo-400" /> Aadhaar Back
+                <FileText className="w-3 h-3 text-red-400" /> Aadhaar Back
               </a>
               <a href={selectedCustomer.documents.panCard} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-indigo-400" /> PAN Card
+                <FileText className="w-3 h-3 text-red-400" /> PAN Card
               </a>
               <a href={selectedCustomer.documents.rentAgreement} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-indigo-400" /> Rent Agreement
+                <FileText className="w-3 h-3 text-red-400" /> Rent Agreement
               </a>
             </div>
 
@@ -473,7 +473,7 @@ export default function CustomerManagement() {
                       <span className="font-semibold text-white block">Order {o.id}</span>
                       <span className="text-[9px] text-slate-500 font-mono">{o.items.length} items | {o.durationMonths} Months</span>
                     </div>
-                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-indigo-500/10 text-indigo-400 font-semibold">{o.status}</span>
+                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-red-500/10 text-red-400 font-semibold">{o.status}</span>
                   </div>
                 ))
               )}
@@ -604,7 +604,7 @@ export default function CustomerManagement() {
 
               {/* Landlord details for rent agreements */}
               <div className="p-3.5 bg-slate-950/40 rounded-xl border border-slate-900 space-y-3">
-                <span className="font-bold text-indigo-400 block uppercase tracking-wider text-[9px]">Landlord / Property Reference</span>
+                <span className="font-bold text-red-400 block uppercase tracking-wider text-[9px]">Landlord / Property Reference</span>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-slate-400 block text-[10px]">Landlord Name</label>
@@ -640,7 +640,7 @@ export default function CustomerManagement() {
                         <button type="button" onClick={() => setAadhaarFront('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
                       </div>
                     ) : (
-                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-red-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
                         <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setAadhaarFront)} />
                       </label>
@@ -656,7 +656,7 @@ export default function CustomerManagement() {
                         <button type="button" onClick={() => setAadhaarBack('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
                       </div>
                     ) : (
-                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-red-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
                         <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setAadhaarBack)} />
                       </label>
@@ -672,7 +672,7 @@ export default function CustomerManagement() {
                         <button type="button" onClick={() => setPanCard('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
                       </div>
                     ) : (
-                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-red-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
                         <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setPanCard)} />
                       </label>
@@ -695,7 +695,7 @@ export default function CustomerManagement() {
                       </div>
                     ) : (
                       <label className={`h-16 w-full border border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                        rentImmediately ? 'border-rose-500/40 hover:border-rose-500 bg-rose-500/5' : 'border-slate-800 hover:border-indigo-500/50 bg-slate-950/60'
+                        rentImmediately ? 'border-rose-500/40 hover:border-rose-500 bg-rose-500/5' : 'border-slate-800 hover:border-red-500/50 bg-slate-950/60'
                       }`}>
                         <span className="text-[9px] text-slate-500 font-bold">📄 Upload Rent Agreement</span>
                         <span className="text-[8px] text-slate-600 block">(PDF or Image)</span>
@@ -713,7 +713,7 @@ export default function CustomerManagement() {
                         <button type="button" onClick={() => setSelfie('')} className="absolute top-1 right-1 p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
                       </div>
                     ) : (
-                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-indigo-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
+                      <label className="h-16 w-full bg-slate-950/60 border border-dashed border-slate-800 hover:border-red-500/50 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors">
                         <span className="text-[9px] text-slate-500 font-bold">📁 Upload Image</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setSelfie)} />
                       </label>
@@ -725,12 +725,12 @@ export default function CustomerManagement() {
               {/* Integrated Checkout Flow */}
               <div className="p-3.5 bg-slate-950/40 rounded-xl border border-slate-900 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-indigo-400 block uppercase tracking-wider text-[9px]">Rent Assets Immediately?</span>
+                  <span className="font-bold text-red-400 block uppercase tracking-wider text-[9px]">Rent Assets Immediately?</span>
                   <input
                     type="checkbox"
                     checked={rentImmediately}
                     onChange={(e) => setRentImmediately(e.target.checked)}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-800"
+                    className="w-4 h-4 rounded text-red-600 focus:ring-red-500 bg-slate-900 border-slate-800"
                   />
                 </div>
 
@@ -748,10 +748,10 @@ export default function CustomerManagement() {
                               key={asset.id}
                               type="button"
                               onClick={() => setSelectedAssets([...selectedAssets, asset.id])}
-                              className="text-left p-1.5 bg-slate-900 hover:bg-indigo-950/30 border border-slate-850 rounded text-[10px] text-slate-300 flex justify-between items-center transition-colors cursor-pointer"
+                              className="text-left p-1.5 bg-slate-900 hover:bg-red-950/30 border border-slate-850 rounded text-[10px] text-slate-300 flex justify-between items-center transition-colors cursor-pointer"
                             >
                               <span className="truncate flex-1 font-semibold">{asset.brand} {asset.category}</span>
-                              <span className="font-mono text-[9px] text-indigo-400 pl-1">₹{asset.monthlyRentalPrice}</span>
+                              <span className="font-mono text-[9px] text-red-400 pl-1">₹{asset.monthlyRentalPrice}</span>
                             </button>
                           ))}
                         </div>
@@ -807,7 +807,7 @@ export default function CustomerManagement() {
                               setDiscount(0);
                               setDiscountType(discountType === 'flat' ? 'percent' : 'flat');
                             }}
-                            className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold uppercase focus:outline-none cursor-pointer"
+                            className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase focus:outline-none cursor-pointer"
                           >
                             Toggle {discountType === 'flat' ? '%' : '₹'}
                           </button>
@@ -846,7 +846,7 @@ export default function CustomerManagement() {
                               setDepDiscount(0);
                               setDepDiscountType(depDiscountType === 'flat' ? 'percent' : 'flat');
                             }}
-                            className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold uppercase focus:outline-none cursor-pointer"
+                            className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase focus:outline-none cursor-pointer"
                           >
                             Toggle {depDiscountType === 'flat' ? '%' : '₹'}
                           </button>
@@ -898,7 +898,7 @@ export default function CustomerManagement() {
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between text-indigo-300 font-bold border-t border-slate-900 pt-1">
+                      <div className="flex justify-between text-red-300 font-bold border-t border-slate-900 pt-1">
                         <span>Net Monthly Rent:</span>
                         <span>₹{totalRentNet}</span>
                       </div>
@@ -914,7 +914,7 @@ export default function CustomerManagement() {
               <div className="flex gap-3 pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold cursor-pointer"
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer"
                 >
                   Onboard Customer
                 </button>

@@ -140,7 +140,7 @@ export default function BarcodeTracking() {
           <button
             onClick={() => setActiveTab('scan')}
             className={`text-sm font-bold uppercase tracking-wider pb-1.5 transition-all border-b-2 cursor-pointer ${
-              activeTab === 'scan' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+              activeTab === 'scan' ? 'text-red-400 border-red-500' : 'text-slate-500 border-transparent hover:text-slate-300'
             }`}
           >
             📟 Handheld Scanner Simulator
@@ -148,7 +148,7 @@ export default function BarcodeTracking() {
           <button
             onClick={() => setActiveTab('labels')}
             className={`text-sm font-bold uppercase tracking-wider pb-1.5 transition-all border-b-2 cursor-pointer ${
-              activeTab === 'labels' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+              activeTab === 'labels' ? 'text-red-400 border-red-500' : 'text-slate-500 border-transparent hover:text-slate-300'
             }`}
           >
             🖨️ Print Barcode Stickers
@@ -163,7 +163,7 @@ export default function BarcodeTracking() {
           {/* Left panel: Scanner Simulator Terminal */}
           <div className="glass-panel p-5 rounded-2xl space-y-5">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <Scan className="w-4 h-4 text-indigo-400" /> Scanner Device Simulation
+              <Scan className="w-4 h-4 text-red-400" /> Scanner Device Simulation
             </h3>
 
             {/* Simulated camera scanning frame */}
@@ -173,14 +173,14 @@ export default function BarcodeTracking() {
               ) : (
                 <>
                   {/* Scan target overlays */}
-                  <div className="absolute inset-8 border border-indigo-500/30 rounded flex flex-col justify-between">
+                  <div className="absolute inset-8 border border-red-500/30 rounded flex flex-col justify-between">
                     <div className="flex justify-between">
-                      <div className="w-3 h-3 border-t-2 border-l-2 border-indigo-400"></div>
-                      <div className="w-3 h-3 border-t-2 border-r-2 border-indigo-400"></div>
+                      <div className="w-3 h-3 border-t-2 border-l-2 border-red-400"></div>
+                      <div className="w-3 h-3 border-t-2 border-r-2 border-red-400"></div>
                     </div>
                     <div className="flex justify-between">
-                      <div className="w-3 h-3 border-b-2 border-l-2 border-indigo-400"></div>
-                      <div className="w-3 h-3 border-b-2 border-r-2 border-indigo-400"></div>
+                      <div className="w-3 h-3 border-b-2 border-l-2 border-red-400"></div>
+                      <div className="w-3 h-3 border-b-2 border-r-2 border-red-400"></div>
                     </div>
                   </div>
 
@@ -223,7 +223,7 @@ export default function BarcodeTracking() {
                   />
                   <button
                     onClick={() => handleSimulateScan(scanInput)}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg px-3 py-1.5 cursor-pointer"
+                    className="bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg px-3 py-1.5 cursor-pointer"
                   >
                     Manual
                   </button>
@@ -237,7 +237,7 @@ export default function BarcodeTracking() {
                   ) : (
                     <button
                       onClick={startCamera}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg px-3 py-1.5 cursor-pointer flex items-center gap-1.5"
+                      className="bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg px-3 py-1.5 cursor-pointer flex items-center gap-1.5"
                     >
                       <Scan className="w-3.5 h-3.5" /> Camera
                     </button>
@@ -287,7 +287,7 @@ export default function BarcodeTracking() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                   <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-900">
                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Status</span>
-                    <span className="font-bold text-indigo-300 block text-xs mt-1">{scannedAsset.status}</span>
+                    <span className="font-bold text-red-300 block text-xs mt-1">{scannedAsset.status}</span>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-900">
                     <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Warehouse Location</span>
@@ -345,7 +345,7 @@ export default function BarcodeTracking() {
               <div className="mt-5 border-t border-slate-800/80 pt-4 flex justify-end">
                 <button
                   onClick={() => alert(`Sticker sent to printer! Code: ${scannedAsset.barcode}`)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs px-4 py-2 flex items-center gap-2 cursor-pointer"
+                  className="bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs px-4 py-2 flex items-center gap-2 cursor-pointer"
                 >
                   <Printer className="w-4 h-4" /> Print Sticker Label
                 </button>

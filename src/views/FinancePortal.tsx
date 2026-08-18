@@ -99,7 +99,7 @@ export default function FinancePortal() {
                 generateMonthlyInvoices();
                 alert('Billing run executed successfully! New monthly invoices generated for active contracts.');
               }}
-              className="bg-indigo-650 hover:bg-indigo-600 border border-indigo-500/25 hover:border-indigo-500 text-white rounded-xl font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer transition-all shadow-md"
+              className="bg-red-650 hover:bg-red-600 border border-red-500/25 hover:border-red-500 text-white rounded-xl font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer transition-all shadow-md"
             >
               <RefreshCw className="w-4 h-4" /> Run Monthly Billing Cycle
             </button>
@@ -130,7 +130,7 @@ export default function FinancePortal() {
                     key={inv.id}
                     onClick={() => setSelectedInvoiceId(inv.id)}
                     className={`hover:bg-slate-800/10 cursor-pointer transition-colors ${
-                      selectedInvoiceId === inv.id ? 'bg-indigo-900/5' : ''
+                      selectedInvoiceId === inv.id ? 'bg-red-900/5' : ''
                     }`}
                   >
                     <td className="p-4 font-bold text-white">{inv.id}</td>
@@ -154,7 +154,7 @@ export default function FinancePortal() {
                           e.stopPropagation();
                           setSelectedInvoiceId(inv.id);
                         }}
-                        className="text-indigo-400 hover:text-indigo-300 font-semibold text-[11px]"
+                        className="text-red-400 hover:text-red-300 font-semibold text-[11px]"
                       >
                         Inspect Bill
                       </button>
@@ -235,7 +235,7 @@ export default function FinancePortal() {
             )}
             <div className="flex justify-between text-slate-100 font-bold border-t border-slate-900 pt-1.5 text-sm">
               <span>Total Bill:</span>
-              <span className="font-mono text-indigo-400">₹{selectedInvoice.totalAmount.toLocaleString()}</span>
+              <span className="font-mono text-red-400">₹{selectedInvoice.totalAmount.toLocaleString()}</span>
             </div>
           </div>
 
@@ -243,7 +243,7 @@ export default function FinancePortal() {
           {selectedInvoice.status !== 'Paid' && (
             <button
               onClick={() => setShowCheckoutModal(true)}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/10"
+              className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-red-600/10"
             >
               <CreditCard className="w-4 h-4" /> Open Razorpay Payment Gateway
             </button>
@@ -255,7 +255,7 @@ export default function FinancePortal() {
               onClick={() => alert(`Sending link via SMS: UPI://pay?pa=rentbuddy@upi&am=${selectedInvoice.totalAmount}`)}
               className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-lg flex items-center justify-center gap-1 cursor-pointer transition-all"
             >
-              <Send className="w-3.5 h-3.5 text-indigo-400" /> Share UPI Link
+              <Send className="w-3.5 h-3.5 text-red-400" /> Share UPI Link
             </button>
             <button
               onClick={() => window.print()}
@@ -281,12 +281,12 @@ export default function FinancePortal() {
 
             {/* Gateway Brand Header */}
             <div className="flex items-center gap-2.5 border-b border-slate-900 pb-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center font-bold text-white text-base shadow shadow-indigo-500/20">
+              <div className="w-8 h-8 rounded-lg bg-red-500 flex items-center justify-center font-bold text-white text-base shadow shadow-red-500/20">
                 R
               </div>
               <div>
                 <h4 className="font-bold text-white text-sm">Razorpay Checkout Sandbox</h4>
-                <p className="text-[10px] text-indigo-400">Secure Merchant payment system</p>
+                <p className="text-[10px] text-red-400">Secure Merchant payment system</p>
               </div>
             </div>
 
@@ -314,7 +314,7 @@ export default function FinancePortal() {
                   type="button"
                   onClick={() => setCheckoutPaymentMethod('UPI')}
                   className={`p-3 rounded-xl border text-center transition-all ${
-                    checkoutPaymentMethod === 'UPI' ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-semibold' : 'bg-slate-900 border-slate-800'
+                    checkoutPaymentMethod === 'UPI' ? 'bg-red-500/10 border-red-500/50 text-red-300 font-semibold' : 'bg-slate-900 border-slate-800'
                   }`}
                 >
                   ⚡ UPI AutoPay (Mandate)
@@ -323,7 +323,7 @@ export default function FinancePortal() {
                   type="button"
                   onClick={() => setCheckoutPaymentMethod('Card')}
                   className={`p-3 rounded-xl border text-center transition-all ${
-                    checkoutPaymentMethod === 'Card' ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-semibold' : 'bg-slate-900 border-slate-800'
+                    checkoutPaymentMethod === 'Card' ? 'bg-red-500/10 border-red-500/50 text-red-300 font-semibold' : 'bg-slate-900 border-slate-800'
                   }`}
                 >
                   💳 Credit/Debit Card
@@ -332,7 +332,7 @@ export default function FinancePortal() {
                   type="button"
                   onClick={() => setCheckoutPaymentMethod('Netbanking')}
                   className={`p-3 rounded-xl border text-center transition-all ${
-                    checkoutPaymentMethod === 'Netbanking' ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-semibold' : 'bg-slate-900 border-slate-800'
+                    checkoutPaymentMethod === 'Netbanking' ? 'bg-red-500/10 border-red-500/50 text-red-300 font-semibold' : 'bg-slate-900 border-slate-800'
                   }`}
                 >
                   🏢 Net Banking
@@ -341,7 +341,7 @@ export default function FinancePortal() {
                   type="button"
                   onClick={() => setCheckoutPaymentMethod('AutoDebit')}
                   className={`p-3 rounded-xl border text-center transition-all ${
-                    checkoutPaymentMethod === 'AutoDebit' ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-semibold' : 'bg-slate-900 border-slate-800'
+                    checkoutPaymentMethod === 'AutoDebit' ? 'bg-red-500/10 border-red-500/50 text-red-300 font-semibold' : 'bg-slate-900 border-slate-800'
                   }`}
                 >
                   🏦 Bank eMandate
@@ -350,7 +350,7 @@ export default function FinancePortal() {
             </div>
 
             <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-850 text-[10px] text-slate-500 leading-normal flex items-start gap-2">
-              <Info className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+              <Info className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
               <span>
                 Simulating AutoPay setup: Accepting this mandate initiates recurring bank auto-debit cycles every 30 days. Sandbox logs attempts in financial auditable logs.
               </span>
@@ -359,7 +359,7 @@ export default function FinancePortal() {
             <div className="flex gap-3 pt-3">
               <button
                 onClick={handlePayInvoice}
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl cursor-pointer"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl cursor-pointer"
               >
                 Simulate Successful Payment
               </button>

@@ -71,13 +71,13 @@ export default function RentalPackages() {
       <div className="flex justify-between items-center glass-panel p-4 rounded-2xl">
         <div>
           <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-            <Gift className="w-4 h-4 text-indigo-400" /> Admin Rental Package Bundles
+            <Gift className="w-4 h-4 text-red-400" /> Admin Rental Package Bundles
           </h2>
           <p className="text-[11px] text-slate-400 mt-0.5">Preconfigure multi-furniture discount packages for students, corporates and office setups.</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg"
+          className="bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg"
         >
           <Plus className="w-4 h-4" /> Create Bundle Package
         </button>
@@ -87,7 +87,7 @@ export default function RentalPackages() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {packages.map(pkg => (
           <div key={pkg.id} className="glass-card p-5 rounded-2xl flex flex-col justify-between h-[300px] border border-slate-800 relative">
-            <div className="absolute top-4 right-4 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded font-mono text-[9px] font-bold">
+            <div className="absolute top-4 right-4 bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded font-mono text-[9px] font-bold">
               {pkg.id}
             </div>
 
@@ -169,11 +169,11 @@ export default function RentalPackages() {
               {/* Dynamic asset categories layout */}
               <div className="space-y-2 p-3 bg-slate-950/40 rounded-xl border border-slate-900">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Bundle Composition *</span>
+                  <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider">Bundle Composition *</span>
                   <button
                     type="button"
                     onClick={handleAddCategoryRow}
-                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold"
+                    className="text-[10px] text-red-400 hover:text-red-300 font-bold"
                   >
                     + Add Row
                   </button>
@@ -264,7 +264,7 @@ export default function RentalPackages() {
               <div className="flex gap-3 pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold cursor-pointer"
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer"
                 >
                   Create Preset Bundle
                 </button>

@@ -39,7 +39,7 @@ export default function OrderManagement() {
       case 'Pending':
         return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
       case 'Assigned':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
       case 'Out for Delivery':
         return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
       case 'Delivered':
@@ -68,7 +68,7 @@ export default function OrderManagement() {
           <React.Fragment key={step.key}>
             <div className="flex items-center gap-2">
               <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold font-mono text-[9px] ${
-                step.done ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30' : 'bg-slate-800 text-slate-500'
+                step.done ? 'bg-red-600 text-white shadow shadow-red-600/30' : 'bg-slate-800 text-slate-500'
               }`}>
                 {idx + 1}
               </span>
@@ -146,7 +146,7 @@ export default function OrderManagement() {
                   key={o.id}
                   onClick={() => setSelectedOrderId(o.id)}
                   className={`hover:bg-slate-800/15 cursor-pointer transition-colors ${
-                    selectedOrderId === o.id ? 'bg-indigo-900/5' : ''
+                    selectedOrderId === o.id ? 'bg-red-900/5' : ''
                   }`}
                 >
                   <td className="p-4">
@@ -180,7 +180,7 @@ export default function OrderManagement() {
                         e.stopPropagation();
                         setSelectedOrderId(o.id);
                       }}
-                      className="text-indigo-400 hover:text-indigo-300 font-semibold text-[11px]"
+                      className="text-red-400 hover:text-red-300 font-semibold text-[11px]"
                     >
                       Track Order
                     </button>
@@ -223,7 +223,7 @@ export default function OrderManagement() {
               <div className="flex justify-between"><span>Start Date:</span> <span className="text-slate-300">{selectedOrder.startDate}</span></div>
               <div className="flex justify-between"><span>Term Period:</span> <span className="text-slate-300">{selectedOrder.durationMonths} months</span></div>
               <div className="flex justify-between"><span>Monthly Rent:</span> <span className="text-emerald-400 font-bold">₹{selectedOrder.netMonthlyRent}</span></div>
-              <div className="flex justify-between"><span>Held Deposit:</span> <span className="text-indigo-400 font-bold">₹{selectedOrder.totalDeposit}</span></div>
+              <div className="flex justify-between"><span>Held Deposit:</span> <span className="text-red-400 font-bold">₹{selectedOrder.totalDeposit}</span></div>
             </div>
           </div>
 
@@ -241,8 +241,8 @@ export default function OrderManagement() {
           </div>
 
           {/* Deposit workflow checks */}
-          <div className="space-y-3.5 p-4 rounded-2xl bg-indigo-900/10 border border-indigo-500/20">
-            <h5 className="font-bold text-indigo-300 uppercase tracking-wider text-[9px] flex justify-between">
+          <div className="space-y-3.5 p-4 rounded-2xl bg-red-900/10 border border-red-500/20">
+            <h5 className="font-bold text-red-300 uppercase tracking-wider text-[9px] flex justify-between">
               <span>Security Deposit Status</span>
               <span>{selectedOrder.depositRefundStatus}</span>
             </h5>
@@ -278,7 +278,7 @@ export default function OrderManagement() {
 
                 <button
                   onClick={handleProcessRefund}
-                  className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-[10px] font-bold text-white cursor-pointer"
+                  className="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-[10px] font-bold text-white cursor-pointer"
                 >
                   Approve & Process Refund
                 </button>

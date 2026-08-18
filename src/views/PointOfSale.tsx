@@ -113,7 +113,7 @@ export default function PointOfSale() {
           {/* Customer Selection Block */}
           <div className="glass-panel p-5 rounded-2xl space-y-4">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <User className="w-4 h-4 text-indigo-400" /> Walk-In Customer Details
+              <User className="w-4 h-4 text-red-400" /> Walk-In Customer Details
             </h3>
 
             {!activeCustomer ? (
@@ -142,7 +142,7 @@ export default function PointOfSale() {
                             setSelectedCustId(c.id);
                             setCustomerSearch('');
                           }}
-                          className="w-full text-left p-3 hover:bg-indigo-900/10 flex justify-between items-center text-slate-300 cursor-pointer"
+                          className="w-full text-left p-3 hover:bg-red-900/10 flex justify-between items-center text-slate-300 cursor-pointer"
                         >
                           <div>
                             <span className="font-semibold text-white block">{c.fullName}</span>
@@ -162,7 +162,7 @@ export default function PointOfSale() {
             ) : (
               <div className="flex items-center justify-between p-3.5 bg-slate-900/40 rounded-xl border border-slate-800 text-xs text-slate-300">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center text-indigo-400 font-bold">
+                  <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center text-red-400 font-bold">
                     {activeCustomer.fullName.substring(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -195,7 +195,7 @@ export default function PointOfSale() {
           {/* Asset Selection Grid */}
           <div className="glass-panel p-5 rounded-2xl space-y-4">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <ShoppingCart className="w-4 h-4 text-indigo-400" /> Select Furniture Catalog ({currentCity})
+              <ShoppingCart className="w-4 h-4 text-red-400" /> Select Furniture Catalog ({currentCity})
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[300px] overflow-y-auto pr-1">
@@ -219,7 +219,7 @@ export default function PointOfSale() {
                     </div>
                     <button
                       onClick={() => handleAddToCart(asset)}
-                      className="bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 hover:border-indigo-500 text-indigo-300 hover:text-white rounded-lg px-2.5 py-1.5 transition-all text-[11px] font-bold cursor-pointer"
+                      className="bg-red-600/10 hover:bg-red-600 border border-red-500/20 hover:border-red-500 text-red-300 hover:text-white rounded-lg px-2.5 py-1.5 transition-all text-[11px] font-bold cursor-pointer"
                     >
                       Add
                     </button>
@@ -300,7 +300,7 @@ export default function PointOfSale() {
                             setDiscount(0);
                             setDiscountType(discountType === 'flat' ? 'percent' : 'flat');
                           }}
-                          className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold uppercase focus:outline-none"
+                          className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase focus:outline-none"
                         >
                           Toggle {discountType === 'flat' ? '%' : '₹'}
                         </button>
@@ -366,7 +366,7 @@ export default function PointOfSale() {
                 
                 <div className="flex justify-between text-slate-200 border-t border-slate-900 pt-2 text-sm">
                   <span className="font-bold">Total First Payment:</span>
-                  <span className="font-mono font-black text-indigo-400">₹{checkoutTotal.toLocaleString()}</span>
+                  <span className="font-mono font-black text-red-400">₹{checkoutTotal.toLocaleString()}</span>
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
                   * First payment includes 100% refundable security deposit + first month's rental fee.
@@ -377,7 +377,7 @@ export default function PointOfSale() {
                   disabled={!selectedCustId}
                   className={`w-full py-2.5 rounded-xl font-bold text-white text-center cursor-pointer shadow-lg transition-all ${
                     selectedCustId
-                      ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/10'
+                      ? 'bg-red-600 hover:bg-red-500 shadow-red-600/10'
                       : 'bg-slate-800 border border-slate-700/40 text-slate-400 cursor-not-allowed'
                   }`}
                 >

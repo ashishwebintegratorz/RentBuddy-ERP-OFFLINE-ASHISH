@@ -58,7 +58,7 @@ export default function ReturnInspection() {
       <div className="flex-1 space-y-4">
         <div className="glass-panel p-4 rounded-2xl flex items-center justify-between">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <ClipboardCheck className="w-4 h-4 text-indigo-400" /> Quality Control Return Queue ({currentCity})
+            <ClipboardCheck className="w-4 h-4 text-red-400" /> Quality Control Return Queue ({currentCity})
           </h3>
           <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
             Awaiting Inspection
@@ -79,7 +79,7 @@ export default function ReturnInspection() {
                   setSelectedAssetId(order.items[0]?.assetId || '');
                 }}
                 className={`p-4 glass-card rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-[150px] ${
-                  selectedOrderId === order.id ? 'border-indigo-500 bg-indigo-900/5 shadow-indigo-600/10' : 'border-slate-800/80'
+                  selectedOrderId === order.id ? 'border-red-500 bg-red-900/5 shadow-red-600/10' : 'border-slate-800/80'
                 }`}
               >
                 <div>
@@ -102,7 +102,7 @@ export default function ReturnInspection() {
 
                 <div className="border-t border-slate-850 pt-2 flex justify-between items-center text-[10px] text-slate-400">
                   <span>{order.items.length} assets to check</span>
-                  <span className="text-indigo-400 font-bold hover:underline">Start QC Checklist</span>
+                  <span className="text-red-400 font-bold hover:underline">Start QC Checklist</span>
                 </div>
               </div>
             ))
@@ -146,7 +146,7 @@ export default function ReturnInspection() {
             <form onSubmit={handleSubmit} className="space-y-4 pt-2">
               {/* Asset Snapshot details */}
               <div className="p-3 bg-slate-950/40 border border-slate-900 rounded-xl space-y-1.5">
-                <span className="text-[10px] font-bold text-indigo-400 block">{activeAsset.brand} {activeAsset.model}</span>
+                <span className="text-[10px] font-bold text-red-400 block">{activeAsset.brand} {activeAsset.model}</span>
                 <div className="text-[10px] text-slate-500 font-mono flex justify-between">
                   <span>Barcode: {activeAsset.barcode}</span>
                   <span>Rack Target: {activeAsset.rackNumber}</span>
@@ -163,7 +163,7 @@ export default function ReturnInspection() {
                     type="checkbox"
                     checked={cleanliness}
                     onChange={(e) => setCleanliness(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 bg-slate-950 rounded border-slate-800 focus:ring-indigo-500"
+                    className="w-4 h-4 text-red-600 bg-slate-950 rounded border-slate-800 focus:ring-red-500"
                   />
                   <div>
                     <span className="font-semibold block text-slate-200">Cleanliness Passed</span>
@@ -177,7 +177,7 @@ export default function ReturnInspection() {
                     type="checkbox"
                     checked={scratches}
                     onChange={(e) => setScratches(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 bg-slate-950 rounded border-slate-800 focus:ring-indigo-500"
+                    className="w-4 h-4 text-red-600 bg-slate-950 rounded border-slate-800 focus:ring-red-500"
                   />
                   <div>
                     <span className="font-semibold block text-slate-200">Scratches / Cosmetic Damage</span>
@@ -191,7 +191,7 @@ export default function ReturnInspection() {
                     type="checkbox"
                     checked={brokenParts}
                     onChange={(e) => setBrokenParts(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 bg-slate-950 rounded border-slate-800 focus:ring-indigo-500"
+                    className="w-4 h-4 text-red-600 bg-slate-950 rounded border-slate-800 focus:ring-red-500"
                   />
                   <div>
                     <span className="font-semibold block text-slate-200">Structural Damage / Broken Parts</span>
@@ -234,7 +234,7 @@ export default function ReturnInspection() {
 
               <button
                 type="submit"
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold cursor-pointer"
+                className="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer"
               >
                 Submit Quality Evaluation Sheet
               </button>

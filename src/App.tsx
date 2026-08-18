@@ -11,6 +11,7 @@ import BarcodeTracking from './views/BarcodeTracking';
 import PointOfSale from './views/PointOfSale';
 import OrderManagement from './views/OrderManagement';
 import LogisticsLog from './views/LogisticsLog';
+import LogisticsDetailDocument from './views/LogisticsDetailDocument';
 import ReturnInspection from './views/ReturnInspection';
 import RepairDashboard from './views/RepairDashboard';
 import RentalPackages from './views/RentalPackages';
@@ -80,6 +81,8 @@ function App() {
         return <OrderManagement />;
       case 'logistics':
         return <LogisticsLog />;
+      case 'logistic-docs':
+        return <LogisticsDetailDocument />;
       case 'inspection':
         return <ReturnInspection />;
       case 'repair':

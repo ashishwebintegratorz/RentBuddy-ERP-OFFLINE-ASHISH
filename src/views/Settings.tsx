@@ -172,7 +172,7 @@ export default function Settings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <Gear className="w-5.5 h-5.5 text-indigo-400" />
+            <Gear className="w-5.5 h-5.5 text-red-400" />
             Security & User Settings
           </h1>
           <p className="text-xs text-slate-400 font-medium">
@@ -194,7 +194,7 @@ export default function Settings() {
         <div className="glass-card p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4 lg:col-span-1">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded bg-indigo-500/10"><KeyRound className="w-4 h-4 text-indigo-400" /></div>
+              <div className="p-2 rounded bg-red-500/10"><KeyRound className="w-4 h-4 text-red-400" /></div>
               <div>
                 <h3 className="text-sm font-bold text-white">Change Password</h3>
                 <p className="text-[10px] text-slate-400 font-medium">Update your own profile credentials</p>
@@ -346,7 +346,7 @@ export default function Settings() {
                   <button
                     type="submit"
                     disabled={createLoading}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
                   >
                     {createLoading ? 'Provisioning...' : 'Provision User Account'}
                   </button>
@@ -358,7 +358,7 @@ export default function Settings() {
             <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded bg-indigo-500/10"><Users className="w-4 h-4 text-indigo-400" /></div>
+                  <div className="p-2 rounded bg-red-500/10"><Users className="w-4 h-4 text-red-400" /></div>
                   <div>
                     <h3 className="text-sm font-bold text-white">Existing System Operators</h3>
                     <p className="text-[10px] text-slate-400 font-medium">Replicate, audits, and reset access for active personnel</p>
@@ -399,7 +399,7 @@ export default function Settings() {
                             usr.role === 'Super Admin' 
                               ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' 
                               : usr.role === 'Operations Manager' 
-                              ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                              ? 'bg-red-500/10 border-red-500/20 text-red-400'
                               : 'bg-slate-800 border-slate-700 text-slate-300'
                           }`}>
                             {usr.role}

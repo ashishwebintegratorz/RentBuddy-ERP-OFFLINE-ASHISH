@@ -66,7 +66,7 @@ export default function RepairDashboard() {
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Active Repair Jobs</span>
             <span className="text-2xl font-bold text-white font-mono mt-1 block">{activeRepairsCount}</span>
           </div>
-          <Activity className="w-8 h-8 text-indigo-400 opacity-80" />
+          <Activity className="w-8 h-8 text-red-400 opacity-80" />
         </div>
 
         <div className="glass-card p-4 rounded-2xl flex justify-between items-center">
@@ -93,7 +93,7 @@ export default function RepairDashboard() {
         </span>
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg"
+          className="bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg"
         >
           <Plus className="w-4 h-4" /> Log Custom Repair Ticket
         </button>
@@ -250,7 +250,7 @@ export default function RepairDashboard() {
               <div className="flex gap-3 pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold cursor-pointer"
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer"
                 >
                   Dispatch to Workshop
                 </button>

@@ -215,3 +215,56 @@ export interface SystemNotification {
   read: boolean;
   city?: CityName;
 }
+
+export type LogisticsDriverStatus = 'Active' | 'Pending Verification' | 'Blocked' | 'Suspended';
+
+export type DriverVehicleType = 'Mini Truck / Tata Ace' | 'Pickup 3-Wheeler' | 'Large Van' | 'Bike / 2-Wheeler' | 'E-Loader / Electric Trike';
+
+export interface DriverDocuments {
+  profilePhoto: string;
+  drivingLicenseFront: string;
+  drivingLicenseBack: string;
+  licenseNumber: string;
+  licenseExpiry: string;
+  licenseVerified: boolean;
+  aadhaarFront: string;
+  aadhaarBack: string;
+  aadhaarNumber: string;
+  aadhaarVerified: boolean;
+  panCard: string;
+  panNumber: string;
+  panVerified: boolean;
+  vehicleRC: string;
+  vehicleNumber: string;
+  rcVerified: boolean;
+  vehicleInsurance: string;
+  insuranceExpiry: string;
+  insuranceVerified: boolean;
+  policeVerificationDoc?: string;
+  policeVerified?: boolean;
+}
+
+export interface LogisticsDriver {
+  id: string; // e.g. "DRV-8801"
+  fullName: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  city: CityName;
+  vehicleType: DriverVehicleType;
+  vehicleNumber: string;
+  status: LogisticsDriverStatus;
+  verificationStatus: VerificationStatus;
+  joiningDate: string;
+  totalDelivered: number;
+  pendingDeliveries: number;
+  deadlineOverdue: number;
+  rating: number;
+  currentLocation?: string;
+  documents: DriverDocuments;
+  isBlocked: boolean;
+  blockedReason?: string;
+  verificationNotes?: string;
+  createdAt: string;
+}
+

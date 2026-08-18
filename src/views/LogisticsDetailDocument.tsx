@@ -1,0 +1,1466 @@
+import React, { useState } from 'react';
+import { useRentBuddyStore } from '../store/rentBuddyStore';
+import { LogisticsDriver, DriverVehicleType } from '../types';
+import { compressImage } from '../utils/compressor';
+import {
+  Truck,
+  ShieldCheck,
+  ShieldAlert,
+  FileCheck,
+  Search,
+  Plus,
+  X,
+  Phone,
+  Mail,
+  MapPin,
+  Star,
+  CheckCircle2,
+  AlertTriangle,
+  Ban,
+  Upload,
+  Eye,
+  Check,
+  Edit3,
+  Clock,
+  Package,
+  Layers,
+  FileText
+} from 'lucide-react';
+
+export default function LogisticsDetailDocument() {
+  const {
+    drivers,
+    addDriver,
+    updateDriver,
+    updateDriverStatus,
+    verifyDriverDocument,
+    verifyAllDriverDocuments,
+    toggleBlockDriver,
+    updateDriverDocuments,
+    currentCity,
+    cities,
+  } = useRentBuddyStore();
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [cityFilter, setCityFilter] = useState<string>('All');
+  
+  // Modals
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [showOnboardModal, setShowOnboardModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockReasonInput, setBlockReasonInput] = useState('');
+  const [driverToBlock, setDriverToBlock] = useState<LogisticsDriver | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'pan' | 'rc' | 'insurance' | 'police'>('license');
+  const [verificationNotesInput, setVerificationNotesInput] = useState('');
+
+  // Selected driver for view document modal
+  const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+
+  // New Driver Form State
+  const [newDriverForm, setNewDriverForm] = useState({
+    fullName: '',
+    phone: '',
+    alternatePhone: '',
+    email: '',
+    city: currentCity,
+    vehicleType: 'Mini Truck / Tata Ace' as DriverVehicleType,
+    vehicleNumber: '',
+    licenseNumber: '',
+    licenseExpiry: '',
+    aadhaarNumber: '',
+    panNumber: '',
+    insuranceExpiry: '',
+  });
+
+  const [profilePhoto, setProfilePhoto] = useState('');
+  const [dlFront, setDlFront] = useState('');
+  const [dlBack, setDlBack] = useState('');
+  const [aadhaarFront, setAadhaarFront] = useState('');
+  const [aadhaarBack, setAadhaarBack] = useState('');
+  const [panCard, setPanCard] = useState('');
+  const [vehicleRC, setVehicleRC] = useState('');
+  const [vehicleInsurance, setVehicleInsurance] = useState('');
+  const [policeVerificationDoc, setPoliceVerificationDoc] = useState('');
+
+  // Edit Driver Form State
+  const [editForm, setEditForm] = useState<{
+    id: string;
+    fullName: string;
+    phone: string;
+    alternatePhone: string;
+    email: string;
+    city: any;
+    vehicleType: DriverVehicleType;
+    vehicleNumber: string;
+    licenseNumber: string;
+    licenseExpiry: string;
+    aadhaarNumber: string;
+    panNumber: string;
+    insuranceExpiry: string;
+  } | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, 600, 0.7);
+      setter(compressed);
+    } catch (err) {
+      console.error('Image compression error:', err);
+      const reader = new FileReader();
+      reader.onloadend = () => setter(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Filter Drivers
+  const filteredDrivers = drivers.filter(d => {
+    const matchSearch =
+      d.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      d.id.toLowerCase().includes(search.toLowerCase()) ||
+      d.phone.includes(search) ||
+      d.vehicleNumber.toLowerCase().includes(search.toLowerCase()) ||
+      d.city.toLowerCase().includes(search.toLowerCase());
+
+    const matchStatus =
+      statusFilter === 'All' ||
+      (statusFilter === 'Active' && d.status === 'Active' && !d.isBlocked) ||
+      (statusFilter === 'Pending' && (d.status === 'Pending Verification' || d.verificationStatus === 'Pending')) ||
+      (statusFilter === 'Blocked' && (d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended'));
+
+    const matchCity = cityFilter === 'All' || d.city === cityFilter;
+
+    return matchSearch && matchStatus && matchCity;
+  });
+
+  // Calculate Metrics
+  const totalDriversCount = drivers.length;
+  const activeDriversCount = drivers.filter(d => d.status === 'Active' && !d.isBlocked).length;
+  const pendingKYCCount = drivers.filter(d => d.verificationStatus === 'Pending' || d.status === 'Pending Verification').length;
+  const blockedDriversCount = drivers.filter(d => d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended').length;
+  const totalFleetDelivered = drivers.reduce((acc, curr) => acc + (curr.totalDelivered || 0), 0);
+
+  const handleCreateDriver = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDriverForm.fullName || !newDriverForm.phone || !newDriverForm.vehicleNumber) {
+      alert('Please fill in all required driver details');
+      return;
+    }
+
+    const defaultMockDoc = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600';
+    const defaultMockPhoto = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
+
+    addDriver({
+      fullName: newDriverForm.fullName,
+      phone: newDriverForm.phone,
+      alternatePhone: newDriverForm.alternatePhone,
+      email: newDriverForm.email || `${newDriverForm.fullName.toLowerCase().replace(/\s+/g, '')}@rentbuddy.in`,
+      city: newDriverForm.city,
+      vehicleType: newDriverForm.vehicleType,
+      vehicleNumber: newDriverForm.vehicleNumber.toUpperCase(),
+      status: 'Pending Verification',
+      verificationStatus: 'Pending',
+      joiningDate: new Date().toISOString().split('T')[0],
+      totalDelivered: 0,
+      pendingDeliveries: 0,
+      deadlineOverdue: 0,
+      rating: 5.0,
+      currentLocation: `${newDriverForm.city} Hub`,
+      isBlocked: false,
+      verificationNotes: 'Onboarded via Admin Panel. Awaiting document verification.',
+      documents: {
+        profilePhoto: profilePhoto || defaultMockPhoto,
+        drivingLicenseFront: dlFront || defaultMockDoc,
+        drivingLicenseBack: dlBack || defaultMockDoc,
+        licenseNumber: newDriverForm.licenseNumber || 'PENDING-DL',
+        licenseExpiry: newDriverForm.licenseExpiry || '2030-01-01',
+        licenseVerified: false,
+        aadhaarFront: aadhaarFront || defaultMockDoc,
+        aadhaarBack: aadhaarBack || defaultMockDoc,
+        aadhaarNumber: newDriverForm.aadhaarNumber || 'XXXX XXXX XXXX',
+        aadhaarVerified: false,
+        panCard: panCard || defaultMockDoc,
+        panNumber: newDriverForm.panNumber || 'XXXXX0000X',
+        panVerified: false,
+        vehicleRC: vehicleRC || defaultMockDoc,
+        vehicleNumber: newDriverForm.vehicleNumber.toUpperCase(),
+        rcVerified: false,
+        vehicleInsurance: vehicleInsurance || defaultMockDoc,
+        insuranceExpiry: newDriverForm.insuranceExpiry || '2027-01-01',
+        insuranceVerified: false,
+        policeVerificationDoc: policeVerificationDoc || defaultMockDoc,
+        policeVerified: false,
+      }
+    });
+
+    setShowOnboardModal(false);
+    // Reset fields
+    setNewDriverForm({
+      fullName: '',
+      phone: '',
+      alternatePhone: '',
+      email: '',
+      city: currentCity,
+      vehicleType: 'Mini Truck / Tata Ace',
+      vehicleNumber: '',
+      licenseNumber: '',
+      licenseExpiry: '',
+      aadhaarNumber: '',
+      panNumber: '',
+      insuranceExpiry: '',
+    });
+    setProfilePhoto('');
+    setDlFront('');
+    setDlBack('');
+    setAadhaarFront('');
+    setAadhaarBack('');
+    setPanCard('');
+    setVehicleRC('');
+    setVehicleInsurance('');
+  };
+
+  const handleOpenEditModal = (driver: LogisticsDriver) => {
+    setEditForm({
+      id: driver.id,
+      fullName: driver.fullName,
+      phone: driver.phone,
+      alternatePhone: driver.alternatePhone || '',
+      email: driver.email,
+      city: driver.city,
+      vehicleType: driver.vehicleType,
+      vehicleNumber: driver.vehicleNumber,
+      licenseNumber: driver.documents?.licenseNumber || '',
+      licenseExpiry: driver.documents?.licenseExpiry || '',
+      aadhaarNumber: driver.documents?.aadhaarNumber || '',
+      panNumber: driver.documents?.panNumber || '',
+      insuranceExpiry: driver.documents?.insuranceExpiry || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm) return;
+
+    updateDriver(editForm.id, {
+      fullName: editForm.fullName,
+      phone: editForm.phone,
+      alternatePhone: editForm.alternatePhone,
+      email: editForm.email,
+      city: editForm.city,
+      vehicleType: editForm.vehicleType,
+      vehicleNumber: editForm.vehicleNumber.toUpperCase(),
+    });
+
+    updateDriverDocuments(editForm.id, {
+      licenseNumber: editForm.licenseNumber,
+      licenseExpiry: editForm.licenseExpiry,
+      aadhaarNumber: editForm.aadhaarNumber,
+      panNumber: editForm.panNumber,
+      vehicleNumber: editForm.vehicleNumber.toUpperCase(),
+      insuranceExpiry: editForm.insuranceExpiry,
+    });
+
+    setShowEditModal(false);
+    setEditForm(null);
+  };
+
+  const handleOpenBlockModal = (driver: LogisticsDriver) => {
+    setDriverToBlock(driver);
+    setBlockReasonInput(driver.blockedReason || 'Policy or document compliance violation');
+    setShowBlockModal(true);
+  };
+
+  const handleConfirmBlockToggle = () => {
+    if (!driverToBlock) return;
+    const newBlockedState = !driverToBlock.isBlocked;
+    toggleBlockDriver(driverToBlock.id, newBlockedState, blockReasonInput);
+    setShowBlockModal(false);
+    setDriverToBlock(null);
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-200">
+      
+      {/* Top Banner & Header */}
+      <div className="glass-panel p-6 rounded-2xl border border-slate-700/50 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                Logistic Detail Document & Driver Fleet
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Live KYC & Compliance
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Inspect onboarded logistics personnel, verify DL & Aadhaar KYC documents, track delivery performance, and manage driver operational status.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowOnboardModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-xs shadow-lg shadow-red-600/30 transition-all border border-red-400/30"
+          >
+            <Plus className="w-4 h-4" /> Onboard New Driver
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Stats Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="glass-panel p-4 rounded-xl border border-slate-700/40 bg-slate-800/40 flex items-center gap-3.5">
+          <div className="p-2.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-medium text-slate-400">Total Fleet</div>
+            <div className="text-xl font-black text-white">{totalDriversCount} Drivers</div>
+          </div>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/20 flex items-center gap-3.5">
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-medium text-emerald-300">Verified & Active</div>
+            <div className="text-xl font-black text-emerald-400">{activeDriversCount}</div>
+          </div>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border border-amber-500/20 bg-amber-950/20 flex items-center gap-3.5">
+          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-medium text-amber-300">Pending KYC</div>
+            <div className="text-xl font-black text-amber-400">{pendingKYCCount}</div>
+          </div>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border border-rose-500/20 bg-rose-950/20 flex items-center gap-3.5">
+          <div className="p-2.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            <Ban className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-medium text-rose-300">Blocked / Flagged</div>
+            <div className="text-xl font-black text-rose-400">{blockedDriversCount}</div>
+          </div>
+        </div>
+
+        <div className="glass-panel p-4 rounded-xl border border-red-500/20 bg-red-950/20 flex items-center gap-3.5 col-span-2 sm:col-span-1">
+          <div className="p-2.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20">
+            <Package className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] font-medium text-red-300">Total Delivered</div>
+            <div className="text-xl font-black text-red-400">{totalFleetDelivered} Orders</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search Controls */}
+      <div className="glass-panel p-4 rounded-xl border border-slate-700/50 bg-slate-900/60 flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Search */}
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search driver name, ID, mobile, vehicle..."
+            className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <div className="flex bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+            {['All', 'Active', 'Pending', 'Blocked'].map((st) => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  statusFilter === st
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {/* City selector */}
+          <select
+            value={cityFilter}
+            onChange={(e) => setCityFilter(e.target.value)}
+            className="bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-red-500"
+          >
+            <option value="All">All Cities</option>
+            {cities.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Driver Cards Grid */}
+      {filteredDrivers.length === 0 ? (
+        <div className="glass-panel p-12 text-center rounded-2xl border border-slate-700/40">
+          <Truck className="w-12 h-12 text-slate-600 mx-auto mb-3 animate-pulse" />
+          <h3 className="text-sm font-bold text-slate-300">No Logistics Drivers Found</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Try adjusting your search criteria or register a new logistics driver to start managing the fleet.
+          </p>
+          <button
+            onClick={() => setShowOnboardModal(true)}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md transition-all"
+          >
+            <Plus className="w-4 h-4" /> Onboard First Driver
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredDrivers.map((driver) => {
+            const isBlocked = driver.isBlocked || driver.status === 'Blocked' || driver.status === 'Suspended';
+            const isVerified = driver.verificationStatus === 'Verified' && !isBlocked;
+
+            return (
+              <div
+                key={driver.id}
+                className={`group relative rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col justify-between ${
+                  isBlocked
+                    ? 'bg-rose-950/10 border-rose-500/30 hover:border-rose-500/50 shadow-lg shadow-rose-950/20'
+                    : isVerified
+                    ? 'bg-slate-900/70 border-slate-700/60 hover:border-red-500/50 shadow-lg hover:shadow-red-950/30'
+                    : 'bg-amber-950/10 border-amber-500/30 hover:border-amber-500/50 shadow-lg'
+                }`}
+              >
+                {/* Top Card Header */}
+                <div className="p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar Photo */}
+                      <div className="relative">
+                        <img
+                          src={driver.documents?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
+                          alt={driver.fullName}
+                          className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-700/80 shadow-md group-hover:border-red-400/60 transition-colors"
+                        />
+                        <span
+                          className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 ${
+                            isBlocked
+                              ? 'bg-rose-500'
+                              : isVerified
+                              ? 'bg-emerald-500 animate-pulse'
+                              : 'bg-amber-500'
+                          }`}
+                          title={isBlocked ? 'Blocked' : isVerified ? 'Active & Verified' : 'Pending Verification'}
+                        />
+                      </div>
+
+                      {/* Name & ID */}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-extrabold text-sm text-white group-hover:text-red-300 transition-colors">
+                            {driver.fullName}
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-red-400 border border-slate-700">
+                            {driver.id}
+                          </span>
+                          <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-slate-500" /> {driver.city.replace(' (Head Office)', '')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div>
+                      {isBlocked ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          <Ban className="w-3 h-3" /> Blocked
+                        </span>
+                      ) : isVerified ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <CheckCircle2 className="w-3 h-3" /> Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <Clock className="w-3 h-3" /> Pending KYC
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vehicle Info Badge */}
+                  <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-red-400 shrink-0" />
+                      <span className="text-slate-300 font-medium text-[11px] truncate max-w-[150px]">
+                        {driver.vehicleType}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-[11px] text-amber-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">
+                      {driver.vehicleNumber}
+                    </span>
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-1 text-[11px] text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="font-mono text-slate-300">{driver.phone}</span>
+                      {driver.alternatePhone && (
+                        <span className="text-[10px] text-slate-500">({driver.alternatePhone})</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="truncate text-slate-300">{driver.email}</span>
+                    </div>
+                  </div>
+
+                  {/* Live Performance Metric Badges (As requested by user) */}
+                  <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800">
+                    <div className="bg-slate-800/50 p-2 rounded-xl text-center border border-slate-700/40">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">Delivered</div>
+                      <div className="text-sm font-black text-emerald-400 mt-0.5">{driver.totalDelivered || 0}</div>
+                    </div>
+
+                    <div className="bg-slate-800/50 p-2 rounded-xl text-center border border-slate-700/40">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">Pending</div>
+                      <div className="text-sm font-black text-red-400 mt-0.5">{driver.pendingDeliveries || 0}</div>
+                    </div>
+
+                    <div className="bg-slate-800/50 p-2 rounded-xl text-center border border-slate-700/40">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase">Overdue</div>
+                      <div className={`text-sm font-black mt-0.5 ${driver.deadlineOverdue > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-400'}`}>
+                        {driver.deadlineOverdue || 0}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 p-2 rounded-xl text-center border border-slate-700/40">
+                      <div className="text-[9px] font-bold text-slate-400 uppercase flex items-center justify-center gap-0.5">
+                        <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" /> Rating
+                      </div>
+                      <div className="text-sm font-black text-amber-400 mt-0.5">{driver.rating || 5.0}</div>
+                    </div>
+                  </div>
+
+                  {/* Block reason notice if blocked */}
+                  {isBlocked && driver.blockedReason && (
+                    <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-500/30 text-[10px] text-rose-300 flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                      <span>{driver.blockedReason}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Actions Footer (View Document, Block/Unblock, Edit) */}
+                <div className="p-3.5 bg-slate-950/60 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedDriverId(driver.id);
+                      setVerificationNotesInput(driver.verificationNotes || '');
+                      setActiveDocTab('license');
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white font-bold text-xs shadow-md shadow-red-900/30 transition-all border border-red-400/30"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View Documents
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenEditModal(driver)}
+                    title="Edit Driver Details"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenBlockModal(driver)}
+                    title={isBlocked ? 'Unblock Driver' : 'Block Driver'}
+                    className={`p-2 rounded-xl border transition-colors ${
+                      isBlocked
+                        ? 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-400 border-emerald-500/30'
+                        : 'bg-rose-950/40 hover:bg-rose-900/50 text-rose-400 border-rose-500/30'
+                    }`}
+                  >
+                    {isBlocked ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VIEW DOCUMENTS & KYC INSPECTION MODAL (Requested specifically by user) */}
+      {/* ========================================================================= */}
+      {selectedDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-4xl max-h-[92vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+              <div className="flex items-center gap-3">
+                <img
+                  src={selectedDriver.documents?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
+                  alt={selectedDriver.fullName}
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-700"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-black text-white">{selectedDriver.fullName}</h2>
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30">
+                      {selectedDriver.id}
+                    </span>
+                    {selectedDriver.isBlocked ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        Blocked
+                      </span>
+                    ) : selectedDriver.verificationStatus === 'Verified' ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Verified Driver
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Pending KYC Review
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {selectedDriver.vehicleType} • <span className="font-mono text-amber-400">{selectedDriver.vehicleNumber}</span> • Joined {selectedDriver.joiningDate}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedDriverId(null)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body - Tabbed Document Inspection */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Document Categories Tabs */}
+              <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+                {[
+                  { id: 'license', label: 'Driving License (DL)', icon: FileText, verified: selectedDriver.documents?.licenseVerified },
+                  { id: 'aadhaar', label: 'Aadhaar Card', icon: ShieldCheck, verified: selectedDriver.documents?.aadhaarVerified },
+                  { id: 'pan', label: 'PAN Card', icon: FileCheck, verified: selectedDriver.documents?.panVerified },
+                  { id: 'rc', label: 'Vehicle RC Book', icon: Truck, verified: selectedDriver.documents?.rcVerified },
+                  { id: 'insurance', label: 'Vehicle Insurance', icon: Layers, verified: selectedDriver.documents?.insuranceVerified },
+                  { id: 'police', label: 'Police Verification', icon: ShieldAlert, verified: selectedDriver.documents?.policeVerified },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeDocTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveDocTab(tab.id as any)}
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                        isActive
+                          ? 'bg-red-600 text-white shadow-lg shadow-red-600/30 border border-red-400/40'
+                          : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{tab.label}</span>
+                      {tab.verified ? (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" title="Verified" />
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-amber-400" title="Pending" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Document Details & Image Previews */}
+              {activeDocTab === 'license' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">License Number</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'Not Provided'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Expiry Date</span>
+                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.documents?.licenseExpiry || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end">
+                      <button
+                        onClick={() => verifyDriverDocument(selectedDriver.id, 'licenseVerified', !selectedDriver.documents?.licenseVerified)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          selectedDriver.documents?.licenseVerified
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {selectedDriver.documents?.licenseVerified ? <Check className="w-3.5 h-3.5" /> : null}
+                        {selectedDriver.documents?.licenseVerified ? 'Verified DL' : 'Mark DL Verified'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Front Image */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
+                        <span>DL Front Copy</span>
+                        <button
+                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseFront, title: 'Driving License - Front' })}
+                          className="text-red-400 hover:text-red-300 flex items-center gap-1"
+                        >
+                          <Eye className="w-3 h-3" /> Zoom
+                        </button>
+                      </div>
+                      <div
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseFront, title: 'Driving License - Front' })}
+                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center"
+                      >
+                        <img
+                          src={selectedDriver.documents?.drivingLicenseFront}
+                          alt="DL Front"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Eye className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Back Image */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
+                        <span>DL Back Copy</span>
+                        <button
+                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseBack, title: 'Driving License - Back' })}
+                          className="text-red-400 hover:text-red-300 flex items-center gap-1"
+                        >
+                          <Eye className="w-3 h-3" /> Zoom
+                        </button>
+                      </div>
+                      <div
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseBack, title: 'Driving License - Back' })}
+                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center"
+                      >
+                        <img
+                          src={selectedDriver.documents?.drivingLicenseBack}
+                          alt="DL Back"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Eye className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDocTab === 'aadhaar' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Aadhaar (UIDAI) Number</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.aadhaarNumber || 'Not Provided'}</span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end">
+                      <button
+                        onClick={() => verifyDriverDocument(selectedDriver.id, 'aadhaarVerified', !selectedDriver.documents?.aadhaarVerified)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          selectedDriver.documents?.aadhaarVerified
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {selectedDriver.documents?.aadhaarVerified ? <Check className="w-3.5 h-3.5" /> : null}
+                        {selectedDriver.documents?.aadhaarVerified ? 'Verified Aadhaar' : 'Mark Aadhaar Verified'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-slate-400 font-semibold block">Aadhaar Front</span>
+                      <div
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarFront, title: 'Aadhaar Card - Front' })}
+                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                      >
+                        <img
+                          src={selectedDriver.documents?.aadhaarFront}
+                          alt="Aadhaar Front"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-xs text-slate-400 font-semibold block">Aadhaar Back</span>
+                      <div
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarBack, title: 'Aadhaar Card - Back' })}
+                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                      >
+                        <img
+                          src={selectedDriver.documents?.aadhaarBack}
+                          alt="Aadhaar Back"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDocTab === 'pan' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">PAN Number</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.panNumber || 'Not Provided'}</span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end">
+                      <button
+                        onClick={() => verifyDriverDocument(selectedDriver.id, 'panVerified', !selectedDriver.documents?.panVerified)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          selectedDriver.documents?.panVerified
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {selectedDriver.documents?.panVerified ? <Check className="w-3.5 h-3.5" /> : null}
+                        {selectedDriver.documents?.panVerified ? 'Verified PAN' : 'Mark PAN Verified'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <span className="text-xs text-slate-400 font-semibold block text-center">PAN Card Photo</span>
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.panCard, title: 'PAN Card Copy' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                    >
+                      <img
+                        src={selectedDriver.documents?.panCard}
+                        alt="PAN Card"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDocTab === 'rc' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Vehicle Registration (RC) Number</span>
+                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleNumber}</span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end">
+                      <button
+                        onClick={() => verifyDriverDocument(selectedDriver.id, 'rcVerified', !selectedDriver.documents?.rcVerified)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          selectedDriver.documents?.rcVerified
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {selectedDriver.documents?.rcVerified ? <Check className="w-3.5 h-3.5" /> : null}
+                        {selectedDriver.documents?.rcVerified ? 'Verified RC' : 'Mark RC Verified'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <span className="text-xs text-slate-400 font-semibold block text-center">Vehicle RC Certificate</span>
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehicleRC, title: 'Vehicle RC Document' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                    >
+                      <img
+                        src={selectedDriver.documents?.vehicleRC}
+                        alt="Vehicle RC"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDocTab === 'insurance' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Insurance Policy Validity</span>
+                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.documents?.insuranceExpiry || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Coverage Type</span>
+                      <span className="text-slate-200 font-bold text-sm">Comprehensive Commercial</span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end">
+                      <button
+                        onClick={() => verifyDriverDocument(selectedDriver.id, 'insuranceVerified', !selectedDriver.documents?.insuranceVerified)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          selectedDriver.documents?.insuranceVerified
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {selectedDriver.documents?.insuranceVerified ? <Check className="w-3.5 h-3.5" /> : null}
+                        {selectedDriver.documents?.insuranceVerified ? 'Verified Insurance' : 'Mark Insurance Verified'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <span className="text-xs text-slate-400 font-semibold block text-center">Insurance Policy Document</span>
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehicleInsurance, title: 'Vehicle Insurance Policy' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                    >
+                      <img
+                        src={selectedDriver.documents?.vehicleInsurance}
+                        alt="Insurance"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDocTab === 'police' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Background & Police Clearance</span>
+                      <span className="text-slate-200 font-bold text-sm">State Police Verification Certificate</span>
+                    </div>
+                    <button
+                      onClick={() => verifyDriverDocument(selectedDriver.id, 'policeVerified', !selectedDriver.documents?.policeVerified)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        selectedDriver.documents?.policeVerified
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                      }`}
+                    >
+                      {selectedDriver.documents?.policeVerified ? <Check className="w-3.5 h-3.5" /> : null}
+                      {selectedDriver.documents?.policeVerified ? 'Verified Police Doc' : 'Mark Police Doc Verified'}
+                    </button>
+                  </div>
+
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <span className="text-xs text-slate-400 font-semibold block text-center">Police Verification Copy</span>
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.policeVerificationDoc || '', title: 'Police Clearance Certificate' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                    >
+                      <img
+                        src={selectedDriver.documents?.policeVerificationDoc}
+                        alt="Police Verification"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Verification Notes Box */}
+              <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">Fleet Admin Verification Notes</label>
+                <div className="flex gap-2">
+                  <textarea
+                    rows={2}
+                    value={verificationNotesInput}
+                    onChange={(e) => setVerificationNotesInput(e.target.value)}
+                    placeholder="Add audit notes, verification observations, or missing document alerts..."
+                    className="flex-1 bg-slate-900/90 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  />
+                  <button
+                    onClick={() => {
+                      updateDriverStatus(selectedDriver.id, selectedDriver.status, verificationNotesInput);
+                      alert('Verification notes saved successfully.');
+                    }}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold self-end transition-colors"
+                  >
+                    Save Notes
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="p-5 border-t border-slate-800 bg-slate-950/90 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {/* Block / Unblock Driver Button */}
+                <button
+                  onClick={() => {
+                    handleOpenBlockModal(selectedDriver);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                    selectedDriver.isBlocked
+                      ? 'bg-emerald-600/90 hover:bg-emerald-600 text-white border-emerald-400/40'
+                      : 'bg-rose-600/90 hover:bg-rose-600 text-white border-rose-400/40 shadow-lg shadow-rose-950/40'
+                  }`}
+                >
+                  <Ban className="w-4 h-4" />
+                  {selectedDriver.isBlocked ? 'Unblock Driver' : 'Block / Suspend Driver'}
+                </button>
+
+                {/* Edit Documents & Details */}
+                <button
+                  onClick={() => {
+                    setSelectedDriverId(null);
+                    handleOpenEditModal(selectedDriver);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-colors"
+                >
+                  <Edit3 className="w-4 h-4" /> Update Documents
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    verifyAllDriverDocuments(selectedDriver.id, 'Rejected', verificationNotesInput);
+                    alert(`Driver ${selectedDriver.fullName} KYC marked as Rejected.`);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 text-xs font-bold transition-colors"
+                >
+                  Reject KYC
+                </button>
+
+                <button
+                  onClick={() => {
+                    verifyAllDriverDocuments(selectedDriver.id, 'Verified', verificationNotesInput);
+                    alert(`Driver ${selectedDriver.fullName} documents successfully verified and approved!`);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-black shadow-lg shadow-emerald-900/30 transition-all border border-emerald-400/30"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Approve & Verify All Documents
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ONBOARD NEW DRIVER MODAL */}
+      {/* ========================================================================= */}
+      {showOnboardModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-2xl max-h-[90vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-red-500/20 text-red-400">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white">Onboard New Logistics Driver</h2>
+                  <p className="text-xs text-slate-400">Register delivery partner and upload initial KYC files.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowOnboardModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDriver} className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDriverForm.fullName}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, fullName: e.target.value })}
+                    placeholder="e.g. Mukesh Solanki"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Mobile Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={newDriverForm.phone}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, phone: e.target.value })}
+                    placeholder="e.g. 9826012345"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Alternate Phone</label>
+                  <input
+                    type="tel"
+                    value={newDriverForm.alternatePhone}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, alternatePhone: e.target.value })}
+                    placeholder="e.g. 9826099999"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={newDriverForm.email}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, email: e.target.value })}
+                    placeholder="e.g. mukesh.driver@gmail.com"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Operating City</label>
+                  <select
+                    value={newDriverForm.city}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, city: e.target.value as any })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  >
+                    {cities.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Vehicle Type</label>
+                  <select
+                    value={newDriverForm.vehicleType}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, vehicleType: e.target.value as any })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  >
+                    <option value="Mini Truck / Tata Ace">Mini Truck / Tata Ace</option>
+                    <option value="Pickup 3-Wheeler">Pickup 3-Wheeler</option>
+                    <option value="Large Van">Large Van</option>
+                    <option value="Bike / 2-Wheeler">Bike / 2-Wheeler</option>
+                    <option value="E-Loader / Electric Trike">E-Loader / Electric Trike</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Vehicle Registration No *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDriverForm.vehicleNumber}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, vehicleNumber: e.target.value.toUpperCase() })}
+                    placeholder="e.g. MP-09-AB-1234"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 uppercase focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Driving License (DL) No</label>
+                  <input
+                    type="text"
+                    value={newDriverForm.licenseNumber}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, licenseNumber: e.target.value })}
+                    placeholder="e.g. MP09-2021-004812"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Aadhaar (UIDAI) No</label>
+                  <input
+                    type="text"
+                    value={newDriverForm.aadhaarNumber}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, aadhaarNumber: e.target.value })}
+                    placeholder="e.g. 1234 5678 9012"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">PAN Card No</label>
+                  <input
+                    type="text"
+                    value={newDriverForm.panNumber}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, panNumber: e.target.value.toUpperCase() })}
+                    placeholder="e.g. ABCDE1234F"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 uppercase focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+
+              {/* Document File Attachments */}
+              <div className="pt-3 border-t border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">KYC Document Uploads</h4>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  {/* Photo Upload */}
+                  <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
+                    <span className="font-semibold text-slate-300 block">Profile Photo</span>
+                    <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
+                      <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                      <span className="text-[10px] text-slate-400">{profilePhoto ? 'Photo Attached ✓' : 'Upload Selfie/Photo'}</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setProfilePhoto)} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* DL Front */}
+                  <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
+                    <span className="font-semibold text-slate-300 block">Driving License Front</span>
+                    <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
+                      <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                      <span className="text-[10px] text-slate-400">{dlFront ? 'DL Attached ✓' : 'Upload DL Image'}</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setDlFront)} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* Aadhaar Front */}
+                  <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
+                    <span className="font-semibold text-slate-300 block">Aadhaar Front Copy</span>
+                    <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
+                      <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                      <span className="text-[10px] text-slate-400">{aadhaarFront ? 'Aadhaar Attached ✓' : 'Upload Aadhaar'}</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setAadhaarFront)} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOnboardModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-900/30"
+                >
+                  Onboard & Save Driver
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* EDIT DRIVER DETAILS MODAL */}
+      {/* ========================================================================= */}
+      {showEditModal && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-xl max-h-[90vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+              <h2 className="text-base font-black text-white">Update Driver Details ({editForm.id})</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editForm.fullName}
+                    onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Mobile Phone</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Vehicle Type</label>
+                  <select
+                    value={editForm.vehicleType}
+                    onChange={(e) => setEditForm({ ...editForm, vehicleType: e.target.value as any })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-red-500"
+                  >
+                    <option value="Mini Truck / Tata Ace">Mini Truck / Tata Ace</option>
+                    <option value="Pickup 3-Wheeler">Pickup 3-Wheeler</option>
+                    <option value="Large Van">Large Van</option>
+                    <option value="Bike / 2-Wheeler">Bike / 2-Wheeler</option>
+                    <option value="E-Loader / Electric Trike">E-Loader / Electric Trike</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Vehicle Plate No</label>
+                  <input
+                    type="text"
+                    value={editForm.vehicleNumber}
+                    onChange={(e) => setEditForm({ ...editForm, vehicleNumber: e.target.value.toUpperCase() })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 uppercase focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">License No</label>
+                  <input
+                    type="text"
+                    value={editForm.licenseNumber}
+                    onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">License Expiry</label>
+                  <input
+                    type="date"
+                    value={editForm.licenseExpiry}
+                    onChange={(e) => setEditForm({ ...editForm, licenseExpiry: e.target.value })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold shadow-lg"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* BLOCK / SUSPEND DRIVER MODAL (Requested specifically by user) */}
+      {/* ========================================================================= */}
+      {showBlockModal && driverToBlock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-md rounded-2xl border border-rose-500/30 bg-slate-900 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30">
+                <Ban className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">
+                  {driverToBlock.isBlocked ? 'Unblock Driver Fleet Partner' : 'Block & Suspend Driver'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {driverToBlock.fullName} ({driverToBlock.id})
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {driverToBlock.isBlocked
+                ? 'Unblocking will restore this driver to active logistics duty, allowing delivery assignment and portal access.'
+                : 'Blocking this driver will immediately suspend their dispatch eligibility and flag their profile in the ERP.'}
+            </p>
+
+            {!driverToBlock.isBlocked && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 block">Reason for Blocking *</label>
+                <input
+                  type="text"
+                  value={blockReasonInput}
+                  onChange={(e) => setBlockReasonInput(e.target.value)}
+                  placeholder="e.g. Expired DL, Damaged Return Asset, Repeated Pickup Delay..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-rose-500"
+                />
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowBlockModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmBlockToggle}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg ${
+                  driverToBlock.isBlocked
+                    ? 'bg-emerald-600 hover:bg-emerald-500'
+                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/50'
+                }`}
+              >
+                {driverToBlock.isBlocked ? 'Confirm Unblock' : 'Confirm Block Driver'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* HIGH-RES IMAGE ZOOM MODAL */}
+      {/* ========================================================================= */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn cursor-pointer"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+            <div className="flex items-center justify-between w-full pb-2 text-white text-xs font-bold">
+              <span>{previewImage.title}</span>
+              <button onClick={() => setPreviewImage(null)} className="p-1 text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.title}
+              className="max-w-full max-h-[80vh] rounded-2xl object-contain border border-slate-700 shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

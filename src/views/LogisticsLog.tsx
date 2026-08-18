@@ -42,9 +42,9 @@ export default function LogisticsLog() {
       <div className="flex-1 space-y-4">
         <div className="glass-panel p-4 rounded-2xl flex items-center justify-between">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Truck className="w-4 h-4 text-indigo-400" /> Active Shipping & Transit Tasks ({currentCity})
+            <Truck className="w-4 h-4 text-red-400" /> Active Shipping & Transit Tasks ({currentCity})
           </h3>
-          <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
+          <span className="text-[10px] text-red-400 font-bold bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20">
             Logistics Dashboard
           </span>
         </div>
@@ -60,7 +60,7 @@ export default function LogisticsLog() {
                 key={order.id}
                 onClick={() => setSelectedOrderId(order.id)}
                 className={`p-4 glass-card rounded-2xl border cursor-pointer transition-all flex flex-col justify-between h-[150px] ${
-                  selectedOrderId === order.id ? 'border-indigo-500 bg-indigo-900/5 shadow-indigo-600/10 shadow-lg' : 'border-slate-800/80'
+                  selectedOrderId === order.id ? 'border-red-500 bg-red-900/5 shadow-red-600/10 shadow-lg' : 'border-slate-800/80'
                 }`}
               >
                 <div>
@@ -84,7 +84,7 @@ export default function LogisticsLog() {
 
                 <div className="border-t border-slate-800/50 pt-2 flex justify-between items-center text-[10px] text-slate-400">
                   <span>{order.items.length} units tag scan checklist</span>
-                  <ChevronRight className="w-4 h-4 text-indigo-400" />
+                  <ChevronRight className="w-4 h-4 text-red-400" />
                 </div>
               </div>
             ))
@@ -111,15 +111,15 @@ export default function LogisticsLog() {
           {/* Delivery Details */}
           <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-900 space-y-2">
             <div className="flex items-center gap-1.5 font-bold text-white text-xs">
-              <User className="w-3.5 h-3.5 text-indigo-400" />
+              <User className="w-3.5 h-3.5 text-red-400" />
               <span>{selectedOrder.customerName}</span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-              <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+              <MapPin className="w-3.5 h-3.5 text-red-400" />
               <span>{selectedOrder.customerMobile}</span>
             </div>
             <div className="text-[11px] text-slate-400 pt-1">
-              Status: <span className="font-mono font-bold text-indigo-300">{selectedOrder.status}</span>
+              Status: <span className="font-mono font-bold text-red-300">{selectedOrder.status}</span>
             </div>
           </div>
 
@@ -155,7 +155,7 @@ export default function LogisticsLog() {
                     ) : (
                       <button
                         onClick={() => handleBarcodeScan(item.assetId, 'loading')}
-                        className="bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer"
+                        className="bg-red-600/25 border border-red-500/30 text-red-300 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer"
                       >
                         Simulate Scan
                       </button>
@@ -167,7 +167,7 @@ export default function LogisticsLog() {
               {selectedOrder.scannedAtLoading && selectedOrder.status === 'Pending' && (
                 <button
                   onClick={() => updateOrderStatus(selectedOrder.id, 'Assigned')}
-                  className="w-full py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold cursor-pointer"
+                  className="w-full py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold cursor-pointer"
                 >
                   Confirm Loaded onto Vehicle
                 </button>
@@ -185,7 +185,7 @@ export default function LogisticsLog() {
                 {selectedOrder.status === 'Assigned' ? (
                   <button
                     onClick={() => updateOrderStatus(selectedOrder.id, 'Out for Delivery')}
-                    className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold cursor-pointer"
+                    className="w-full py-1.5 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold cursor-pointer"
                   >
                     Set Transit: Out for Delivery
                   </button>
@@ -200,7 +200,7 @@ export default function LogisticsLog() {
                           ) : (
                             <button
                               onClick={() => handleBarcodeScan(item.assetId, 'delivery')}
-                              className="bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer"
+                              className="bg-red-600/25 border border-red-500/30 text-red-300 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer"
                             >
                               Simulate Scan
                             </button>
@@ -239,7 +239,7 @@ export default function LogisticsLog() {
                       ) : (
                         <button
                           onClick={() => handleBarcodeScan(item.assetId, 'pickup')}
-                          className="bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer"
+                          className="bg-red-600/25 border border-red-500/30 text-red-300 px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer"
                         >
                           Simulate Scan
                         </button>
@@ -251,7 +251,7 @@ export default function LogisticsLog() {
                 {selectedOrder.scannedAtPickup && selectedOrder.status === 'Return Pickup' && (
                   <button
                     onClick={() => updateOrderStatus(selectedOrder.id, 'Returned')}
-                    className="w-full py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold cursor-pointer"
+                    className="w-full py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold cursor-pointer"
                   >
                     Confirm Loaded for Return
                   </button>

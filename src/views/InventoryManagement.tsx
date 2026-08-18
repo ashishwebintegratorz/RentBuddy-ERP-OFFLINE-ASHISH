@@ -132,7 +132,7 @@ export default function InventoryManagement() {
       case 'Available':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Available</span>;
       case 'Rented':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Rented</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">Rented</span>;
       case 'Reserved':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Reserved</span>;
       case 'Under Repair':
@@ -205,7 +205,7 @@ export default function InventoryManagement() {
 
             <button
               onClick={() => setShowAddAsset(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg"
+              className="bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg"
             >
               <Plus className="w-4 h-4" /> Add Furniture Asset
             </button>
@@ -233,14 +233,14 @@ export default function InventoryManagement() {
                     key={asset.id}
                     onClick={() => setSelectedAssetId(asset.id)}
                     className={`hover:bg-slate-800/15 cursor-pointer transition-colors ${
-                      selectedAssetId === asset.id ? 'bg-indigo-900/5' : ''
+                      selectedAssetId === asset.id ? 'bg-red-900/5' : ''
                     }`}
                   >
                     <td className="p-4">
                       <div>
                         <div className="font-bold text-white text-sm">{asset.brand} {asset.model}</div>
                         <div className="text-[10px] text-slate-500 mt-0.5 flex gap-2">
-                          <span className="font-mono text-indigo-400">{asset.id}</span>
+                          <span className="font-mono text-red-400">{asset.id}</span>
                           <span>|</span>
                           <span>{asset.category}</span>
                           <span>|</span>
@@ -261,7 +261,7 @@ export default function InventoryManagement() {
                           e.stopPropagation();
                           setSelectedAssetId(asset.id);
                         }}
-                        className="text-indigo-400 hover:text-indigo-300 font-semibold text-[11px]"
+                        className="text-red-400 hover:text-red-300 font-semibold text-[11px]"
                       >
                         Lifecycle ROI
                       </button>
@@ -325,8 +325,8 @@ export default function InventoryManagement() {
           </div>
 
           {/* ROI Telemetry (Calculated dynamically) */}
-          <div className="p-4 bg-gradient-to-br from-indigo-950/30 to-purple-950/30 border border-indigo-500/25 rounded-2xl space-y-3 relative">
-            <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider block">Financial ROI Performance</span>
+          <div className="p-4 bg-gradient-to-br from-red-950/30 to-purple-950/30 border border-red-500/25 rounded-2xl space-y-3 relative">
+            <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider block">Financial ROI Performance</span>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -339,7 +339,7 @@ export default function InventoryManagement() {
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-2 border-t border-indigo-900/60 text-xs">
+            <div className="flex justify-between items-center pt-2 border-t border-red-900/60 text-xs">
               <span className="text-slate-400">ROI Return Metric:</span>
               <span className="font-mono font-bold text-emerald-400 text-sm">
                 {selectedAsset.purchaseCost > 0 ? Math.round((selectedAsset.lifecycle.revenueEarned / selectedAsset.purchaseCost) * 100) : 0}%
@@ -382,7 +382,7 @@ export default function InventoryManagement() {
           {/* Quick Actions (Relocate / Status change) */}
           <div className="space-y-3 pt-3 border-t border-slate-800">
             <h5 className="font-bold text-slate-400 uppercase tracking-wider text-[10px] flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-indigo-400" /> Relocate Warehouse / Change State
+              <MapPin className="w-3 h-3 text-red-400" /> Relocate Warehouse / Change State
             </h5>
             <div className="space-y-2.5">
               <div>
@@ -554,7 +554,7 @@ export default function InventoryManagement() {
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="text-[10px] text-slate-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-500/20 file:text-indigo-300 hover:file:bg-indigo-500/30 cursor-pointer"
+                    className="text-[10px] text-slate-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-red-500/20 file:text-red-300 hover:file:bg-red-500/30 cursor-pointer"
                   />
                   {newAsset.imageUrl && (
                     <div className="flex items-center gap-2">
@@ -576,7 +576,7 @@ export default function InventoryManagement() {
               <div className="flex gap-3 pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold cursor-pointer"
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer"
                 >
                   Procure Asset & Generate Barcode
                 </button>

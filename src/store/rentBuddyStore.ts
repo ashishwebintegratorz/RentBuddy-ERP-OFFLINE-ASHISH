@@ -166,57 +166,7 @@ interface RentBuddyState {
 // Generate unique IDs
 const genId = (prefix: string) => `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-// Mock documents for pre-populated database
-const mockSelfie = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
-const mockDocImage = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300';
-
-const initialPackages: RentalPackage[] = [
-  {
-    id: 'PKG-STUDENT',
-    name: 'Student Essential Bundle',
-    description: 'Perfect setup for students living away from home. Includes a single bed, a study table, and a comfortable chair.',
-    includedAssets: [
-      { category: 'Bed', quantity: 1 },
-      { category: 'Study Table', quantity: 1 },
-      { category: 'Chair', quantity: 1 },
-    ],
-    offerPrice: 999,
-    securityDeposit: 1500,
-    discountPercent: 20,
-    durationMonths: 6,
-  },
-  {
-    id: 'PKG-COUPLE',
-    name: 'Cozy Couple Combo',
-    description: 'Complete living and bedroom setup for young couples. Includes a Double Bed with mattress, 3-seater Sofa, and Fridge.',
-    includedAssets: [
-      { category: 'Bed', quantity: 1 },
-      { category: 'Mattress', quantity: 1 },
-      { category: 'Sofa', quantity: 1 },
-      { category: 'Refrigerator', quantity: 1 },
-    ],
-    offerPrice: 2499,
-    securityDeposit: 4500,
-    discountPercent: 15,
-    durationMonths: 12,
-  },
-  {
-    id: 'PKG-OFFICE',
-    name: 'Startup Office Basic',
-    description: 'Set up your small office space instantly. Contains 3 ergonomic office chairs, 3 desks, and a small TV unit.',
-    includedAssets: [
-      { category: 'Chair', quantity: 3 },
-      { category: 'Study Table', quantity: 3 },
-      { category: 'TV Unit', quantity: 1 },
-    ],
-    offerPrice: 3499,
-    securityDeposit: 6000,
-    discountPercent: 25,
-    durationMonths: 12,
-  },
-];
-
-const BACKEND_URL = 'http://localhost:5001/api';
+const BACKEND_URL = 'http://localhost:5001/api/v1';
 
 // Debounced synchronization engine to prevent database flooding
 let syncTimeout: any = null;
@@ -264,651 +214,8 @@ const syncToDatabase = (state: any) => {
 export const useRentBuddyStore = create<RentBuddyState>()(
   persist(
     (set, get) => {
-      // Setup Initial Mock Data if state is initialized first time
+      // Clean Initial State (Populated dynamically from MongoDB Atlas)
       const getInitialState = () => {
-        // Prepopulated Customers
-        const mockCustomers: Customer[] = [
-          {
-            id: 'RB-CUST-1001',
-            fullName: 'Rajesh Kumar',
-            mobileNumber: '9876543210',
-            alternateNumber: '9123456789',
-            email: 'rajesh.kumar@gmail.com',
-            aadhaarNumber: '1234 5678 9012',
-            panNumber: 'ABCDE1234F',
-            occupation: 'Software Engineer',
-            employer: 'TCS Noida',
-            monthlyIncome: 75000,
-            currentAddress: 'Sector 62, Landmark Residency, Flat 405',
-            permanentAddress: '12, Shanti Nagar, Jaipur, Rajasthan',
-            landmark: 'Near Fortis Hospital',
-            gpsLocation: '28.6273, 77.3725',
-            deliveryAddress: 'Palasia Square, flat 405, Indore (Head Office)',
-            billingAddress: 'Palasia Square, flat 405, Indore (Head Office)',
-            landlordName: 'S. K. Gupta',
-            landlordMobile: '9988776655',
-            landlordId: 'LL-49292',
-            status: 'Good Customer',
-            verificationStatus: 'Verified',
-            documents: {
-              aadhaarFront: mockDocImage,
-              aadhaarBack: mockDocImage,
-              panCard: mockDocImage,
-              rentAgreement: mockDocImage,
-              selfie: mockSelfie,
-            },
-            createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'RB-CUST-1002',
-            fullName: 'Sonia Gupta',
-            mobileNumber: '9812345678',
-            alternateNumber: '9876123456',
-            email: 'sonia.gupta@outlook.com',
-            aadhaarNumber: '9876 5432 1098',
-            panNumber: 'XYZWP5678G',
-            occupation: 'UI Designer',
-            employer: 'Freelaner Inc.',
-            monthlyIncome: 45000,
-            currentAddress: 'Andheri West, Link Road, Orchid Towers, 12th Floor',
-            permanentAddress: '45, Lake View, Bhopal, MP',
-            landmark: 'Behind Infinity Mall',
-            gpsLocation: '19.1197, 72.8464',
-            deliveryAddress: 'Arera Colony, Orchid Towers, 12th Floor, Bhopal',
-            billingAddress: 'Arera Colony, Orchid Towers, 12th Floor, Bhopal',
-            landlordName: 'Haresh Mehta',
-            landlordMobile: '9001100220',
-            landlordId: 'LL-99881',
-            status: 'VIP',
-            verificationStatus: 'Verified',
-            documents: {
-              aadhaarFront: mockDocImage,
-              aadhaarBack: mockDocImage,
-              panCard: mockDocImage,
-              rentAgreement: mockDocImage,
-              selfie: mockSelfie,
-            },
-            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'RB-CUST-1003',
-            fullName: 'Vikram Singh',
-            mobileNumber: '9765432109',
-            alternateNumber: '',
-            email: 'vikram.singh@gmail.com',
-            aadhaarNumber: '4455 6677 8899',
-            panNumber: 'JKLMN9012H',
-            occupation: 'Student',
-            employer: 'IIT Indore',
-            monthlyIncome: 12000,
-            currentAddress: 'Hostel 3, Room 22, Simrol Campus',
-            permanentAddress: '154, Tilak Nagar, Indore, MP',
-            landmark: 'Opposite Library',
-            gpsLocation: '22.5244, 75.9207',
-            deliveryAddress: 'Navrangpura, Flat 22, Ahmedabad',
-            billingAddress: '154, Tilak Nagar, Indore, MP',
-            landlordName: 'Hostel Warden',
-            landlordMobile: '9111222333',
-            landlordId: 'LL-IIT',
-            status: 'High Risk',
-            verificationStatus: 'Pending',
-            documents: {
-              aadhaarFront: mockDocImage,
-              aadhaarBack: mockDocImage,
-              panCard: mockDocImage,
-              rentAgreement: mockDocImage,
-              selfie: mockSelfie,
-            },
-            createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'RB-CUST-1004',
-            fullName: 'Amit Sharma',
-            mobileNumber: '9999888877',
-            alternateNumber: '9888777766',
-            email: 'amit.sharma@yahoo.com',
-            aadhaarNumber: '1122 3344 5566',
-            panNumber: 'PQRST3456D',
-            occupation: 'Manager',
-            employer: 'HDFC Bank',
-            monthlyIncome: 90000,
-            currentAddress: 'Adajan, Flat 102',
-            permanentAddress: 'Adajan, Flat 102, Surat',
-            landmark: 'Near Adajan Lake',
-            gpsLocation: '21.1702, 72.8311',
-            deliveryAddress: 'Adajan, Flat 102, Surat',
-            billingAddress: 'Adajan, Flat 102, Surat',
-            landlordName: 'Self-Owned',
-            landlordMobile: '',
-            landlordId: '',
-            status: 'Defaulter',
-            verificationStatus: 'Verified',
-            documents: {
-              aadhaarFront: mockDocImage,
-              aadhaarBack: mockDocImage,
-              panCard: mockDocImage,
-              rentAgreement: mockDocImage,
-              selfie: mockSelfie,
-            },
-            createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ];
-
-        // Prepopulated Assets
-        const mockCategories = [
-          { name: 'Sofa', deposit: 1500, price: 600, brand: 'Sleepwell', model: '3-Seater Comfort' },
-          { name: 'Bed', deposit: 2500, price: 900, brand: 'Godrej Interio', model: 'Queen Size Wooden' },
-          { name: 'Mattress', deposit: 1000, price: 400, brand: 'Kurl-On', model: 'Ortho 6-inch' },
-          { name: 'Dining Table', deposit: 2000, price: 700, brand: 'Urban Ladder', model: '4-Seater Glass' },
-          { name: 'Chair', deposit: 500, price: 200, brand: 'Featherlite', model: 'Ergonomic Mesh Office' },
-          { name: 'Wardrobe', deposit: 2500, price: 800, brand: 'Godrej Interio', model: '2-Door Steel Almirah' },
-          { name: 'Refrigerator', deposit: 3500, price: 1100, brand: 'LG', model: 'Single Door 190L' },
-          { name: 'Washing Machine', deposit: 4000, price: 1200, brand: 'Samsung', model: 'Fully Automatic 6.5kg' },
-          { name: 'Study Table', deposit: 800, price: 300, brand: 'IKEA', model: 'Micke Desks' },
-          { name: 'TV Unit', deposit: 1500, price: 500, brand: 'Wakefit', model: 'Wall Mounted unit' },
-        ];
-
-        const mockAssets: Asset[] = [];
-        const cities: CityName[] = ['Indore (Head Office)', 'Bhopal', 'Surat', 'Ahmedabad'];
-        const warehouses: { [key: string]: string[] } = {
-          'Indore (Head Office)': ['Indore Bypass Warehouse', 'Indore Main Depot'],
-          'Bhopal': ['Bhopal Warehouse A'],
-          'Surat': ['Surat Warehouse A'],
-          'Ahmedabad': ['Ahmedabad Warehouse A', 'Ahmedabad Warehouse B'],
-        };
-
-        // Create ~35 mock assets
-        let assetCounter = 1;
-        cities.forEach(city => {
-          const wList = warehouses[city];
-          mockCategories.forEach((cat, index) => {
-            // Add 1 or 6 items per category in each city
-            const count = city === 'Indore (Head Office)' ? 6 : 1;
-            for (let i = 0; i < count; i++) {
-              const id = `RB-${cat.name.replace(/\s+/g, '').toUpperCase()}-${String(assetCounter).padStart(4, '0')}`;
-              const warehouse = wList[i % wList.length];
-              const conditionOptions: ('Excellent' | 'Good' | 'Fair' | 'Poor')[] = ['Excellent', 'Good', 'Fair'];
-              const condition = conditionOptions[Math.floor(Math.random() * conditionOptions.length)];
-              
-              // Distribute status
-              let status: AssetStatus = 'Available';
-              if (assetCounter % 7 === 0) status = 'Under Repair';
-              else if (assetCounter % 5 === 0) status = 'Lost';
-              else if (assetCounter % 3 === 0) status = 'Rented';
-
-              const ageMonths = Math.floor(Math.random() * 24) + 1;
-              const cost = cat.deposit * 5;
-              const rentals = status === 'Rented' ? Math.floor(Math.random() * 5) + 1 : Math.floor(Math.random() * 4);
-              const revenue = rentals * cat.price * (Math.floor(Math.random() * 6) + 2);
-
-              mockAssets.push({
-                id,
-                barcode: id,
-                qrCode: `${id}-QR`,
-                category: cat.name,
-                brand: cat.brand,
-                model: cat.model,
-                purchaseDate: new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                purchaseCost: cost,
-                currentValue: Math.max(1000, cost - (ageMonths * 100)),
-                securityDeposit: cat.deposit,
-                monthlyRentalPrice: cat.price,
-                warehouse,
-                city,
-                rackNumber: `RACK-${Math.floor(Math.random() * 10) + 1}-${String.fromCharCode(65 + Math.floor(Math.random() * 6))}`,
-                status,
-                lifecycle: {
-                  purchasedDate: new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  revenueEarned: revenue,
-                  repairCost: status === 'Under Repair' ? 1200 : Math.floor(Math.random() * 2000),
-                  currentCondition: condition,
-                  totalRentalsCount: rentals,
-                }
-              });
-              assetCounter++;
-            }
-          });
-        });
-
-        // Prepopulated Orders
-        const mockOrders: RentalOrder[] = [
-          {
-            id: 'RB-ORD-88001',
-            customerId: 'RB-CUST-1001',
-            customerName: 'Rajesh Kumar',
-            customerMobile: '9876543210',
-            items: [
-              { assetId: mockAssets[2].id, category: mockAssets[2].category, monthlyRentalPrice: mockAssets[2].monthlyRentalPrice, securityDeposit: mockAssets[2].securityDeposit },
-              { assetId: mockAssets[5].id, category: mockAssets[5].category, monthlyRentalPrice: mockAssets[5].monthlyRentalPrice, securityDeposit: mockAssets[5].securityDeposit },
-            ],
-            durationMonths: 6,
-            startDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            endDate: new Date(Date.now() + 135 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            totalDeposit: mockAssets[2].securityDeposit + mockAssets[5].securityDeposit,
-            totalMonthlyRent: mockAssets[2].monthlyRentalPrice + mockAssets[5].monthlyRentalPrice,
-            discountAmount: 0,
-            discountType: 'flat',
-            discountValue: 0,
-            netMonthlyRent: mockAssets[2].monthlyRentalPrice + mockAssets[5].monthlyRentalPrice,
-            status: 'Delivered',
-            assignedLogisticsUser: 'Logistics Courier Team A',
-            scannedAtLoading: true,
-            scannedAtDelivery: true,
-            scannedAtPickup: false,
-            scannedAtWarehouseEntry: false,
-            depositRefundStatus: 'Held',
-            depositDeductions: 0,
-            createdAt: new Date(Date.now() - 48 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'RB-ORD-88002',
-            customerId: 'RB-CUST-1002',
-            customerName: 'Sonia Gupta',
-            customerMobile: '9812345678',
-            items: [
-              { assetId: mockAssets[1].id, category: mockAssets[1].category, monthlyRentalPrice: mockAssets[1].monthlyRentalPrice, securityDeposit: mockAssets[1].securityDeposit }
-            ],
-            durationMonths: 3,
-            startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            endDate: new Date(Date.now() + 80 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            totalDeposit: mockAssets[1].securityDeposit,
-            totalMonthlyRent: mockAssets[1].monthlyRentalPrice,
-            discountAmount: 100,
-            discountType: 'flat',
-            discountValue: 100,
-            netMonthlyRent: mockAssets[1].monthlyRentalPrice - 100,
-            status: 'Out for Delivery',
-            assignedLogisticsUser: 'Logistics Courier Team B',
-            scannedAtLoading: true,
-            scannedAtDelivery: false,
-            scannedAtPickup: false,
-            scannedAtWarehouseEntry: false,
-            depositRefundStatus: 'Held',
-            depositDeductions: 0,
-            createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ];
-
-        // Make sure those assets are marked rented or reserved
-        mockOrders[0].items.forEach(item => {
-          const asset = mockAssets.find(a => a.id === item.assetId);
-          if (asset) asset.status = 'Rented';
-        });
-        mockOrders[1].items.forEach(item => {
-          const asset = mockAssets.find(a => a.id === item.assetId);
-          if (asset) asset.status = 'Reserved';
-        });
-
-        // Prepopulated Invoices
-        const mockInvoices: Invoice[] = [
-          {
-            id: 'RB-INV-99001',
-            orderId: 'RB-ORD-88001',
-            customerId: 'RB-CUST-1001',
-            customerName: 'Rajesh Kumar',
-            billingPeriod: 'June 2026',
-            dueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            depositAmount: 0,
-            rentalCharges: mockOrders[0].netMonthlyRent,
-            lateFee: 0,
-            discount: 0,
-            totalAmount: mockOrders[0].netMonthlyRent,
-            status: 'Paid',
-            paymentDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            paymentMethod: 'UPI (GPay)',
-            createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'RB-INV-99002',
-            orderId: 'RB-ORD-88001',
-            customerId: 'RB-CUST-1001',
-            customerName: 'Rajesh Kumar',
-            billingPeriod: 'July 2026',
-            dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            depositAmount: 0,
-            rentalCharges: mockOrders[0].netMonthlyRent,
-            lateFee: 0,
-            discount: 0,
-            totalAmount: mockOrders[0].netMonthlyRent,
-            status: 'Pending',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: 'RB-INV-99003',
-            orderId: 'RB-ORD-88002',
-            customerId: 'RB-CUST-1002',
-            customerName: 'Sonia Gupta',
-            billingPeriod: 'First Invoice (Rent + Deposit)',
-            dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            depositAmount: mockOrders[1].totalDeposit,
-            rentalCharges: mockOrders[1].netMonthlyRent,
-            lateFee: 150,
-            discount: 0,
-            totalAmount: mockOrders[1].totalDeposit + mockOrders[1].netMonthlyRent + 150,
-            status: 'Overdue',
-            createdAt: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ];
-
-        // Prepopulated Complaints
-        const mockComplaints: Complaint[] = [
-          {
-            id: 'RB-CMP-3001',
-            customerId: 'RB-CUST-1001',
-            customerName: 'Rajesh Kumar',
-            assetId: mockAssets[2].id,
-            assetName: `${mockAssets[2].brand} ${mockAssets[2].model} (${mockAssets[2].category})`,
-            complaintType: 'Scratch on delivery',
-            description: 'The wooden panel of the bed has a deep scratch of 3 inches on the backboard.',
-            images: [mockDocImage],
-            technicianAssigned: 'Karan Singh (Technician)',
-            status: 'Assigned',
-            createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ];
-
-        // Prepopulated Repairs
-        const mockRepairs: RepairJob[] = [
-          {
-            id: 'RB-REP-4001',
-            assetId: mockAssets[4].id,
-            assetBarcode: mockAssets[4].barcode,
-            assetName: `${mockAssets[4].brand} ${mockAssets[4].category}`,
-            repairCost: 500,
-            vendor: 'Metro Furniture Repair Shop',
-            technician: 'Ramesh Mistri',
-            repairTimeDays: 3,
-            warrantyMonths: 6,
-            photos: [mockDocImage],
-            status: 'In Progress',
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ];
-
-        // Audit Logs
-        const mockAuditLogs: AuditLog[] = [
-          {
-            id: 'RB-AUD-001',
-            timestamp: new Date(Date.now() - 2 * 3600000).toISOString(),
-            userRole: 'Super Admin',
-            userName: 'Ashish (Admin)',
-            city: 'Indore (Head Office)',
-            action: 'System initialization',
-            category: 'INVENTORY',
-            severity: 'INFO',
-            details: 'Initial master database successfully imported, matching 4 warehouses.',
-          },
-          {
-            id: 'RB-AUD-002',
-            timestamp: new Date(Date.now() - 1.5 * 3600000).toISOString(),
-            userRole: 'Warehouse Manager',
-            userName: 'Vikram Warehouse Lead',
-            city: 'Indore (Head Office)',
-            action: 'Asset state change',
-            category: 'ASSET_MOVE',
-            severity: 'INFO',
-            details: `Asset ${mockAssets[4].id} status changed to Under Repair. Dispatched to vendor Metro.`,
-          },
-          {
-            id: 'RB-AUD-003',
-            timestamp: new Date(Date.now() - 30 * 60000).toISOString(),
-            userRole: 'Logistics Team',
-            userName: 'Indore Logistics Hub A',
-            city: 'Indore (Head Office)',
-            action: 'Barcode loading scan',
-            category: 'BARCODE_SCAN',
-            severity: 'INFO',
-            details: `Barcode ${mockAssets[1].barcode} successfully scanned and loaded onto delivery vehicle MP-09-AB-8840.`,
-          }
-        ];
-
-        // Notifications
-        const mockNotifications: SystemNotification[] = [
-          {
-            id: 'NOT-001',
-            title: 'Late Payment Alert',
-            message: 'Customer Sonia Gupta has an overdue invoice of ₹4,650 for Order RB-ORD-88002.',
-            type: 'error',
-            timestamp: new Date(Date.now() - 120 * 60000).toISOString(),
-            read: false,
-            city: 'Bhopal',
-          },
-          {
-            id: 'NOT-002',
-            title: 'Low Stock: Beds',
-            message: 'Indore (Head Office) inventory for Bed is below critical threshold. Only 2 items remaining.',
-            type: 'warning',
-            timestamp: new Date(Date.now() - 60 * 60000).toISOString(),
-            read: false,
-            city: 'Indore (Head Office)',
-          },
-          {
-            id: 'NOT-003',
-            title: 'New Customer Verification',
-            message: 'Vikram Singh uploaded document verification files. Awaiting review.',
-            type: 'info',
-            timestamp: new Date(Date.now() - 10 * 60000).toISOString(),
-            read: false,
-            city: 'Indore (Head Office)',
-          }
-        ];
-
-        // Logistics Drivers & KYC Documents
-        const mockDrivers: LogisticsDriver[] = [
-          {
-            id: 'DRV-8801',
-            fullName: 'Ramesh Verma',
-            phone: '9826012345',
-            alternatePhone: '9826099999',
-            email: 'ramesh.verma.logistics@gmail.com',
-            city: 'Indore (Head Office)',
-            vehicleType: 'Mini Truck / Tata Ace',
-            vehicleNumber: 'MP-09-AB-8840',
-            status: 'Active',
-            verificationStatus: 'Verified',
-            joiningDate: '2025-11-10',
-            totalDelivered: 48,
-            pendingDeliveries: 2,
-            deadlineOverdue: 0,
-            rating: 4.9,
-            currentLocation: 'Palasia, Indore Hub',
-            isBlocked: false,
-            verificationNotes: 'All transport and identity documents verified by Fleet Admin.',
-            createdAt: '2025-11-10T10:00:00.000Z',
-            documents: {
-              profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300',
-              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              licenseNumber: 'MP09-2018-0049210',
-              licenseExpiry: '2034-08-15',
-              licenseVerified: true,
-              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              aadhaarNumber: '7821 4452 9018',
-              aadhaarVerified: true,
-              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              panNumber: 'ABCVP4492K',
-              panVerified: true,
-              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              vehicleNumber: 'MP-09-AB-8840',
-              rcVerified: true,
-              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              insuranceExpiry: '2027-04-20',
-              insuranceVerified: true,
-              policeVerificationDoc: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              policeVerified: true,
-            }
-          },
-          {
-            id: 'DRV-8802',
-            fullName: 'Sunil Rathore',
-            phone: '9755123456',
-            alternatePhone: '9755998877',
-            email: 'sunil.rathore.deliveries@gmail.com',
-            city: 'Indore (Head Office)',
-            vehicleType: 'Pickup 3-Wheeler',
-            vehicleNumber: 'MP-09-GF-4512',
-            status: 'Active',
-            verificationStatus: 'Verified',
-            joiningDate: '2026-01-15',
-            totalDelivered: 34,
-            pendingDeliveries: 1,
-            deadlineOverdue: 0,
-            rating: 4.8,
-            currentLocation: 'Vijay Nagar, Indore',
-            isBlocked: false,
-            verificationNotes: 'Approved for 3-Wheeler Intra-City Logistics.',
-            createdAt: '2026-01-15T09:30:00.000Z',
-            documents: {
-              profilePhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300',
-              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              licenseNumber: 'MP09-2020-0081293',
-              licenseExpiry: '2036-12-01',
-              licenseVerified: true,
-              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              aadhaarNumber: '4412 8890 3215',
-              aadhaarVerified: true,
-              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              panNumber: 'DFGPR9912M',
-              panVerified: true,
-              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              vehicleNumber: 'MP-09-GF-4512',
-              rcVerified: true,
-              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              insuranceExpiry: '2026-11-30',
-              insuranceVerified: true,
-            }
-          },
-          {
-            id: 'DRV-8803',
-            fullName: 'Deepak Sharma',
-            phone: '9425098765',
-            email: 'deepak.bhopal.driver@yahoo.com',
-            city: 'Bhopal',
-            vehicleType: 'Large Van',
-            vehicleNumber: 'MP-04-CZ-7890',
-            status: 'Pending Verification',
-            verificationStatus: 'Pending',
-            joiningDate: '2026-08-14',
-            totalDelivered: 0,
-            pendingDeliveries: 0,
-            deadlineOverdue: 0,
-            rating: 5.0,
-            currentLocation: 'MP Nagar, Bhopal Depot',
-            isBlocked: false,
-            verificationNotes: 'Newly registered. Awaiting Aadhaar back side re-upload.',
-            createdAt: '2026-08-14T11:20:00.000Z',
-            documents: {
-              profilePhoto: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=300',
-              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              licenseNumber: 'MP04-2022-0099412',
-              licenseExpiry: '2038-03-10',
-              licenseVerified: true,
-              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              aadhaarNumber: '9901 2234 5567',
-              aadhaarVerified: false,
-              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              panNumber: 'JKLPS7781N',
-              panVerified: true,
-              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              vehicleNumber: 'MP-04-CZ-7890',
-              rcVerified: true,
-              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              insuranceExpiry: '2027-01-15',
-              insuranceVerified: true,
-            }
-          },
-          {
-            id: 'DRV-8804',
-            fullName: 'Imran Khan',
-            phone: '9893456789',
-            email: 'imran.khan.surat@gmail.com',
-            city: 'Surat',
-            vehicleType: 'Bike / 2-Wheeler',
-            vehicleNumber: 'GJ-05-XY-1204',
-            status: 'Blocked',
-            verificationStatus: 'Rejected',
-            joiningDate: '2025-12-01',
-            totalDelivered: 12,
-            pendingDeliveries: 0,
-            deadlineOverdue: 3,
-            rating: 3.2,
-            currentLocation: 'Ring Road, Surat',
-            isBlocked: true,
-            blockedReason: 'Failed return pickups repeatedly & Driving License expired.',
-            verificationNotes: 'Blocked due to policy violations and invalid DL.',
-            createdAt: '2025-12-01T08:00:00.000Z',
-            documents: {
-              profilePhoto: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300',
-              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              licenseNumber: 'GJ05-2015-0012894',
-              licenseExpiry: '2025-05-10',
-              licenseVerified: false,
-              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              aadhaarNumber: '3310 9981 4423',
-              aadhaarVerified: true,
-              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              panNumber: 'IKLMN1122Q',
-              panVerified: true,
-              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              vehicleNumber: 'GJ-05-XY-1204',
-              rcVerified: true,
-              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              insuranceExpiry: '2025-08-01',
-              insuranceVerified: false,
-            }
-          },
-          {
-            id: 'DRV-8805',
-            fullName: 'Ajay Parmar',
-            phone: '9724123890',
-            email: 'ajay.parmar.ahmedabad@gmail.com',
-            city: 'Ahmedabad',
-            vehicleType: 'E-Loader / Electric Trike',
-            vehicleNumber: 'GJ-01-EE-9081',
-            status: 'Active',
-            verificationStatus: 'Verified',
-            joiningDate: '2026-02-01',
-            totalDelivered: 62,
-            pendingDeliveries: 3,
-            deadlineOverdue: 0,
-            rating: 4.95,
-            currentLocation: 'SG Highway, Ahmedabad',
-            isBlocked: false,
-            verificationNotes: 'EV Fleet Partner. All Green Logistics clearances approved.',
-            createdAt: '2026-02-01T10:15:00.000Z',
-            documents: {
-              profilePhoto: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=300',
-              drivingLicenseFront: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              drivingLicenseBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              licenseNumber: 'GJ01-2019-0099124',
-              licenseExpiry: '2035-09-20',
-              licenseVerified: true,
-              aadhaarFront: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              aadhaarBack: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
-              aadhaarNumber: '8876 1123 4490',
-              aadhaarVerified: true,
-              panCard: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              panNumber: 'APQPR8821Z',
-              panVerified: true,
-              vehicleRC: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              vehicleNumber: 'GJ-01-EE-9081',
-              rcVerified: true,
-              vehicleInsurance: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=600',
-              insuranceExpiry: '2027-06-18',
-              insuranceVerified: true,
-              policeVerificationDoc: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
-              policeVerified: true,
-            }
-          }
-        ];
-
         return {
           currentUserRole: 'Super Admin' as UserRole,
           currentCity: 'Indore (Head Office)' as CityName,
@@ -917,20 +224,20 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           token: null as string | null,
           currentUser: null as any | null,
           loginError: null as string | null,
-          customers: mockCustomers,
-          inventory: mockAssets,
-          orders: mockOrders,
-          invoices: mockInvoices,
-          complaints: mockComplaints,
-          repairs: mockRepairs,
-          packages: initialPackages,
-          auditLogs: mockAuditLogs,
-          notifications: mockNotifications,
-          drivers: mockDrivers,
+          customers: [],
+          inventory: [],
+          orders: [],
+          invoices: [],
+          complaints: [],
+          repairs: [],
+          packages: [],
+          auditLogs: [],
+          notifications: [],
+          drivers: [],
           fraudAlerts: [],
           expectedVsActualAudit: {
-            expectedCount: mockAssets.length,
-            actualCount: mockAssets.length,
+            expectedCount: 0,
+            actualCount: 0,
             missingCount: 0,
             duplicateBarcodes: [],
             fraudAlertCount: 0,
@@ -1480,7 +787,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 technician: 'Assigned Senior Repair Tech',
                 repairTimeDays: inspection.result === 'Minor Repair' ? 3 : 7,
                 warrantyMonths: inspection.result === 'Minor Repair' ? 3 : 12,
-                photos: [mockDocImage],
+                photos: [],
                 status: 'In Progress',
                 createdAt: new Date().toISOString(),
               };
@@ -1521,7 +828,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             ...repair,
             assetBarcode: repair.assetId,
             assetName: get().inventory.find(a => a.id === repair.assetId)?.category || 'Furniture',
-            photos: [mockDocImage],
+            photos: [],
             status: 'In Progress',
             createdAt: new Date().toISOString(),
           };
@@ -2139,13 +1446,12 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               {
                 id: genId('NOT'),
                 title: 'Database Reset Successful',
-                message: 'All system metrics, assets, barcodes, and agreements have been restored to pristine default values.',
+                message: 'All local store metrics and cache have been cleared.',
                 type: 'success',
                 timestamp: new Date().toISOString(),
                 read: false,
                 city: freshState.currentCity,
-              },
-              ...freshState.notifications
+              }
             ]
           });
           get().runSystemAudit();
@@ -2154,18 +1460,21 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         login: async (username, password) => {
           try {
             set({ loginError: null });
-            const res = await fetch(`${BACKEND_URL}/login`, {
+            const res = await fetch(`${BACKEND_URL}/auth/login`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ username, password })
             });
             const data = await res.json();
-            if (data.success && data.token) {
+            const token = data.token || data.data?.token || data.data?.access_token;
+            const user = data.user || data.data?.user;
+
+            if (data.success && token) {
               set({
-                token: data.token,
-                currentUser: data.user,
-                currentUserRole: data.user.role,
-                currentCity: data.user.city,
+                token: token,
+                currentUser: user,
+                currentUserRole: user?.role || 'Super Admin',
+                currentCity: user?.city || 'Indore (Head Office)',
                 loginError: null
               });
               await get().initializeStore();
@@ -2191,168 +1500,50 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         initializeStore: async () => {
           try {
             const token = get().token;
-            if (!token) return;
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) {
+              headers['Authorization'] = `Bearer ${token}`;
+            }
 
-            const res = await fetch(`${BACKEND_URL}/load`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await fetch(`${BACKEND_URL}/sync/load`, { headers });
             const data = await res.json();
             
-            if (data.success && data.data) {
-              const db = data.data;
-              
-              // Seed database if MongoDB is completely empty
-              if (!db.assets || db.assets.length === 0) {
-                console.log("MongoDB Atlas cluster is empty. Seeding default data...");
-                const localState = get();
-                await fetch(`${BACKEND_URL}/sync`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                  },
-                  body: JSON.stringify({
-                    assets: localState.inventory,
-                    customers: localState.customers,
-                    orders: localState.orders,
-                    invoices: localState.invoices,
-                    repairs: localState.repairs,
-                    auditLogs: localState.auditLogs,
-                    notifications: localState.notifications,
-                    drivers: localState.drivers,
-                    cities: localState.cities,
-                    currentCity: localState.currentCity,
-                    currentUserRole: localState.currentUserRole,
-                    expectedVsActualAudit: localState.expectedVsActualAudit
-                  })
-                });
-                return;
-              }
+            if (data.success) {
+              const db = (data.data && typeof data.data === 'object' && !Array.isArray(data.data) && data.data.drivers)
+                ? data.data
+                : data;
 
-              // Overwrite local memory state with synced cluster collections
+              // Overwrite local memory state with synced real MongoDB collections
               set({
-                inventory: db.assets,
-                customers: db.customers,
-                orders: db.orders,
-                invoices: db.invoices,
-                repairs: db.repairs,
-                auditLogs: db.auditLogs,
-                notifications: db.notifications,
-                drivers: db.drivers && db.drivers.length > 0 ? db.drivers : get().drivers,
-                cities: db.cities || get().cities,
+                inventory: db.assets || [],
+                customers: db.customers || [],
+                orders: db.orders || [],
+                invoices: db.invoices || [],
+                repairs: db.repairs || [],
+                auditLogs: db.auditLogs || [],
+                notifications: db.notifications || [],
+                drivers: db.drivers || [],
+                cities: db.cities && db.cities.length > 0 ? db.cities : get().cities,
                 currentCity: db.currentCity || get().currentCity,
                 currentUserRole: db.currentUserRole || get().currentUserRole,
-                expectedVsActualAudit: db.expectedVsActualAudit || get().expectedVsActualAudit
+                expectedVsActualAudit: db.expectedVsActualAudit || {
+                  expectedCount: (db.assets || []).length,
+                  actualCount: (db.assets || []).length,
+                  missingCount: 0,
+                  duplicateBarcodes: [],
+                  fraudAlertCount: 0,
+                }
               });
-              console.log("Synced local state successfully with MongoDB Atlas.");
+              console.log(`[RentBuddy Sync] Live MongoDB sync complete: ${db.drivers?.length || 0} drivers, ${db.assets?.length || 0} assets, ${db.customers?.length || 0} customers.`);
             }
           } catch (err: any) {
-            console.warn("MongoDB Atlas offline, falling back to offline LocalStorage cache:", err.message);
-          }
-
-          // Indore auto-migration: ensure Indore inventory has at least 6 items per category
-          const currentInventory = get().inventory || [];
-          const indoreCount = currentInventory.filter((a: any) => a.city === 'Indore (Head Office)').length;
-          if (indoreCount < 60) {
-            console.log("Auto-migrating: Indore inventory count is low. Generating additional assets...");
-            const mockCategories = [
-              { name: 'Sofa', deposit: 1500, price: 600, brand: 'Sleepwell', model: '3-Seater Comfort' },
-              { name: 'Bed', deposit: 2500, price: 900, brand: 'Godrej Interio', model: 'Queen Size Wooden' },
-              { name: 'Mattress', deposit: 1000, price: 400, brand: 'Kurl-On', model: 'Ortho 6-inch' },
-              { name: 'Dining Table', deposit: 2000, price: 700, brand: 'Urban Ladder', model: '4-Seater Glass' },
-              { name: 'Chair', deposit: 500, price: 200, brand: 'Featherlite', model: 'Ergonomic Mesh Office' },
-              { name: 'Wardrobe', deposit: 2500, price: 800, brand: 'Godrej Interio', model: '2-Door Steel Almirah' },
-              { name: 'Refrigerator', deposit: 3500, price: 1100, brand: 'LG', model: 'Single Door 190L' },
-              { name: 'Washing Machine', deposit: 4000, price: 1200, brand: 'Samsung', model: 'Fully Automatic 6.5kg' },
-              { name: 'Study Table', deposit: 800, price: 300, brand: 'IKEA', model: 'Micke Desks' },
-              { name: 'TV Unit', deposit: 1500, price: 500, brand: 'Wakefit', model: 'Wall Mounted unit' },
-            ];
-
-            const updatedInventory = [...currentInventory];
-            const existingIds = new Set(updatedInventory.map((a: any) => a.id));
-            let nextCounter = 1;
-            const getUniqueId = (catName: string) => {
-              const prefix = `RB-${catName.replace(/\s+/g, '').toUpperCase()}-`;
-              while (true) {
-                const id = `${prefix}${String(nextCounter).padStart(4, '0')}`;
-                nextCounter++;
-                if (!existingIds.has(id)) {
-                  existingIds.add(id);
-                  return id;
-                }
-              }
-            };
-
-            const warehouses = ['Indore Bypass Warehouse', 'Indore Main Depot'];
-
-            mockCategories.forEach((cat) => {
-              const currentCatIndoreCount = updatedInventory.filter(
-                (a: any) => a.city === 'Indore (Head Office)' && a.category === cat.name
-              ).length;
-              const targetCount = 6;
-              const diff = targetCount - currentCatIndoreCount;
-
-              for (let i = 0; i < diff; i++) {
-                const id = getUniqueId(cat.name);
-                const warehouse = warehouses[i % warehouses.length];
-                const conditionOptions: ('Excellent' | 'Good' | 'Fair' | 'Poor')[] = ['Excellent', 'Good', 'Fair'];
-                const condition = conditionOptions[Math.floor(Math.random() * conditionOptions.length)];
-
-                let status: AssetStatus = 'Available';
-                const rand = Math.random();
-                if (rand < 0.1) status = 'Under Repair';
-                else if (rand < 0.15) status = 'Lost';
-                else if (rand < 0.35) status = 'Rented';
-
-                const ageMonths = Math.floor(Math.random() * 24) + 1;
-                const cost = cat.deposit * 5;
-                const rentals = status === 'Rented' ? Math.floor(Math.random() * 5) + 1 : Math.floor(Math.random() * 4);
-                const revenue = rentals * cat.price * (Math.floor(Math.random() * 6) + 2);
-
-                updatedInventory.push({
-                  id,
-                  barcode: id,
-                  qrCode: `${id}-QR`,
-                  category: cat.name,
-                  brand: cat.brand,
-                  model: cat.model,
-                  purchaseDate: new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  purchaseCost: cost,
-                  currentValue: Math.max(1000, cost - ageMonths * 100),
-                  securityDeposit: cat.deposit,
-                  monthlyRentalPrice: cat.price,
-                  warehouse,
-                  city: 'Indore (Head Office)',
-                  rackNumber: `RACK-${Math.floor(Math.random() * 10) + 1}-${String.fromCharCode(
-                    65 + Math.floor(Math.random() * 6)
-                  )}`,
-                  status,
-                  lifecycle: {
-                    purchasedDate: new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                    revenueEarned: revenue,
-                    repairCost: status === 'Under Repair' ? 1200 : Math.floor(Math.random() * 2000),
-                    currentCondition: condition,
-                    totalRentalsCount: rentals,
-                  },
-                });
-              }
-            });
-
-            set({
-              inventory: updatedInventory,
-              expectedVsActualAudit: {
-                ...get().expectedVsActualAudit,
-                expectedCount: updatedInventory.length,
-                actualCount: updatedInventory.length,
-              },
-            });
-            console.log(`Auto-migration complete. Indore inventory count is now ${updatedInventory.filter((a: any) => a.city === 'Indore (Head Office)').length} items.`);
+            console.warn("MongoDB synchronization offline or error:", err.message);
           }
         }
       };
     },
     {
-      name: 'rentbuddy-erp-storage-v2',
+      name: 'rentbuddy-erp-live-atlas',
     }
   )
 );

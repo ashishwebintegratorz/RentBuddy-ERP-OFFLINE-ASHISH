@@ -5,7 +5,7 @@ import type { UserRole, CityName } from '../types';
 
 export default function Settings() {
   const { token, currentUser, cities } = useRentBuddyStore();
-  const BACKEND_URL = 'http://localhost:5001/api';
+  const BACKEND_URL = 'http://localhost:5001/api/v1';
   
   // Self Password Change states
   const [oldPassword, setOldPassword] = useState('');
@@ -35,7 +35,7 @@ export default function Settings() {
     if (!token || currentUser?.role !== 'Super Admin') return;
     setUsersLoading(true);
     try {
-      const res = await fetch(`http://localhost:5001/api/users`, {
+      const res = await fetch(`${BACKEND_URL}/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -64,7 +64,7 @@ export default function Settings() {
 
     setSelfLoading(true);
     try {
-      const res = await fetch(`http://localhost:5001/api/users/self/password`, {
+      const res = await fetch(`${BACKEND_URL}/users/self/password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ export default function Settings() {
     setCreateLoading(true);
 
     try {
-      const res = await fetch(`http://localhost:5001/api/users`, {
+      const res = await fetch(`${BACKEND_URL}/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ export default function Settings() {
     setResetLoading(true);
 
     try {
-      const res = await fetch(`http://localhost:5001/api/users/${resettingUser.username}/password`, {
+      const res = await fetch(`${BACKEND_URL}/users/${resettingUser.username}/password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

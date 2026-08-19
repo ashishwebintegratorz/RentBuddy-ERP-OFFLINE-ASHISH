@@ -221,27 +221,33 @@ export type LogisticsDriverStatus = 'Active' | 'Pending Verification' | 'Blocked
 export type DriverVehicleType = 'Mini Truck / Tata Ace' | 'Pickup 3-Wheeler' | 'Large Van' | 'Bike / 2-Wheeler' | 'E-Loader / Electric Trike';
 
 export interface DriverDocuments {
-  profilePhoto: string;
-  drivingLicenseFront: string;
-  drivingLicenseBack: string;
-  licenseNumber: string;
-  licenseExpiry: string;
-  licenseVerified: boolean;
-  aadhaarFront: string;
-  aadhaarBack: string;
-  aadhaarNumber: string;
-  aadhaarVerified: boolean;
-  panCard: string;
-  panNumber: string;
-  panVerified: boolean;
-  vehicleRC: string;
-  vehicleNumber: string;
-  rcVerified: boolean;
-  vehicleInsurance: string;
-  insuranceExpiry: string;
-  insuranceVerified: boolean;
+  profilePhoto?: string;
+  selfiePhoto?: string;
+  drivingLicenseFront?: string;
+  drivingLicenseBack?: string;
+  licenseFront?: string;
+  licenseBack?: string;
+  licenseNumber?: string;
+  licenseExpiry?: string;
+  licenseVerified?: boolean;
+  aadhaarFront?: string;
+  aadhaarBack?: string;
+  aadhaarNumber?: string;
+  aadhaarVerified?: boolean;
+  panCard?: string;
+  panNumber?: string;
+  panVerified?: boolean;
+  vehicleRC?: string;
+  vehicleRc?: string;
+  vehiclePhoto?: string;
+  vehicleNumber?: string;
+  rcVerified?: boolean;
+  vehicleInsurance?: string;
+  insuranceExpiry?: string;
+  insuranceVerified?: boolean;
   policeVerificationDoc?: string;
   policeVerified?: boolean;
+  [key: string]: any;
 }
 
 export interface LogisticsDriver {

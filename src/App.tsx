@@ -30,9 +30,25 @@ function App() {
 
   // Run initial compliance audit and sync state from MongoDB Atlas
   useEffect(() => {
+    // Purge legacy mock cache from browser localStorage
+    try {
+      localStorage.removeItem('rentbuddy-erp-storage-v2');
+      localStorage.removeItem('rentbuddy-storage');
+      localStorage.removeItem('rentbuddy-offline-storage');
+    } catch (e) {
+      console.warn("Storage purge warning:", e);
+    }
+
     initializeStore().then(() => {
       runSystemAudit();
     });
+
+    // Real-time polling every 5 seconds for new drivers / live updates from mobile apps
+    const interval = setInterval(() => {
+      initializeStore();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [initializeStore, runSystemAudit]);
 
   // Sync theme changes with document root class

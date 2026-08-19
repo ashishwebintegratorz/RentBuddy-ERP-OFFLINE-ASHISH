@@ -1,0 +1,49 @@
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config/constants.js';
+import { errorResponse } from '../utils/response.js';
+
+/**
+ * Verify JWT Token from Authorization header
+ */
+export const authenticateToken = (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return errorResponse(res, 'Authentication required. Missing Bearer token.', 401);
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        return errorResponse(res, 'Session expired or invalid token.', 403);
+      }
+      req.user = decoded;
+      next();
+    });
+  } catch (err) {
+    return errorResponse(res, `Authentication error: ${err.message}`, 500);
+  }
+};
+
+/**
+ * Require Super Admin role
+ */
+export const requireSuperAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'Super Admin') {
+    return errorResponse(res, 'Access denied: Super Admin privileges required.', 403);
+  }
+  next();
+};
+
+/**
+ * Require specific role(s)
+ */
+export const requireRoles = (roles = []) => {
+  return (req, res, next) => {
+    if (!req.user || (!roles.includes(req.user.role) && req.user.role !== 'Super Admin')) {
+      return errorResponse(res, `Access denied: Requires one of [${roles.join(', ')}]`, 403);
+    }
+    next();
+  };
+};

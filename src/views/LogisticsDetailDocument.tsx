@@ -53,7 +53,7 @@ export default function LogisticsDetailDocument() {
   const [blockReasonInput, setBlockReasonInput] = useState('');
   const [driverToBlock, setDriverToBlock] = useState<LogisticsDriver | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
-  const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'pan' | 'rc' | 'insurance' | 'police'>('license');
+  const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'rc' | 'profile' | 'pan' | 'insurance' | 'police'>('license');
   const [verificationNotesInput, setVerificationNotesInput] = useState('');
 
   // Selected driver for view document modal
@@ -118,12 +118,14 @@ export default function LogisticsDetailDocument() {
 
   // Filter Drivers
   const filteredDrivers = drivers.filter(d => {
+    const vNum = d.vehicleNumber || '';
+    const dCity = d.city || 'Indore (Head Office)';
     const matchSearch =
-      d.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      d.id.toLowerCase().includes(search.toLowerCase()) ||
-      d.phone.includes(search) ||
-      d.vehicleNumber.toLowerCase().includes(search.toLowerCase()) ||
-      d.city.toLowerCase().includes(search.toLowerCase());
+      (d.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (d.id || '').toLowerCase().includes(search.toLowerCase()) ||
+      (d.phone || '').includes(search) ||
+      vNum.toLowerCase().includes(search.toLowerCase()) ||
+      dCity.toLowerCase().includes(search.toLowerCase());
 
     const matchStatus =
       statusFilter === 'All' ||
@@ -131,7 +133,7 @@ export default function LogisticsDetailDocument() {
       (statusFilter === 'Pending' && (d.status === 'Pending Verification' || d.verificationStatus === 'Pending')) ||
       (statusFilter === 'Blocked' && (d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended'));
 
-    const matchCity = cityFilter === 'All' || d.city === cityFilter;
+    const matchCity = cityFilter === 'All' || dCity === cityFilter;
 
     return matchSearch && matchStatus && matchCity;
   });
@@ -482,15 +484,15 @@ export default function LogisticsDetailDocument() {
                       <div>
                         <div className="flex items-center gap-1.5">
                           <h3 className="font-extrabold text-sm text-white group-hover:text-red-300 transition-colors">
-                            {driver.fullName}
+                            {driver.fullName || 'Logistic Rider'}
                           </h3>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-red-400 border border-slate-700">
-                            {driver.id}
+                            {driver.id || 'DRV'}
                           </span>
                           <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-slate-500" /> {driver.city.replace(' (Head Office)', '')}
+                            <MapPin className="w-3 h-3 text-slate-500" /> {(driver.city || 'Indore').replace(' (Head Office)', '')}
                           </span>
                         </div>
                       </div>
@@ -519,11 +521,11 @@ export default function LogisticsDetailDocument() {
                     <div className="flex items-center gap-2">
                       <Truck className="w-4 h-4 text-red-400 shrink-0" />
                       <span className="text-slate-300 font-medium text-[11px] truncate max-w-[150px]">
-                        {driver.vehicleType}
+                        {driver.vehicleType || 'Two Wheeler / Bike'}
                       </span>
                     </div>
                     <span className="font-mono font-bold text-[11px] text-amber-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">
-                      {driver.vehicleNumber}
+                      {driver.vehicleNumber || 'N/A'}
                     </span>
                   </div>
 
@@ -531,14 +533,14 @@ export default function LogisticsDetailDocument() {
                   <div className="space-y-1 text-[11px] text-slate-400">
                     <div className="flex items-center gap-2">
                       <Phone className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="font-mono text-slate-300">{driver.phone}</span>
+                      <span className="font-mono text-slate-300">{driver.phone || 'N/A'}</span>
                       {driver.alternatePhone && (
                         <span className="text-[10px] text-slate-500">({driver.alternatePhone})</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 truncate">
                       <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="truncate text-slate-300">{driver.email}</span>
+                      <span className="truncate text-slate-300">{driver.email || `${(driver.fullName || 'driver').toLowerCase().replace(/\s+/g, '')}@rentbuddy.in`}</span>
                     </div>
                   </div>
 
@@ -674,10 +676,8 @@ export default function LogisticsDetailDocument() {
                 {[
                   { id: 'license', label: 'Driving License (DL)', icon: FileText, verified: selectedDriver.documents?.licenseVerified },
                   { id: 'aadhaar', label: 'Aadhaar Card', icon: ShieldCheck, verified: selectedDriver.documents?.aadhaarVerified },
-                  { id: 'pan', label: 'PAN Card', icon: FileCheck, verified: selectedDriver.documents?.panVerified },
-                  { id: 'rc', label: 'Vehicle RC Book', icon: Truck, verified: selectedDriver.documents?.rcVerified },
-                  { id: 'insurance', label: 'Vehicle Insurance', icon: Layers, verified: selectedDriver.documents?.insuranceVerified },
-                  { id: 'police', label: 'Police Verification', icon: ShieldAlert, verified: selectedDriver.documents?.policeVerified },
+                  { id: 'rc', label: 'Vehicle Photo & Number Plate', icon: Truck, verified: selectedDriver.documents?.rcVerified },
+                  { id: 'profile', label: 'Profile Photo (Selfie)', icon: ShieldCheck, verified: true },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeDocTab === tab.id;
@@ -708,12 +708,12 @@ export default function LogisticsDetailDocument() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
-                      <span className="text-slate-400 text-[11px] block">License Number</span>
-                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'Not Provided'}</span>
+                      <span className="text-slate-400 text-[11px] block">License Number / Status</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'Uploaded by Rider'}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[11px] block">Expiry Date</span>
-                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.documents?.licenseExpiry || 'N/A'}</span>
+                      <span className="text-slate-400 text-[11px] block">Vehicle Category</span>
+                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleType || 'Two Wheeler / Van'}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end">
                       <button
@@ -731,23 +731,23 @@ export default function LogisticsDetailDocument() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Front Image */}
+                    {/* DL Front Image */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                        <span>DL Front Copy</span>
+                        <span>DL Copy (Front / Full)</span>
                         <button
-                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseFront, title: 'Driving License - Front' })}
+                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License - Front' })}
                           className="text-red-400 hover:text-red-300 flex items-center gap-1"
                         >
                           <Eye className="w-3 h-3" /> Zoom
                         </button>
                       </div>
                       <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseFront, title: 'Driving License - Front' })}
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License - Front' })}
                         className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center"
                       >
                         <img
-                          src={selectedDriver.documents?.drivingLicenseFront}
+                          src={selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
                           alt="DL Front"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -757,23 +757,23 @@ export default function LogisticsDetailDocument() {
                       </div>
                     </div>
 
-                    {/* Back Image */}
+                    {/* DL Back Image */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                        <span>DL Back Copy</span>
+                        <span>DL Back Copy (Optional)</span>
                         <button
-                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseBack, title: 'Driving License - Back' })}
+                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseBack || selectedDriver.documents?.drivingLicenseBack || '', title: 'Driving License - Back' })}
                           className="text-red-400 hover:text-red-300 flex items-center gap-1"
                         >
                           <Eye className="w-3 h-3" /> Zoom
                         </button>
                       </div>
                       <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.drivingLicenseBack, title: 'Driving License - Back' })}
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseBack || selectedDriver.documents?.drivingLicenseBack || '', title: 'Driving License - Back' })}
                         className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center"
                       >
                         <img
-                          src={selectedDriver.documents?.drivingLicenseBack}
+                          src={selectedDriver.documents?.licenseBack || selectedDriver.documents?.drivingLicenseBack || selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
                           alt="DL Back"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -791,7 +791,7 @@ export default function LogisticsDetailDocument() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
                       <span className="text-slate-400 text-[11px] block">Aadhaar (UIDAI) Number</span>
-                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.aadhaarNumber || 'Not Provided'}</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.aadhaarNumber || 'Uploaded by Rider'}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end">
                       <button
@@ -812,11 +812,11 @@ export default function LogisticsDetailDocument() {
                     <div className="space-y-1.5">
                       <span className="text-xs text-slate-400 font-semibold block">Aadhaar Front</span>
                       <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarFront, title: 'Aadhaar Card - Front' })}
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarFront || '', title: 'Aadhaar Card - Front' })}
                         className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
                       >
                         <img
-                          src={selectedDriver.documents?.aadhaarFront}
+                          src={selectedDriver.documents?.aadhaarFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
                           alt="Aadhaar Front"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
@@ -826,11 +826,11 @@ export default function LogisticsDetailDocument() {
                     <div className="space-y-1.5">
                       <span className="text-xs text-slate-400 font-semibold block">Aadhaar Back</span>
                       <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarBack, title: 'Aadhaar Card - Back' })}
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarBack || '', title: 'Aadhaar Card - Back' })}
                         className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
                       >
                         <img
-                          src={selectedDriver.documents?.aadhaarBack}
+                          src={selectedDriver.documents?.aadhaarBack || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
                           alt="Aadhaar Back"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
@@ -840,50 +840,12 @@ export default function LogisticsDetailDocument() {
                 </div>
               )}
 
-              {activeDocTab === 'pan' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">PAN Number</span>
-                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.panNumber || 'Not Provided'}</span>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end">
-                      <button
-                        onClick={() => verifyDriverDocument(selectedDriver.id, 'panVerified', !selectedDriver.documents?.panVerified)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          selectedDriver.documents?.panVerified
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
-                        }`}
-                      >
-                        {selectedDriver.documents?.panVerified ? <Check className="w-3.5 h-3.5" /> : null}
-                        {selectedDriver.documents?.panVerified ? 'Verified PAN' : 'Mark PAN Verified'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="max-w-md mx-auto space-y-1.5">
-                    <span className="text-xs text-slate-400 font-semibold block text-center">PAN Card Photo</span>
-                    <div
-                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.panCard, title: 'PAN Card Copy' })}
-                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
-                    >
-                      <img
-                        src={selectedDriver.documents?.panCard}
-                        alt="PAN Card"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeDocTab === 'rc' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
-                      <span className="text-slate-400 text-[11px] block">Vehicle Registration (RC) Number</span>
-                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleNumber}</span>
+                      <span className="text-slate-400 text-[11px] block">Vehicle Registration / Number Plate</span>
+                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleNumber || 'Not Provided'}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end">
                       <button
@@ -895,20 +857,49 @@ export default function LogisticsDetailDocument() {
                         }`}
                       >
                         {selectedDriver.documents?.rcVerified ? <Check className="w-3.5 h-3.5" /> : null}
-                        {selectedDriver.documents?.rcVerified ? 'Verified RC' : 'Mark RC Verified'}
+                        {selectedDriver.documents?.rcVerified ? 'Verified Vehicle' : 'Mark Vehicle Verified'}
                       </button>
                     </div>
                   </div>
 
                   <div className="max-w-md mx-auto space-y-1.5">
-                    <span className="text-xs text-slate-400 font-semibold block text-center">Vehicle RC Certificate</span>
+                    <span className="text-xs text-slate-400 font-semibold block text-center">Vehicle Photo with Number Plate</span>
                     <div
-                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehicleRC, title: 'Vehicle RC Document' })}
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || '', title: 'Vehicle Photo' })}
                       className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
                     >
                       <img
-                        src={selectedDriver.documents?.vehicleRC}
-                        alt="Vehicle RC"
+                        src={selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600'}
+                        alt="Vehicle Photo"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeDocTab === 'profile' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Rider Full Name & Contact</span>
+                      <span className="font-bold text-white text-sm">{selectedDriver.fullName} ({selectedDriver.phone})</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Assigned Operating City</span>
+                      <span className="font-bold text-amber-400 text-sm">{selectedDriver.city || 'Indore (Head Office)'}</span>
+                    </div>
+                  </div>
+
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <span className="text-xs text-slate-400 font-semibold block text-center">Profile / Selfie Photo</span>
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.profilePhoto || selectedDriver.documents?.selfiePhoto || '', title: 'Profile Photo' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-square max-w-[280px] mx-auto"
+                    >
+                      <img
+                        src={selectedDriver.documents?.profilePhoto || selectedDriver.documents?.selfiePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=400'}
+                        alt="Profile Photo"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     </div>
@@ -945,7 +936,7 @@ export default function LogisticsDetailDocument() {
                   <div className="max-w-md mx-auto space-y-1.5">
                     <span className="text-xs text-slate-400 font-semibold block text-center">Insurance Policy Document</span>
                     <div
-                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehicleInsurance, title: 'Vehicle Insurance Policy' })}
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehicleInsurance || '', title: 'Vehicle Insurance Policy' })}
                       className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
                     >
                       <img

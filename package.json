@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js & vite",
+    "server": "node server.js",
+    "start:server": "node server.js",
+    "client": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -18,9 +21,11 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "html5-qrcode": "^2.3.8",
+    "imagekit": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.23.0",
     "mongoose": "^9.7.3",
+    "multer": "^2.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^3.9.1",

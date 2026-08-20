@@ -24,7 +24,9 @@ import {
   Clock,
   Package,
   Layers,
-  FileText
+  FileText,
+  CreditCard,
+  KeyRound
 } from 'lucide-react';
 
 export default function LogisticsDetailDocument() {
@@ -53,37 +55,30 @@ export default function LogisticsDetailDocument() {
   const [blockReasonInput, setBlockReasonInput] = useState('');
   const [driverToBlock, setDriverToBlock] = useState<LogisticsDriver | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
-  const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'rc' | 'profile' | 'pan' | 'insurance' | 'police'>('license');
+  const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'vehicle' | 'profile' | 'account'>('license');
   const [verificationNotesInput, setVerificationNotesInput] = useState('');
 
   // Selected driver for view document modal
-  const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+  const selectedDriver = drivers.find(d => d.id === selectedDriverId || d.phone === selectedDriverId || (d as any)._id === selectedDriverId);
 
   // New Driver Form State
   const [newDriverForm, setNewDriverForm] = useState({
     fullName: '',
     phone: '',
     alternatePhone: '',
-    email: '',
+    upiId: '',
+    pin: '1234',
     city: currentCity,
-    vehicleType: 'Mini Truck / Tata Ace' as DriverVehicleType,
+    vehicleType: 'Two Wheeler / Bike' as DriverVehicleType,
     vehicleNumber: '',
     licenseNumber: '',
-    licenseExpiry: '',
     aadhaarNumber: '',
-    panNumber: '',
-    insuranceExpiry: '',
   });
 
   const [profilePhoto, setProfilePhoto] = useState('');
   const [dlFront, setDlFront] = useState('');
-  const [dlBack, setDlBack] = useState('');
   const [aadhaarFront, setAadhaarFront] = useState('');
-  const [aadhaarBack, setAadhaarBack] = useState('');
-  const [panCard, setPanCard] = useState('');
-  const [vehicleRC, setVehicleRC] = useState('');
-  const [vehicleInsurance, setVehicleInsurance] = useState('');
-  const [policeVerificationDoc, setPoliceVerificationDoc] = useState('');
+  const [vehiclePhoto, setVehiclePhoto] = useState('');
 
   // Edit Driver Form State
   const [editForm, setEditForm] = useState<{
@@ -91,15 +86,13 @@ export default function LogisticsDetailDocument() {
     fullName: string;
     phone: string;
     alternatePhone: string;
-    email: string;
+    upiId: string;
+    pin: string;
     city: any;
     vehicleType: DriverVehicleType;
     vehicleNumber: string;
     licenseNumber: string;
-    licenseExpiry: string;
     aadhaarNumber: string;
-    panNumber: string;
-    insuranceExpiry: string;
   } | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -124,6 +117,7 @@ export default function LogisticsDetailDocument() {
       (d.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
       (d.id || '').toLowerCase().includes(search.toLowerCase()) ||
       (d.phone || '').includes(search) ||
+      (d.upiId || '').toLowerCase().includes(search.toLowerCase()) ||
       vNum.toLowerCase().includes(search.toLowerCase()) ||
       dCity.toLowerCase().includes(search.toLowerCase());
 
@@ -148,23 +142,25 @@ export default function LogisticsDetailDocument() {
   const handleCreateDriver = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDriverForm.fullName || !newDriverForm.phone || !newDriverForm.vehicleNumber) {
-      alert('Please fill in all required driver details');
+      alert('Please fill in required rider details (Full Name, Mobile Number, Vehicle Number)');
       return;
     }
 
     const defaultMockDoc = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600';
     const defaultMockPhoto = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
+    const defaultMockVehicle = 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600';
 
     addDriver({
       fullName: newDriverForm.fullName,
       phone: newDriverForm.phone,
       alternatePhone: newDriverForm.alternatePhone,
-      email: newDriverForm.email || `${newDriverForm.fullName.toLowerCase().replace(/\s+/g, '')}@rentbuddy.in`,
+      upiId: newDriverForm.upiId || `${newDriverForm.phone}@upi`,
+      pin: newDriverForm.pin || '1234',
       city: newDriverForm.city,
       vehicleType: newDriverForm.vehicleType,
       vehicleNumber: newDriverForm.vehicleNumber.toUpperCase(),
-      status: 'Pending Verification',
-      verificationStatus: 'Pending',
+      status: 'Active',
+      verificationStatus: 'Verified',
       joiningDate: new Date().toISOString().split('T')[0],
       totalDelivered: 0,
       pendingDeliveries: 0,
@@ -172,29 +168,19 @@ export default function LogisticsDetailDocument() {
       rating: 5.0,
       currentLocation: `${newDriverForm.city} Hub`,
       isBlocked: false,
-      verificationNotes: 'Onboarded via Admin Panel. Awaiting document verification.',
+      verificationNotes: 'Onboarded via Admin Panel.',
       documents: {
         profilePhoto: profilePhoto || defaultMockPhoto,
         drivingLicenseFront: dlFront || defaultMockDoc,
-        drivingLicenseBack: dlBack || defaultMockDoc,
-        licenseNumber: newDriverForm.licenseNumber || 'PENDING-DL',
-        licenseExpiry: newDriverForm.licenseExpiry || '2030-01-01',
-        licenseVerified: false,
+        licenseFront: dlFront || defaultMockDoc,
+        licenseNumber: newDriverForm.licenseNumber || 'DL-APPROVED',
+        licenseVerified: true,
         aadhaarFront: aadhaarFront || defaultMockDoc,
-        aadhaarBack: aadhaarBack || defaultMockDoc,
-        aadhaarNumber: newDriverForm.aadhaarNumber || 'XXXX XXXX XXXX',
-        aadhaarVerified: false,
-        panCard: panCard || defaultMockDoc,
-        panNumber: newDriverForm.panNumber || 'XXXXX0000X',
-        panVerified: false,
-        vehicleRC: vehicleRC || defaultMockDoc,
+        aadhaarNumber: newDriverForm.aadhaarNumber || 'UIDAI-VERIFIED',
+        aadhaarVerified: true,
+        vehiclePhoto: vehiclePhoto || defaultMockVehicle,
         vehicleNumber: newDriverForm.vehicleNumber.toUpperCase(),
-        rcVerified: false,
-        vehicleInsurance: vehicleInsurance || defaultMockDoc,
-        insuranceExpiry: newDriverForm.insuranceExpiry || '2027-01-01',
-        insuranceVerified: false,
-        policeVerificationDoc: policeVerificationDoc || defaultMockDoc,
-        policeVerified: false,
+        rcVerified: true
       }
     });
 
@@ -204,24 +190,18 @@ export default function LogisticsDetailDocument() {
       fullName: '',
       phone: '',
       alternatePhone: '',
-      email: '',
+      upiId: '',
+      pin: '1234',
       city: currentCity,
-      vehicleType: 'Mini Truck / Tata Ace',
+      vehicleType: 'Two Wheeler / Bike' as DriverVehicleType,
       vehicleNumber: '',
       licenseNumber: '',
-      licenseExpiry: '',
       aadhaarNumber: '',
-      panNumber: '',
-      insuranceExpiry: '',
     });
     setProfilePhoto('');
     setDlFront('');
-    setDlBack('');
     setAadhaarFront('');
-    setAadhaarBack('');
-    setPanCard('');
-    setVehicleRC('');
-    setVehicleInsurance('');
+    setVehiclePhoto('');
   };
 
   const handleOpenEditModal = (driver: LogisticsDriver) => {
@@ -230,15 +210,13 @@ export default function LogisticsDetailDocument() {
       fullName: driver.fullName,
       phone: driver.phone,
       alternatePhone: driver.alternatePhone || '',
-      email: driver.email,
+      upiId: driver.upiId || `${driver.phone}@upi`,
+      pin: driver.pin || '1234',
       city: driver.city,
       vehicleType: driver.vehicleType,
       vehicleNumber: driver.vehicleNumber,
       licenseNumber: driver.documents?.licenseNumber || '',
-      licenseExpiry: driver.documents?.licenseExpiry || '',
       aadhaarNumber: driver.documents?.aadhaarNumber || '',
-      panNumber: driver.documents?.panNumber || '',
-      insuranceExpiry: driver.documents?.insuranceExpiry || '',
     });
     setShowEditModal(true);
   };
@@ -251,7 +229,8 @@ export default function LogisticsDetailDocument() {
       fullName: editForm.fullName,
       phone: editForm.phone,
       alternatePhone: editForm.alternatePhone,
-      email: editForm.email,
+      upiId: editForm.upiId,
+      pin: editForm.pin,
       city: editForm.city,
       vehicleType: editForm.vehicleType,
       vehicleNumber: editForm.vehicleNumber.toUpperCase(),
@@ -259,11 +238,8 @@ export default function LogisticsDetailDocument() {
 
     updateDriverDocuments(editForm.id, {
       licenseNumber: editForm.licenseNumber,
-      licenseExpiry: editForm.licenseExpiry,
       aadhaarNumber: editForm.aadhaarNumber,
-      panNumber: editForm.panNumber,
       vehicleNumber: editForm.vehicleNumber.toUpperCase(),
-      insuranceExpiry: editForm.insuranceExpiry,
     });
 
     setShowEditModal(false);
@@ -448,7 +424,7 @@ export default function LogisticsDetailDocument() {
 
             return (
               <div
-                key={driver.id}
+                key={driver.id || driver.phone || (driver as any)._id}
                 className={`group relative rounded-2xl border transition-all duration-200 overflow-hidden flex flex-col justify-between ${
                   isBlocked
                     ? 'bg-rose-950/10 border-rose-500/30 hover:border-rose-500/50 shadow-lg shadow-rose-950/20'
@@ -529,7 +505,7 @@ export default function LogisticsDetailDocument() {
                     </span>
                   </div>
 
-                  {/* Contact Info */}
+                  {/* Contact & UPI Info */}
                   <div className="space-y-1 text-[11px] text-slate-400">
                     <div className="flex items-center gap-2">
                       <Phone className="w-3.5 h-3.5 text-slate-500" />
@@ -538,9 +514,15 @@ export default function LogisticsDetailDocument() {
                         <span className="text-[10px] text-slate-500">({driver.alternatePhone})</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="truncate text-slate-300">{driver.email || `${(driver.fullName || 'driver').toLowerCase().replace(/\s+/g, '')}@rentbuddy.in`}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <CreditCard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate font-mono text-[11px] text-emerald-300 font-semibold">{driver.upiId || `${driver.phone}@upi`}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
+                        <KeyRound className="w-2.5 h-2.5 text-amber-400" />
+                        <span className="font-mono text-[10px] text-amber-300">PIN: {driver.pin || '1234'}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -584,7 +566,7 @@ export default function LogisticsDetailDocument() {
                 <div className="p-3.5 bg-slate-950/60 border-t border-slate-800/80 flex items-center justify-between gap-2">
                   <button
                     onClick={() => {
-                      setSelectedDriverId(driver.id);
+                      setSelectedDriverId(driver.id || driver.phone || (driver as any)._id);
                       setVerificationNotesInput(driver.verificationNotes || '');
                       setActiveDocTab('license');
                     }}
@@ -676,8 +658,9 @@ export default function LogisticsDetailDocument() {
                 {[
                   { id: 'license', label: 'Driving License (DL)', icon: FileText, verified: selectedDriver.documents?.licenseVerified },
                   { id: 'aadhaar', label: 'Aadhaar Card', icon: ShieldCheck, verified: selectedDriver.documents?.aadhaarVerified },
-                  { id: 'rc', label: 'Vehicle Photo & Number Plate', icon: Truck, verified: selectedDriver.documents?.rcVerified },
+                  { id: 'vehicle', label: 'Vehicle Photo & Plate', icon: Truck, verified: selectedDriver.documents?.rcVerified },
                   { id: 'profile', label: 'Profile Photo (Selfie)', icon: ShieldCheck, verified: true },
+                  { id: 'account', label: 'UPI & Login PIN', icon: CreditCard, verified: true },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeDocTab === tab.id;
@@ -709,11 +692,11 @@ export default function LogisticsDetailDocument() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
                       <span className="text-slate-400 text-[11px] block">License Number / Status</span>
-                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'Uploaded by Rider'}</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'DL Uploaded'}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 text-[11px] block">Vehicle Category</span>
-                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleType || 'Two Wheeler / Van'}</span>
+                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleType || 'Two Wheeler / Bike'}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end">
                       <button
@@ -730,56 +713,27 @@ export default function LogisticsDetailDocument() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* DL Front Image */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                        <span>DL Copy (Front / Full)</span>
-                        <button
-                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License - Front' })}
-                          className="text-red-400 hover:text-red-300 flex items-center gap-1"
-                        >
-                          <Eye className="w-3 h-3" /> Zoom
-                        </button>
-                      </div>
-                      <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License - Front' })}
-                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center"
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
+                      <span>Driving License (DL) Copy</span>
+                      <button
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License' })}
+                        className="text-red-400 hover:text-red-300 flex items-center gap-1"
                       >
-                        <img
-                          src={selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
-                          alt="DL Front"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Eye className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
+                        <Eye className="w-3 h-3" /> Zoom
+                      </button>
                     </div>
-
-                    {/* DL Back Image */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                        <span>DL Back Copy (Optional)</span>
-                        <button
-                          onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseBack || selectedDriver.documents?.drivingLicenseBack || '', title: 'Driving License - Back' })}
-                          className="text-red-400 hover:text-red-300 flex items-center gap-1"
-                        >
-                          <Eye className="w-3 h-3" /> Zoom
-                        </button>
-                      </div>
-                      <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseBack || selectedDriver.documents?.drivingLicenseBack || '', title: 'Driving License - Back' })}
-                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center"
-                      >
-                        <img
-                          src={selectedDriver.documents?.licenseBack || selectedDriver.documents?.drivingLicenseBack || selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
-                          alt="DL Back"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Eye className="w-6 h-6 text-white" />
-                        </div>
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center shadow-lg"
+                    >
+                      <img
+                        src={selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=600'}
+                        alt="Driving License"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye className="w-6 h-6 text-white" />
                       </div>
                     </div>
                   </div>
@@ -791,7 +745,7 @@ export default function LogisticsDetailDocument() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
                       <span className="text-slate-400 text-[11px] block">Aadhaar (UIDAI) Number</span>
-                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.aadhaarNumber || 'Uploaded by Rider'}</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.aadhaarNumber || 'Aadhaar Attached'}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end">
                       <button
@@ -808,39 +762,34 @@ export default function LogisticsDetailDocument() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <span className="text-xs text-slate-400 font-semibold block">Aadhaar Front</span>
-                      <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarFront || '', title: 'Aadhaar Card - Front' })}
-                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
+                      <span>Aadhaar Card Copy</span>
+                      <button
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarFront || '', title: 'Aadhaar Card' })}
+                        className="text-red-400 hover:text-red-300 flex items-center gap-1"
                       >
-                        <img
-                          src={selectedDriver.documents?.aadhaarFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
-                          alt="Aadhaar Front"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      </div>
+                        <Eye className="w-3 h-3" /> Zoom
+                      </button>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <span className="text-xs text-slate-400 font-semibold block">Aadhaar Back</span>
-                      <div
-                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarBack || '', title: 'Aadhaar Card - Back' })}
-                        className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
-                      >
-                        <img
-                          src={selectedDriver.documents?.aadhaarBack || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=400'}
-                          alt="Aadhaar Back"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
+                    <div
+                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.aadhaarFront || '', title: 'Aadhaar Card' })}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center shadow-lg"
+                    >
+                      <img
+                        src={selectedDriver.documents?.aadhaarFront || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=600'}
+                        alt="Aadhaar Card"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye className="w-6 h-6 text-white" />
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {activeDocTab === 'rc' && (
+              {activeDocTab === 'vehicle' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
@@ -863,16 +812,27 @@ export default function LogisticsDetailDocument() {
                   </div>
 
                   <div className="max-w-md mx-auto space-y-1.5">
-                    <span className="text-xs text-slate-400 font-semibold block text-center">Vehicle Photo with Number Plate</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
+                      <span>Vehicle Photo with Number Plate</span>
+                      <button
+                        onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || '', title: 'Vehicle Photo' })}
+                        className="text-red-400 hover:text-red-300 flex items-center gap-1"
+                      >
+                        <Eye className="w-3 h-3" /> Zoom
+                      </button>
+                    </div>
                     <div
                       onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || '', title: 'Vehicle Photo' })}
-                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center shadow-lg"
                     >
                       <img
                         src={selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600'}
                         alt="Vehicle Photo"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye className="w-6 h-6 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -895,7 +855,7 @@ export default function LogisticsDetailDocument() {
                     <span className="text-xs text-slate-400 font-semibold block text-center">Profile / Selfie Photo</span>
                     <div
                       onClick={() => setPreviewImage({ url: selectedDriver.documents?.profilePhoto || selectedDriver.documents?.selfiePhoto || '', title: 'Profile Photo' })}
-                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-square max-w-[280px] mx-auto"
+                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-square max-w-[280px] mx-auto shadow-lg"
                     >
                       <img
                         src={selectedDriver.documents?.profilePhoto || selectedDriver.documents?.selfiePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=400'}
@@ -907,79 +867,33 @@ export default function LogisticsDetailDocument() {
                 </div>
               )}
 
-              {activeDocTab === 'insurance' && (
+              {activeDocTab === 'account' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Insurance Policy Validity</span>
-                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.documents?.insuranceExpiry || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Coverage Type</span>
-                      <span className="text-slate-200 font-bold text-sm">Comprehensive Commercial</span>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end">
-                      <button
-                        onClick={() => verifyDriverDocument(selectedDriver.id, 'insuranceVerified', !selectedDriver.documents?.insuranceVerified)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          selectedDriver.documents?.insuranceVerified
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
-                        }`}
-                      >
-                        {selectedDriver.documents?.insuranceVerified ? <Check className="w-3.5 h-3.5" /> : null}
-                        {selectedDriver.documents?.insuranceVerified ? 'Verified Insurance' : 'Mark Insurance Verified'}
-                      </button>
-                    </div>
-                  </div>
+                  <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 space-y-3">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-emerald-400" />
+                      Payout & App Login Credentials
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <span className="text-slate-400 text-[11px] block">Rider UPI ID (For Direct Payouts)</span>
+                        <span className="font-mono font-bold text-emerald-300 text-sm mt-0.5 block">
+                          {selectedDriver.upiId || `${selectedDriver.phone}@upi`}
+                        </span>
+                      </div>
 
-                  <div className="max-w-md mx-auto space-y-1.5">
-                    <span className="text-xs text-slate-400 font-semibold block text-center">Insurance Policy Document</span>
-                    <div
-                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.vehicleInsurance || '', title: 'Vehicle Insurance Policy' })}
-                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
-                    >
-                      <img
-                        src={selectedDriver.documents?.vehicleInsurance}
-                        alt="Insurance"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeDocTab === 'police' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Background & Police Clearance</span>
-                      <span className="text-slate-200 font-bold text-sm">State Police Verification Certificate</span>
-                    </div>
-                    <button
-                      onClick={() => verifyDriverDocument(selectedDriver.id, 'policeVerified', !selectedDriver.documents?.policeVerified)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        selectedDriver.documents?.policeVerified
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
-                      }`}
-                    >
-                      {selectedDriver.documents?.policeVerified ? <Check className="w-3.5 h-3.5" /> : null}
-                      {selectedDriver.documents?.policeVerified ? 'Verified Police Doc' : 'Mark Police Doc Verified'}
-                    </button>
-                  </div>
-
-                  <div className="max-w-md mx-auto space-y-1.5">
-                    <span className="text-xs text-slate-400 font-semibold block text-center">Police Verification Copy</span>
-                    <div
-                      onClick={() => setPreviewImage({ url: selectedDriver.documents?.policeVerificationDoc || '', title: 'Police Clearance Certificate' })}
-                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3]"
-                    >
-                      <img
-                        src={selectedDriver.documents?.policeVerificationDoc}
-                        alt="Police Verification"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <span className="text-slate-400 text-[11px] block">Rider Mobile App Login PIN</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="font-mono font-bold text-amber-300 text-sm">
+                            {selectedDriver.pin || '1234'}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            4-Digit Security PIN
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1108,10 +1022,36 @@ export default function LogisticsDetailDocument() {
                   <input
                     type="tel"
                     required
+                    maxLength={10}
                     value={newDriverForm.phone}
-                    onChange={(e) => setNewDriverForm({ ...newDriverForm, phone: e.target.value })}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, phone: e.target.value.replace(/[^0-9]/g, '') })}
                     placeholder="e.g. 9826012345"
                     className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">UPI ID (For Payouts) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDriverForm.upiId}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, upiId: e.target.value })}
+                    placeholder="e.g. 9826012345@upi"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-emerald-300 font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">4-Digit Login PIN *</label>
+                  <input
+                    type="password"
+                    required
+                    maxLength={4}
+                    value={newDriverForm.pin}
+                    onChange={(e) => setNewDriverForm({ ...newDriverForm, pin: e.target.value.replace(/[^0-9]/g, '') })}
+                    placeholder="e.g. 1234"
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono tracking-widest focus:outline-none focus:border-red-500"
                   />
                 </div>
 
@@ -1122,17 +1062,6 @@ export default function LogisticsDetailDocument() {
                     value={newDriverForm.alternatePhone}
                     onChange={(e) => setNewDriverForm({ ...newDriverForm, alternatePhone: e.target.value })}
                     placeholder="e.g. 9826099999"
-                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    value={newDriverForm.email}
-                    onChange={(e) => setNewDriverForm({ ...newDriverForm, email: e.target.value })}
-                    placeholder="e.g. mukesh.driver@gmail.com"
                     className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
                   />
                 </div>
@@ -1157,10 +1086,10 @@ export default function LogisticsDetailDocument() {
                     onChange={(e) => setNewDriverForm({ ...newDriverForm, vehicleType: e.target.value as any })}
                     className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
                   >
+                    <option value="Two Wheeler / Bike">Two Wheeler / Bike</option>
                     <option value="Mini Truck / Tata Ace">Mini Truck / Tata Ace</option>
                     <option value="Pickup 3-Wheeler">Pickup 3-Wheeler</option>
                     <option value="Large Van">Large Van</option>
-                    <option value="Bike / 2-Wheeler">Bike / 2-Wheeler</option>
                     <option value="E-Loader / Electric Trike">E-Loader / Electric Trike</option>
                   </select>
                 </div>
@@ -1198,51 +1127,50 @@ export default function LogisticsDetailDocument() {
                     className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-red-500"
                   />
                 </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">PAN Card No</label>
-                  <input
-                    type="text"
-                    value={newDriverForm.panNumber}
-                    onChange={(e) => setNewDriverForm({ ...newDriverForm, panNumber: e.target.value.toUpperCase() })}
-                    placeholder="e.g. ABCDE1234F"
-                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 uppercase focus:outline-none focus:border-red-500"
-                  />
-                </div>
               </div>
 
               {/* Document File Attachments */}
               <div className="pt-3 border-t border-slate-800 space-y-3">
                 <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">KYC Document Uploads</h4>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   {/* Photo Upload */}
                   <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
-                    <span className="font-semibold text-slate-300 block">Profile Photo</span>
+                    <span className="font-semibold text-slate-300 block text-[11px]">1. Profile (Selfie)</span>
                     <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
                       <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                      <span className="text-[10px] text-slate-400">{profilePhoto ? 'Photo Attached ✓' : 'Upload Selfie/Photo'}</span>
+                      <span className="text-[10px] text-slate-400">{profilePhoto ? 'Photo Added ✓' : 'Upload Selfie'}</span>
                       <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setProfilePhoto)} className="hidden" />
                     </label>
                   </div>
 
                   {/* DL Front */}
                   <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
-                    <span className="font-semibold text-slate-300 block">Driving License Front</span>
+                    <span className="font-semibold text-slate-300 block text-[11px]">2. Driving License</span>
                     <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
                       <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                      <span className="text-[10px] text-slate-400">{dlFront ? 'DL Attached ✓' : 'Upload DL Image'}</span>
+                      <span className="text-[10px] text-slate-400">{dlFront ? 'DL Added ✓' : 'Upload DL'}</span>
                       <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setDlFront)} className="hidden" />
                     </label>
                   </div>
 
                   {/* Aadhaar Front */}
                   <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
-                    <span className="font-semibold text-slate-300 block">Aadhaar Front Copy</span>
+                    <span className="font-semibold text-slate-300 block text-[11px]">3. Aadhaar Card</span>
                     <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
                       <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                      <span className="text-[10px] text-slate-400">{aadhaarFront ? 'Aadhaar Attached ✓' : 'Upload Aadhaar'}</span>
+                      <span className="text-[10px] text-slate-400">{aadhaarFront ? 'Aadhaar Added ✓' : 'Upload Aadhaar'}</span>
                       <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setAadhaarFront)} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* Vehicle Photo with Plate */}
+                  <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1.5">
+                    <span className="font-semibold text-slate-300 block text-[11px]">4. Vehicle Photo</span>
+                    <label className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-600 rounded-lg hover:border-red-500 cursor-pointer text-center bg-slate-900/60">
+                      <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                      <span className="text-[10px] text-slate-400">{vehiclePhoto ? 'Vehicle Added ✓' : 'Upload Gaadi Pic'}</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setVehiclePhoto)} className="hidden" />
                     </label>
                   </div>
                 </div>
@@ -1319,6 +1247,25 @@ export default function LogisticsDetailDocument() {
                   </select>
                 </div>
                 <div>
+                  <label className="font-bold text-slate-300 block mb-1">UPI ID</label>
+                  <input
+                    type="text"
+                    value={editForm.upiId}
+                    onChange={(e) => setEditForm({ ...editForm, upiId: e.target.value })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-emerald-300 font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Login PIN</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={editForm.pin}
+                    onChange={(e) => setEditForm({ ...editForm, pin: e.target.value.replace(/[^0-9]/g, '') })}
+                    className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-mono tracking-widest focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
                   <label className="font-bold text-slate-300 block mb-1">Vehicle Plate No</label>
                   <input
                     type="text"
@@ -1337,11 +1284,11 @@ export default function LogisticsDetailDocument() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">License Expiry</label>
+                  <label className="font-bold text-slate-300 block mb-1">Aadhaar (UIDAI) No</label>
                   <input
-                    type="date"
-                    value={editForm.licenseExpiry}
-                    onChange={(e) => setEditForm({ ...editForm, licenseExpiry: e.target.value })}
+                    type="text"
+                    value={editForm.aadhaarNumber}
+                    onChange={(e) => setEditForm({ ...editForm, aadhaarNumber: e.target.value })}
                     className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-red-500"
                   />
                 </div>

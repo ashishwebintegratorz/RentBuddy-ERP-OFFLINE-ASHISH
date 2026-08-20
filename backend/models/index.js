@@ -189,6 +189,53 @@ const ConfigSchema = new mongoose.Schema({
   value: mongoose.Schema.Types.Mixed
 }, { timestamps: true });
 
+// Asset Scan Log Schema (Immutable Audit Trail for Two-Way Verification)
+const AssetScanLogSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  assetId: String,
+  assetBarcode: String,
+  orderId: String,
+  driverId: String,
+  driverName: String,
+  scanType: { type: String, enum: ['CHECKOUT', 'DELIVERY', 'PICKUP', 'CHECKIN'], required: true },
+  scanResult: { type: String, enum: ['VERIFIED', 'REJECTED', 'MISMATCH', 'DUPLICATE'], required: true },
+  latitude: Number,
+  longitude: Number,
+  deviceId: String,
+  notes: String,
+  timestamp: { type: String, default: () => new Date().toISOString() }
+}, { strict: false, timestamps: true });
+
+// Damage Report Schema (Quality Inspection & Damage Escalations)
+const DamageReportSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  assetId: { type: String, required: true },
+  assetBarcode: String,
+  assetName: String,
+  orderId: String,
+  pickupId: String,
+  reportedByDriverId: String,
+  reportedByDriverName: String,
+  damageType: String,
+  severity: { type: String, enum: ['Minor', 'Medium', 'Major', 'Broken'], default: 'Minor' },
+  description: String,
+  photos: [String],
+  estimatedRepairCost: Number,
+  status: { type: String, enum: ['PENDING_REVIEW', 'APPROVED_REPAIR', 'RETIRED', 'RESOLVED'], default: 'PENDING_REVIEW' },
+  adminNotes: String,
+  resolvedAt: String
+}, { strict: false, timestamps: true });
+
+// Zone Schema (Zone-Based Order Dispatching)
+const ZoneSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  city: { type: String, required: true },
+  areas: [String],
+  pincodes: [String],
+  active: { type: Boolean, default: true }
+}, { strict: false, timestamps: true });
+
 export const User = mongoose.model('User', UserSchema);
 export const Driver = mongoose.model('Driver', DriverSchema);
 export const Customer = mongoose.model('Customer', CustomerSchema);
@@ -199,3 +246,7 @@ export const Repair = mongoose.model('Repair', RepairSchema);
 export const Log = mongoose.model('Log', LogSchema);
 export const Notif = mongoose.model('Notif', NotifSchema);
 export const Config = mongoose.model('Config', ConfigSchema);
+export const AssetScanLog = mongoose.model('AssetScanLog', AssetScanLogSchema);
+export const DamageReport = mongoose.model('DamageReport', DamageReportSchema);
+export const Zone = mongoose.model('Zone', ZoneSchema);
+

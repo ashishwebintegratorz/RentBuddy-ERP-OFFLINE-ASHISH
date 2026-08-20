@@ -54,16 +54,18 @@ export default function Dashboard({ setView }: DashboardProps) {
   };
 
   // Filter collections by current active city for local metrics
-  const cityAssets = inventory.filter(a => a.city === currentCity);
-  const activeAgreements = orders.filter(o => o.status === 'Delivered');
-  const cityActiveAgreements = orders.filter(o => o.status === 'Delivered' && (inventory.find(a => a.id === o.items[0]?.assetId)?.city === currentCity));
+  const cityAssets = (inventory || []).filter(a => a && (!a.city || a.city === currentCity));
+  const activeAgreements = (orders || []).filter(o => o && o.status === 'Delivered');
+  const cityActiveAgreements = (orders || []).filter(o => o && o.status === 'Delivered' && (inventory.find(a => a.id === o.items?.[0]?.assetId)?.city === currentCity));
 
   // Compute metrics
-  const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(c => c.status === 'Good Customer' || c.status === 'VIP' || c.status === 'Verified').length;
-  const newCustomersThisMonth = customers.filter(c => {
-    const diff = Date.now() - new Date(c.createdAt).getTime();
-    return diff < 30 * 24 * 60 * 60 * 1000;
+  const totalCustomers = (customers || []).length;
+  const activeCustomers = (customers || []).filter(c => c && (c.status === 'Good Customer' || c.status === 'VIP' || c.status === 'Verified' || c.verificationStatus === 'Verified')).length;
+  const newCustomersThisMonth = (customers || []).filter(c => {
+    if (!c || !c.createdAt) return false;
+    const time = new Date(c.createdAt).getTime();
+    if (isNaN(time)) return false;
+    return (Date.now() - time) < 30 * 24 * 60 * 60 * 1000;
   }).length;
 
   const totalAssets = cityAssets.length;
@@ -72,27 +74,27 @@ export default function Dashboard({ setView }: DashboardProps) {
   const assetsRepair = cityAssets.filter(a => a.status === 'Under Repair').length;
   const assetsLost = cityAssets.filter(a => a.status === 'Lost').length;
 
-  const pendingDeliveries = orders.filter(o => o.status === 'Pending' || o.status === 'Assigned' || o.status === 'Out for Delivery').length;
-  const pendingPickups = orders.filter(o => o.status === 'Return Pickup').length;
+  const pendingDeliveries = (orders || []).filter(o => o && (o.status === 'Pending' || o.status === 'Assigned' || o.status === 'Out for Delivery')).length;
+  const pendingPickups = (orders || []).filter(o => o && (o.status === 'Return Pickup')).length;
 
   // Financial calculations
-  const monthlyRevenue = invoices
-    .filter(i => i.status === 'Paid')
-    .reduce((sum, i) => sum + i.rentalCharges, 0);
+  const monthlyRevenue = (invoices || [])
+    .filter(i => i && i.status === 'Paid')
+    .reduce((sum, i) => sum + (i.rentalCharges || 0), 0);
 
-  const pendingPayments = invoices
-    .filter(i => i.status === 'Pending' || i.status === 'Overdue')
-    .reduce((sum, i) => sum + i.totalAmount, 0);
+  const pendingPayments = (invoices || [])
+    .filter(i => i && (i.status === 'Pending' || i.status === 'Overdue'))
+    .reduce((sum, i) => sum + (i.totalAmount || 0), 0);
 
-  const securityDepositsHeld = orders
-    .filter(o => o.depositRefundStatus === 'Held')
-    .reduce((sum, o) => sum + o.totalDeposit, 0);
+  const securityDepositsHeld = (orders || [])
+    .filter(o => o && o.depositRefundStatus === 'Held')
+    .reduce((sum, o) => sum + (o.totalDeposit || 0), 0);
 
-  const refundPending = orders
-    .filter(o => o.depositRefundStatus === 'Pending Inspection')
-    .reduce((sum, o) => sum + o.totalDeposit, 0);
+  const refundPending = (orders || [])
+    .filter(o => o && o.depositRefundStatus === 'Pending Inspection')
+    .reduce((sum, o) => sum + (o.totalDeposit || 0), 0);
 
-  const defaultersCount = customers.filter(c => c.status === 'Defaulter').length;
+  const defaultersCount = (customers || []).filter(c => c && c.status === 'Defaulter').length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">

@@ -88,6 +88,7 @@ interface RentBuddyState {
 
   // Asset Actions
   addAsset: (asset: Omit<Asset, 'id' | 'lifecycle'>) => void;
+  updateAsset: (id: string, updates: Partial<Asset>) => void;
   updateAssetStatus: (id: string, status: AssetStatus) => void;
   moveAssetWarehouse: (id: string, warehouse: string) => void;
 
@@ -386,6 +387,29 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               category: 'INVENTORY',
               severity: 'INFO',
               details: `Procured new ${newAsset.category} (${newAsset.brand} ${newAsset.model}). Barcode ${newAsset.barcode} registered.`,
+            };
+            return {
+              inventory: list,
+              auditLogs: [log, ...state.auditLogs],
+            };
+          });
+          get().runSystemAudit();
+        },
+
+        updateAsset: (id, updates) => {
+          set((state) => {
+            const list = state.inventory.map((a) => (a.id === id ? { ...a, ...updates } : a));
+            const aDetail = state.inventory.find((a) => a.id === id);
+            const log: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `User (${state.currentUserRole})`,
+              city: state.currentCity,
+              action: 'Asset update',
+              category: 'INVENTORY',
+              severity: 'INFO',
+              details: `Updated asset ${aDetail?.category} [${id}] (${updates.brand || aDetail?.brand} ${updates.model || aDetail?.model}).`,
             };
             return {
               inventory: list,
@@ -1047,6 +1071,29 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               read: false,
               city: newDriver.city,
             };
+
+            // Immediately persist to backend MongoDB Atlas
+            try {
+              fetch(`${BACKEND_URL}/auth/driver/complete-onboarding`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: newDriver.fullName,
+                  fullName: newDriver.fullName,
+                  phone: newDriver.phone,
+                  alternatePhone: newDriver.alternatePhone,
+                  city: newDriver.city,
+                  vehicleNumber: newDriver.vehicleNumber,
+                  vehicleType: newDriver.vehicleType,
+                  upiId: newDriver.upiId,
+                  pin: newDriver.pin || '1234',
+                  profilePhoto: newDriver.documents?.profilePhoto,
+                  aadhaarFront: newDriver.documents?.aadhaarFront,
+                  licenseFront: newDriver.documents?.licenseFront || newDriver.documents?.drivingLicenseFront,
+                  vehiclePhoto: newDriver.documents?.vehiclePhoto
+                })
+              }).catch(() => {});
+            } catch (_) {}
 
             return {
               drivers: [newDriver, ...state.drivers],

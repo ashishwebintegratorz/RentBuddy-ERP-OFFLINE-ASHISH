@@ -8,13 +8,13 @@ import {
   toggleBlockDriver,
   updateDriverDocuments
 } from '../../controllers/driver.controller.js';
-import { authenticateToken } from '../../middlewares/auth.middleware.js';
+import { optionalAuth } from '../../middlewares/auth.middleware.js';
 import { successResponse } from '../../utils/response.js';
 
 const router = Router();
 
-// Secure driver endpoints
-router.use(authenticateToken);
+// Driver endpoints with flexible authentication
+router.use(optionalAuth);
 
 // Core Driver CRUD & Admin Operations
 router.get('/', getDrivers);

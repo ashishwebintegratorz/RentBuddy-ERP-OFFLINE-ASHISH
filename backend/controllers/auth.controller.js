@@ -190,9 +190,11 @@ export const completeDriverOnboarding = async (req, res) => {
       name,
       fullName,
       phone,
+      alternatePhone,
       city,
       vehicleNumber,
       vehicleType,
+      upiId,
       pin,
       profilePhoto,
       aadhaarFront,
@@ -230,6 +232,7 @@ export const completeDriverOnboarding = async (req, res) => {
         driver.city = driverCity;
         driver.vehicleNumber = vehicleNumber || driver.vehicleNumber || 'MP 09 RB 1234';
         driver.vehicleType = vehicleType || driver.vehicleType || 'Two Wheeler / Bike';
+        driver.upiId = upiId || driver.upiId || '';
         driver.pin = pin || driver.pin || '1234';
         driver.hasPin = true;
         driver.verificationStatus = 'Verified';
@@ -241,9 +244,11 @@ export const completeDriverOnboarding = async (req, res) => {
           id: driverId,
           fullName: driverName,
           phone: cleanPhone,
+          alternatePhone: alternatePhone || '',
           city: driverCity,
           vehicleNumber: vehicleNumber || 'MP 09 RB 1234',
           vehicleType: vehicleType || 'Two Wheeler / Bike',
+          upiId: upiId || '',
           pin: pin || '1234',
           hasPin: true,
           status: 'Active',

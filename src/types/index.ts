@@ -255,7 +255,9 @@ export interface LogisticsDriver {
   fullName: string;
   phone: string;
   alternatePhone?: string;
-  email: string;
+  email?: string;
+  upiId?: string;
+  pin?: string;
   city: CityName;
   vehicleType: DriverVehicleType;
   vehicleNumber: string;

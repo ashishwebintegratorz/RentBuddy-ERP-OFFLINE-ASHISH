@@ -10,6 +10,7 @@ import {
 export default function OrderManagement() {
   const {
     orders,
+    drivers,
     updateOrderStatus,
     refundSecurityDeposit,
     requestOrderReturn,
@@ -299,6 +300,33 @@ export default function OrderManagement() {
                 File Return Request
               </button>
             )}
+          </div>
+
+          {/* Assign Driver */}
+          <div className="space-y-2 pt-3 border-t border-slate-800">
+            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Assign Delivery Driver / Rider</label>
+            <select
+              value={selectedOrder.assignedLogisticsUser || ''}
+              onChange={(e) => {
+                const driverName = e.target.value;
+                const driverObj = drivers.find(d => d.fullName === driverName || d.id === driverName);
+                if (driverObj) {
+                  updateOrderStatus(selectedOrder.id, 'Assigned');
+                  // update backend assignment
+                  fetch(`http://localhost:5001/api/v1/orders/${selectedOrder.id}/assign-driver`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ driverId: driverObj.id })
+                  }).catch(err => console.error('Error assigning driver:', err));
+                }
+              }}
+              className="w-full text-[11px] py-1.5 px-2.5 bg-slate-950 border border-slate-850 rounded text-cyan-300 font-semibold"
+            >
+              <option value="">-- Select Active Rider --</option>
+              {drivers.filter(d => !d.isBlocked).map(d => (
+                <option key={d.id} value={d.fullName}>{d.fullName} ({d.phone}) - {d.city}</option>
+              ))}
+            </select>
           </div>
 
           {/* Quick status controls */}

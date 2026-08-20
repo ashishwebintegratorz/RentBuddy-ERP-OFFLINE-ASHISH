@@ -4,7 +4,7 @@ import { DEFAULT_ADMIN } from './constants.js';
 
 let isMongoConnected = false;
 
-export const getDbStatus = () => isMongoConnected;
+export const getDbStatus = () => isMongoConnected || mongoose.connection.readyState === 1;
 
 export async function connectDB() {
   const uris = [

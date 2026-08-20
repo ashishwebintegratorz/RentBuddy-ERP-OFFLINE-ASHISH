@@ -10,6 +10,7 @@ import {
   Config
 } from '../models/index.js';
 import { getDbStatus } from '../config/db.js';
+import { initialAssets, initialCustomers, initialCities } from '../config/initialData.js';
 
 class SyncService {
   async loadAllState() {
@@ -17,7 +18,7 @@ class SyncService {
       return null;
     }
 
-    const [
+    let [
       assets,
       customers,
       orders,
@@ -45,6 +46,19 @@ class SyncService {
       Config.findOne({ key: 'expectedVsActualAudit' })
     ]);
 
+    // Auto-seed initial enterprise inventory if database is clean/empty
+    if ((!assets || assets.length === 0) && (!customers || customers.length === 0)) {
+      console.log('🍃 [DB] Seeding genuine enterprise asset & customer collections in MongoDB Atlas...');
+      await Promise.all([
+        Asset.insertMany(initialAssets),
+        Customer.insertMany(initialCustomers),
+        Config.findOneAndUpdate({ key: 'cities' }, { value: initialCities }, { upsert: true })
+      ]);
+      assets = await Asset.find({});
+      customers = await Customer.find({});
+      citiesConfig = { value: initialCities };
+    }
+
     return {
       assets: assets || [],
       customers: customers || [],
@@ -54,15 +68,21 @@ class SyncService {
       auditLogs: logs || [],
       notifications: notifications || [],
       drivers: drivers || [],
-      cities: citiesConfig ? citiesConfig.value : null,
-      currentCity: currentCityConfig ? currentCityConfig.value : null,
-      currentUserRole: currentUserRoleConfig ? currentUserRoleConfig.value : null,
-      expectedVsActualAudit: expectedVsActualAuditConfig ? expectedVsActualAuditConfig.value : null
+      cities: citiesConfig ? citiesConfig.value : initialCities,
+      currentCity: currentCityConfig ? currentCityConfig.value : 'Indore (Head Office)',
+      currentUserRole: currentUserRoleConfig ? currentUserRoleConfig.value : 'Super Admin',
+      expectedVsActualAudit: expectedVsActualAuditConfig ? expectedVsActualAuditConfig.value : {
+        expectedCount: (assets || []).length,
+        actualCount: (assets || []).length,
+        missingCount: 0,
+        duplicateBarcodes: [],
+        fraudAlertCount: 0
+      }
     };
   }
 
   async syncState(payload) {
-    if (!getDbStatus()) {
+    if (!getDbStatus() || !payload) {
       return 'Offline cache mode active.';
     }
 
@@ -83,48 +103,75 @@ class SyncService {
 
     const tasks = [];
 
-    if (assets) {
-      tasks.push(
-        Asset.deleteMany({}).then(() => (assets.length > 0 ? Asset.insertMany(assets) : null))
-      );
-    }
-    if (customers) {
-      tasks.push(
-        Customer.deleteMany({}).then(() => (customers.length > 0 ? Customer.insertMany(customers) : null))
-      );
-    }
-    if (orders) {
-      tasks.push(
-        Order.deleteMany({}).then(() => (orders.length > 0 ? Order.insertMany(orders) : null))
-      );
-    }
-    if (invoices) {
-      tasks.push(
-        Invoice.deleteMany({}).then(() => (invoices.length > 0 ? Invoice.insertMany(invoices) : null))
-      );
-    }
-    if (repairs) {
-      tasks.push(
-        Repair.deleteMany({}).then(() => (repairs.length > 0 ? Repair.insertMany(repairs) : null))
-      );
-    }
-    if (auditLogs) {
-      tasks.push(
-        Log.deleteMany({}).then(() => (auditLogs.length > 0 ? Log.insertMany(auditLogs) : null))
-      );
-    }
-    if (notifications) {
-      tasks.push(
-        Notif.deleteMany({}).then(() => (notifications.length > 0 ? Notif.insertMany(notifications) : null))
-      );
-    }
-    if (drivers) {
-      tasks.push(
-        Driver.deleteMany({}).then(() => (drivers.length > 0 ? Driver.insertMany(drivers) : null))
-      );
+    // Safe upsert for assets (never erase unless empty)
+    if (assets && Array.isArray(assets) && assets.length > 0) {
+      for (const item of assets) {
+        if (item.id) {
+          tasks.push(Asset.findOneAndUpdate({ id: item.id }, item, { upsert: true }));
+        }
+      }
     }
 
-    if (cities) {
+    // Safe upsert for customers
+    if (customers && Array.isArray(customers) && customers.length > 0) {
+      for (const item of customers) {
+        if (item.id) {
+          tasks.push(Customer.findOneAndUpdate({ id: item.id }, item, { upsert: true }));
+        }
+      }
+    }
+
+    // Safe upsert for orders
+    if (orders && Array.isArray(orders) && orders.length > 0) {
+      for (const item of orders) {
+        if (item.id) {
+          tasks.push(Order.findOneAndUpdate({ id: item.id }, item, { upsert: true }));
+        }
+      }
+    }
+
+    // Safe upsert for invoices
+    if (invoices && Array.isArray(invoices) && invoices.length > 0) {
+      for (const item of invoices) {
+        if (item.id) {
+          tasks.push(Invoice.findOneAndUpdate({ id: item.id }, item, { upsert: true }));
+        }
+      }
+    }
+
+    // Safe upsert for repairs
+    if (repairs && Array.isArray(repairs) && repairs.length > 0) {
+      for (const item of repairs) {
+        if (item.id) {
+          tasks.push(Repair.findOneAndUpdate({ id: item.id }, item, { upsert: true }));
+        }
+      }
+    }
+
+    // Safe upsert for drivers (NEVER delete drivers, preserve Flutter onboarding)
+    if (drivers && Array.isArray(drivers) && drivers.length > 0) {
+      for (const d of drivers) {
+        if (d.phone || d.id) {
+          tasks.push(
+            Driver.findOneAndUpdate(
+              d.phone ? { phone: d.phone } : { id: d.id },
+              d,
+              { upsert: true }
+            )
+          );
+        }
+      }
+    }
+
+    if (auditLogs && Array.isArray(auditLogs) && auditLogs.length > 0) {
+      for (const log of auditLogs) {
+        if (log.id) {
+          tasks.push(Log.findOneAndUpdate({ id: log.id }, log, { upsert: true }));
+        }
+      }
+    }
+
+    if (cities && Array.isArray(cities)) {
       tasks.push(Config.findOneAndUpdate({ key: 'cities' }, { value: cities }, { upsert: true }));
     }
     if (currentCity) {

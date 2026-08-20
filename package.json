@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js & vite",
-    "server": "node server.js",
-    "start:server": "node server.js",
+    "server": "node --watch server.js",
+    "start:server": "node --watch server.js",
     "client": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

@@ -7,13 +7,19 @@ import {
   Plus,
   X,
   MapPin,
-  AlertCircle
+  AlertCircle,
+  Edit3,
+  Power,
+  Ban,
+  CheckCircle2,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function InventoryManagement() {
   const {
     inventory,
     addAsset,
+    updateAsset,
     updateAssetStatus,
     moveAssetWarehouse,
     currentCity,
@@ -25,6 +31,10 @@ export default function InventoryManagement() {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  // Edit Asset Modal state
+  const [showEditAsset, setShowEditAsset] = useState(false);
+  const [editAssetForm, setEditAssetForm] = useState<Asset | null>(null);
 
   // New Asset form state
   const [newAsset, setNewAsset] = useState({
@@ -107,6 +117,55 @@ export default function InventoryManagement() {
     setShowAddAsset(false);
   };
 
+  const openEditModal = (asset: Asset) => {
+    setEditAssetForm({ ...asset });
+    setShowEditAsset(true);
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editAssetForm) return;
+    try {
+      const compressedDataUrl = await compressImage(file, 300, 0.6);
+      setEditAssetForm(prev => prev ? ({ ...prev, imageUrl: compressedDataUrl }) : null);
+    } catch (err) {
+      console.error("Error compressing edit image:", err);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditAssetForm(prev => prev ? ({ ...prev, imageUrl: reader.result as string }) : null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveEditAsset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editAssetForm) return;
+    updateAsset(editAssetForm.id, {
+      brand: editAssetForm.brand,
+      model: editAssetForm.model,
+      category: editAssetForm.category,
+      purchaseCost: Number(editAssetForm.purchaseCost) || 0,
+      monthlyRentalPrice: Number(editAssetForm.monthlyRentalPrice) || 0,
+      securityDeposit: Number(editAssetForm.securityDeposit) || 0,
+      city: editAssetForm.city,
+      warehouse: editAssetForm.warehouse,
+      rackNumber: editAssetForm.rackNumber,
+      imageUrl: editAssetForm.imageUrl,
+      status: editAssetForm.status,
+    });
+    setShowEditAsset(false);
+    setEditAssetForm(null);
+  };
+
+  const handleToggleCloseAsset = (asset: Asset) => {
+    if (asset.status === 'Scrapped') {
+      updateAssetStatus(asset.id, 'Available');
+    } else {
+      updateAssetStatus(asset.id, 'Scrapped');
+    }
+  };
+
   const selectedAsset = inventory.find(a => a.id === selectedAssetId);
 
   // Low Stock thresholds check (Mumbai, Delhi, Indore specific)
@@ -116,14 +175,15 @@ export default function InventoryManagement() {
   }).filter(item => item.count <= 1); // 1 or less is low stock!
 
   // Filter lists based on City, Category, Status, Search
-  const filteredAssets = inventory.filter(a => {
-    const matchesCity = a.city === currentCity;
+  const filteredAssets = (inventory || []).filter(a => {
+    if (!a) return false;
+    const matchesCity = !a.city || a.city === currentCity;
     const matchesCategory = selectedCategory === 'All' || a.category === selectedCategory;
     const matchesStatus = selectedStatus === 'All' || a.status === selectedStatus;
-    const matchesSearch = a.brand.toLowerCase().includes(search.toLowerCase()) ||
-                          a.model.toLowerCase().includes(search.toLowerCase()) ||
-                          a.id.toLowerCase().includes(search.toLowerCase()) ||
-                          a.barcode.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = (a.brand || '').toLowerCase().includes(search.toLowerCase()) ||
+                          (a.model || '').toLowerCase().includes(search.toLowerCase()) ||
+                          (a.id || '').toLowerCase().includes(search.toLowerCase()) ||
+                          (a.barcode || '').toLowerCase().includes(search.toLowerCase());
     return matchesCity && matchesCategory && matchesStatus && matchesSearch;
   });
 
@@ -140,7 +200,9 @@ export default function InventoryManagement() {
       case 'Lost':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">Lost</span>;
       case 'Scrapped':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-550/10 text-slate-400 border border-slate-700/20">Scrapped</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/30 text-slate-400 border border-slate-700/40">Closed / Off-Rent</span>;
+      default:
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Available</span>;
     }
   };
 
@@ -227,7 +289,9 @@ export default function InventoryManagement() {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {filteredAssets.map(asset => {
-                const roi = asset.purchaseCost > 0 ? Math.round((asset.lifecycle.revenueEarned / asset.purchaseCost) * 100) : 0;
+                const revenue = asset.lifecycle?.revenueEarned ?? 0;
+                const cost = asset.purchaseCost || 1;
+                const roi = Math.round((revenue / cost) * 100);
                 return (
                   <tr
                     key={asset.id}
@@ -238,33 +302,67 @@ export default function InventoryManagement() {
                   >
                     <td className="p-4">
                       <div>
-                        <div className="font-bold text-white text-sm">{asset.brand} {asset.model}</div>
+                        <div className="font-bold text-white text-sm">
+                          {asset.brand || 'RentBuddy'} {asset.model || asset.category || 'Asset'}
+                        </div>
                         <div className="text-[10px] text-slate-500 mt-0.5 flex gap-2">
                           <span className="font-mono text-red-400">{asset.id}</span>
                           <span>|</span>
                           <span>{asset.category}</span>
                           <span>|</span>
-                          <span className="font-medium text-slate-400">{asset.warehouse}</span>
+                          <span className="font-medium text-slate-400">{asset.warehouse || 'Hub Warehouse'}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="p-4 font-mono text-slate-300">{asset.rackNumber}</td>
+                    <td className="p-4 font-mono text-slate-300">{asset.rackNumber || 'A-01'}</td>
                     <td className="p-4">
-                      <div className="text-slate-200">Rent: ₹{asset.monthlyRentalPrice}/mo</div>
-                      <div className="text-[10px] text-slate-500">Deposit: ₹{asset.securityDeposit}</div>
+                      <div className="text-slate-200">Rent: ₹{asset.monthlyRentalPrice || 0}/mo</div>
+                      <div className="text-[10px] text-slate-500">Deposit: ₹{asset.securityDeposit || 0}</div>
                     </td>
                     <td className="p-4">{getStatusBadge(asset.status)}</td>
                     <td className="p-4 font-mono font-bold text-emerald-400">{roi}%</td>
                     <td className="p-4 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAssetId(asset.id);
-                        }}
-                        className="text-red-400 hover:text-red-300 font-semibold text-[11px]"
-                      >
-                        Lifecycle ROI
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(asset);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Edit Furniture Details"
+                        >
+                          <Edit3 className="w-3 h-3" /> Edit
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleCloseAsset(asset);
+                          }}
+                          className={`px-2 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer ${
+                            asset.status === 'Scrapped'
+                              ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                              : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                          }`}
+                          title={asset.status === 'Scrapped' ? 'Reactivate Asset for Renting' : 'Close / Take Off Renting Market'}
+                        >
+                          {asset.status === 'Scrapped' ? (
+                            <><Power className="w-3 h-3" /> Reopen</>
+                          ) : (
+                            <><Ban className="w-3 h-3" /> Close</>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAssetId(asset.id);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-[11px] cursor-pointer"
+                        >
+                          ROI
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -320,8 +418,32 @@ export default function InventoryManagement() {
             </div>
             <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-900">
               <span className="text-[9px] text-slate-500 block font-semibold uppercase">Rack Number</span>
-              <span className="font-mono text-slate-200 block mt-0.5">{selectedAsset.rackNumber}</span>
+              <span className="font-mono text-slate-200 block mt-0.5">{selectedAsset.rackNumber || 'A-01'}</span>
             </div>
+          </div>
+
+          {/* Action Buttons: Edit & Close Asset */}
+          <div className="pt-1 flex gap-2">
+            <button
+              onClick={() => openEditModal(selectedAsset)}
+              className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow text-xs"
+            >
+              <Edit3 className="w-3.5 h-3.5" /> Edit Furniture
+            </button>
+            <button
+              onClick={() => handleToggleCloseAsset(selectedAsset)}
+              className={`flex-1 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow text-xs ${
+                selectedAsset.status === 'Scrapped'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : 'bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300'
+              }`}
+            >
+              {selectedAsset.status === 'Scrapped' ? (
+                <><Power className="w-3.5 h-3.5" /> Reactivate</>
+              ) : (
+                <><Ban className="w-3.5 h-3.5" /> Close / Off-Rent</>
+              )}
+            </button>
           </div>
 
           {/* ROI Telemetry (Calculated dynamically) */}
@@ -331,18 +453,18 @@ export default function InventoryManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="text-[10px] text-slate-400">Total Revenue Earned</span>
-                <div className="text-lg font-bold text-white font-mono mt-0.5">₹{selectedAsset.lifecycle.revenueEarned.toLocaleString()}</div>
+                <div className="text-lg font-bold text-white font-mono mt-0.5">₹{(selectedAsset.lifecycle?.revenueEarned ?? 0).toLocaleString()}</div>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400">Purchase Cost</span>
-                <div className="text-lg font-bold text-slate-300 font-mono mt-0.5">₹{selectedAsset.purchaseCost.toLocaleString()}</div>
+                <div className="text-lg font-bold text-slate-300 font-mono mt-0.5">₹{(selectedAsset.purchaseCost || 0).toLocaleString()}</div>
               </div>
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-red-900/60 text-xs">
               <span className="text-slate-400">ROI Return Metric:</span>
               <span className="font-mono font-bold text-emerald-400 text-sm">
-                {selectedAsset.purchaseCost > 0 ? Math.round((selectedAsset.lifecycle.revenueEarned / selectedAsset.purchaseCost) * 100) : 0}%
+                {(selectedAsset.purchaseCost || 0) > 0 ? Math.round(((selectedAsset.lifecycle?.revenueEarned ?? 0) / selectedAsset.purchaseCost) * 100) : 0}%
               </span>
             </div>
           </div>
@@ -351,11 +473,11 @@ export default function InventoryManagement() {
           <div className="space-y-2 bg-slate-900/10 p-3 rounded-xl border border-slate-850">
             <div className="flex justify-between text-slate-400">
               <span>Procurement Date:</span>
-              <span className="text-slate-200 font-mono">{selectedAsset.purchaseDate}</span>
+              <span className="text-slate-200 font-mono">{selectedAsset.purchaseDate || 'N/A'}</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Current Book Value:</span>
-              <span className="text-slate-200 font-mono">₹{selectedAsset.currentValue}</span>
+              <span className="text-slate-200 font-mono">₹{selectedAsset.currentValue || selectedAsset.purchaseCost || 0}</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Depreciation Index:</span>
@@ -363,19 +485,19 @@ export default function InventoryManagement() {
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Security Deposit:</span>
-              <span className="text-slate-200 font-mono">₹{selectedAsset.securityDeposit}</span>
+              <span className="text-slate-200 font-mono">₹{selectedAsset.securityDeposit || 0}</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Monthly Rental Fee:</span>
-              <span className="text-slate-200 font-mono">₹{selectedAsset.monthlyRentalPrice}</span>
+              <span className="text-slate-200 font-mono">₹{selectedAsset.monthlyRentalPrice || 0}</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Rentals Count:</span>
-              <span className="text-slate-200 font-mono font-semibold">{selectedAsset.lifecycle.totalRentalsCount} times</span>
+              <span className="text-slate-200 font-mono font-semibold">{selectedAsset.lifecycle?.totalRentalsCount ?? 0} times</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Cumulative repairs:</span>
-              <span className="text-slate-200 font-mono">₹{selectedAsset.lifecycle.repairCost}</span>
+              <span className="text-slate-200 font-mono">₹{selectedAsset.lifecycle?.repairCost ?? 0}</span>
             </div>
           </div>
 
@@ -388,7 +510,7 @@ export default function InventoryManagement() {
               <div>
                 <label className="text-[9px] text-slate-500 block mb-1">Assigned Warehouse</label>
                 <select
-                  value={selectedAsset.warehouse}
+                  value={selectedAsset.warehouse || 'Indore Bypass Warehouse'}
                   onChange={(e) => moveAssetWarehouse(selectedAsset.id, e.target.value)}
                   className="w-full text-[11px] py-1 px-2 bg-slate-950 border border-slate-850 rounded"
                 >
@@ -397,6 +519,9 @@ export default function InventoryManagement() {
                   <option value="Mumbai Central Warehouse">Mumbai Central Warehouse</option>
                   <option value="Thane Warehouse">Thane Warehouse</option>
                   <option value="Indore Bypass Warehouse">Indore Bypass Warehouse</option>
+                  <option value="Bhopal Hub Warehouse">Bhopal Hub Warehouse</option>
+                  <option value="Surat Depot">Surat Depot</option>
+                  <option value="Ahmedabad Depot">Ahmedabad Depot</option>
                 </select>
               </div>
 
@@ -412,7 +537,7 @@ export default function InventoryManagement() {
                   <option value="Rented">Rented</option>
                   <option value="Under Repair">Under Repair</option>
                   <option value="Lost">Lost</option>
-                  <option value="Scrapped">Scrapped</option>
+                  <option value="Scrapped">Closed / Off-Rent (Scrapped)</option>
                 </select>
               </div>
             </div>
@@ -424,7 +549,7 @@ export default function InventoryManagement() {
       {/* Add Furniture dialog modal */}
       {showAddAsset && (
         <div className="fixed inset-0 bg-[#030303]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-[500px] glass-panel border border-slate-800/90 rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="w-[520px] glass-panel border border-slate-800/90 rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-white text-base">Procure New Furniture Asset</h3>
               <button
@@ -442,7 +567,7 @@ export default function InventoryManagement() {
                   <select
                     value={newAsset.category}
                     onChange={(e) => setNewAsset({ ...newAsset, category: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2 cursor-pointer"
+                    className="w-full rounded-lg px-2.5 py-2 cursor-pointer bg-slate-900 border border-slate-800 text-slate-200"
                   >
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -454,7 +579,7 @@ export default function InventoryManagement() {
                     required
                     value={newAsset.brand}
                     onChange={(e) => setNewAsset({ ...newAsset, brand: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
                     placeholder="e.g. Godrej, LG, Sleepwell"
                   />
                 </div>
@@ -467,7 +592,7 @@ export default function InventoryManagement() {
                   required
                   value={newAsset.model}
                   onChange={(e) => setNewAsset({ ...newAsset, model: e.target.value })}
-                  className="w-full rounded-lg px-2.5 py-2"
+                  className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
                   placeholder="e.g. Double door 250L, orthopaedic mattress"
                 />
               </div>
@@ -480,7 +605,7 @@ export default function InventoryManagement() {
                     required
                     value={newAsset.purchaseCost || ''}
                     onChange={(e) => setNewAsset({ ...newAsset, purchaseCost: Number(e.target.value) })}
-                    className="w-full rounded-lg px-2.5 py-2"
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
                     placeholder="INR"
                   />
                 </div>
@@ -491,7 +616,7 @@ export default function InventoryManagement() {
                     required
                     value={newAsset.monthlyRentalPrice || ''}
                     onChange={(e) => setNewAsset({ ...newAsset, monthlyRentalPrice: Number(e.target.value) })}
-                    className="w-full rounded-lg px-2.5 py-2"
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
                     placeholder="INR"
                   />
                 </div>
@@ -502,7 +627,7 @@ export default function InventoryManagement() {
                     required
                     value={newAsset.securityDeposit || ''}
                     onChange={(e) => setNewAsset({ ...newAsset, securityDeposit: Number(e.target.value) })}
-                    className="w-full rounded-lg px-2.5 py-2"
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
                     placeholder="INR"
                   />
                 </div>
@@ -570,19 +695,214 @@ export default function InventoryManagement() {
               </div>
 
               <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-900 text-[10px] text-slate-500 leading-normal">
-                Tagging: RentBuddy automatically generates a permanent Code-128 Barcode and QR sticker matching standard formats. Barcodes cannot be edited after creation.
+                Tagging: RentBuddy automatically generates a permanent Code-128 Barcode and QR sticker matching standard formats.
               </div>
 
               <div className="flex gap-3 pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer"
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold cursor-pointer shadow"
                 >
                   Procure Asset & Generate Barcode
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddAsset(false)}
+                  className="flex-1 py-2 border border-slate-800 text-slate-300 hover:bg-slate-900 rounded-lg font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Furniture dialog modal */}
+      {showEditAsset && editAssetForm && (
+        <div className="fixed inset-0 bg-[#030303]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-[520px] glass-panel border border-slate-800/90 rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-white text-base flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-cyan-400" /> Edit Furniture Asset
+                </h3>
+                <p className="text-[10px] text-slate-400 font-mono mt-0.5">{editAssetForm.id} • {editAssetForm.barcode}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditAsset(false);
+                  setEditAssetForm(null);
+                }}
+                className="p-1 rounded bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditAsset} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Category *</label>
+                  <select
+                    value={editAssetForm.category}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, category: e.target.value })}
+                    className="w-full rounded-lg px-2.5 py-2 cursor-pointer bg-slate-900 border border-slate-800 text-slate-200"
+                  >
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Brand Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editAssetForm.brand}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, brand: e.target.value })}
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                    placeholder="e.g. Godrej, LG, Sleepwell"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400 block font-medium">Model Description *</label>
+                <input
+                  type="text"
+                  required
+                  value={editAssetForm.model}
+                  onChange={(e) => setEditAssetForm({ ...editAssetForm, model: e.target.value })}
+                  className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                  placeholder="e.g. Double door 250L, orthopaedic mattress"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Purchase Cost (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={editAssetForm.purchaseCost || ''}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, purchaseCost: Number(e.target.value) })}
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                    placeholder="INR"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Monthly Rent (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={editAssetForm.monthlyRentalPrice || ''}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, monthlyRentalPrice: Number(e.target.value) })}
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                    placeholder="INR"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Deposit (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={editAssetForm.securityDeposit || ''}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, securityDeposit: Number(e.target.value) })}
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                    placeholder="INR"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">City Hub *</label>
+                  <select
+                    value={editAssetForm.city}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, city: e.target.value as any })}
+                    className="w-full rounded-lg px-2.5 py-2 cursor-pointer bg-slate-900 border border-slate-800 text-slate-200"
+                    required
+                  >
+                    {cities.map((city) => (
+                      <option key={city} value={city} className="bg-slate-900 text-slate-200">{city}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Warehouse *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editAssetForm.warehouse}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, warehouse: e.target.value })}
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                    placeholder="e.g. Indore Central Hub"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-400 block font-medium">Rack Position *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editAssetForm.rackNumber || ''}
+                    onChange={(e) => setEditAssetForm({ ...editAssetForm, rackNumber: e.target.value })}
+                    className="w-full rounded-lg px-2.5 py-2 bg-slate-900 border border-slate-800 text-slate-200"
+                    placeholder="e.g. RACK-4-A"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400 block font-medium">Status / Availability State</label>
+                <select
+                  value={editAssetForm.status}
+                  onChange={(e) => setEditAssetForm({ ...editAssetForm, status: e.target.value as AssetStatus })}
+                  className="w-full rounded-lg px-2.5 py-2 cursor-pointer bg-slate-900 border border-slate-800 text-slate-200 font-semibold"
+                >
+                  <option value="Available">Available (Ready to Rent)</option>
+                  <option value="Reserved">Reserved (Awaiting Dispatch)</option>
+                  <option value="Rented">Rented (Active Customer Contract)</option>
+                  <option value="Under Repair">Under Repair</option>
+                  <option value="Lost">Lost</option>
+                  <option value="Scrapped">Closed / Off-Rent (Take Off Market)</option>
+                </select>
+              </div>
+
+              {/* Asset Photo Upload */}
+              <div className="space-y-1.5 p-3.5 bg-slate-950/40 rounded-xl border border-slate-900">
+                <label className="text-slate-400 block font-medium">Update Photo (lossless auto-WebP conversion)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditImageUpload}
+                    className="text-[10px] text-slate-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-500/20 file:text-cyan-300 hover:file:bg-cyan-500/30 cursor-pointer"
+                  />
+                  {editAssetForm.imageUrl && (
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={editAssetForm.imageUrl}
+                        className="w-8 h-8 rounded border border-slate-800 object-cover"
+                        alt="Preview"
+                      />
+                      <span className="text-[9px] text-cyan-400 font-semibold font-mono">current photo</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditAsset(false);
+                    setEditAssetForm(null);
+                  }}
                   className="flex-1 py-2 border border-slate-800 text-slate-300 hover:bg-slate-900 rounded-lg font-bold cursor-pointer"
                 >
                   Cancel

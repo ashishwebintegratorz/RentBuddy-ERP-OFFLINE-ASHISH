@@ -37,13 +37,25 @@ export const requireSuperAdmin = (req, res, next) => {
 };
 
 /**
- * Require specific role(s)
+ * Optional JWT Token verification (proceeds even if no token, populates req.user if valid)
  */
-export const requireRoles = (roles = []) => {
-  return (req, res, next) => {
-    if (!req.user || (!roles.includes(req.user.role) && req.user.role !== 'Super Admin')) {
-      return errorResponse(res, `Access denied: Requires one of [${roles.join(', ')}]`, 403);
+export const optionalAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return next();
     }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (!err && decoded) {
+        req.user = decoded;
+      }
+      next();
+    });
+  } catch (_) {
     next();
-  };
+  }
 };
+

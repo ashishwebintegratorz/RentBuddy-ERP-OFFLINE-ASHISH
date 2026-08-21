@@ -38,6 +38,41 @@ export const getProfile = async (req, res) => {
 
 // ==================== DRIVER / RIDER APP AUTH ====================
 
+export const checkDriverPhone = async (req, res) => {
+  try {
+    const rawPhone = req.body.phone || req.query.phone || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return errorResponse(res, 'A valid 10-digit mobile number is required', 400);
+    }
+
+    let isRegistered = false;
+    let hasPin = false;
+    let name = 'Rider';
+    let city = 'Indore';
+
+    if (getDbStatus()) {
+      const driver = await Driver.findOne({ phone: cleanPhone });
+      if (driver) {
+        isRegistered = true;
+        hasPin = !!(driver.pin || driver.hasPin);
+        name = driver.fullName || 'Rider';
+        city = driver.city || 'Indore';
+      }
+    }
+
+    return successResponse(res, 'Phone status checked', {
+      phone: cleanPhone,
+      isRegistered,
+      hasPin,
+      name,
+      city
+    });
+  } catch (err) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
 export const sendDriverOtp = async (req, res) => {
   try {
     const rawPhone = req.body.phone || req.cleanPhone || '';
@@ -161,14 +196,16 @@ export const loginDriverWithPin = async (req, res) => {
       city: driver?.city || 'Indore (Head Office)'
     });
 
+    const avatarUrl = driver?.documents?.profilePhoto || driver?.documents?.selfiePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
+
     const userPayload = {
       _id: driver?._id || `driver-${cleanPhone}`,
       id: driver?.id || `DRV-${cleanPhone.slice(-4)}`,
       riderId: driver?.id || `DRV-${cleanPhone.slice(-4)}`,
       phone: cleanPhone,
       role: 'driver',
-      name: driver?.fullName || 'Rider Driver',
-      avatar: driver?.documents?.profilePhoto || driver?.documents?.selfiePhoto || '',
+      name: driver?.fullName || 'Faisal Rabani',
+      avatar: avatarUrl,
       isOnline: driver?.status === 'Active',
       hasPin: true
     };

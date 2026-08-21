@@ -18,6 +18,8 @@ export type AssetStatus = 'Available' | 'Reserved' | 'Rented' | 'Under Repair' |
 
 export type OrderStatus =
   | 'Pending'
+  | 'Order Placed'
+  | 'Ready for Dispatch'
   | 'Assigned'
   | 'Out for Delivery'
   | 'Delivered'
@@ -120,11 +122,21 @@ export interface RentalOrder {
   discountValue: number;
   netMonthlyRent: number;
   status: OrderStatus;
+  city?: string;
+  deliveryAddress?: string;
   assignedLogisticsUser?: string;
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
   scannedAtLoading: boolean;
   scannedAtDelivery: boolean;
   scannedAtPickup: boolean;
   scannedAtWarehouseEntry: boolean;
+  deliveryDeadline?: string;
+  deliveryProofPhoto?: string;
+  isPrepared?: boolean;
+  preparedAt?: string;
+  packedBy?: string;
   depositRefundStatus: 'Held' | 'Pending Inspection' | 'Approved' | 'Refunded';
   depositDeductions: number;
   createdAt: string;

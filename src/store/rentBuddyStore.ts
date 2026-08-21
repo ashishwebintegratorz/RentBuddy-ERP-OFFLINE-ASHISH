@@ -104,6 +104,7 @@ interface RentBuddyState {
     couponCode?: string;
   }) => RentalOrder;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  assignDriverToOrder: (orderId: string, driverId: string) => Promise<boolean>;
   scanAssetBarcode: (orderId: string, assetId: string, scanType: 'loading' | 'delivery' | 'pickup' | 'warehouse') => boolean;
   refundSecurityDeposit: (orderId: string, deductions: number, reason: string) => void;
   requestOrderReturn: (orderId: string) => void;
@@ -637,6 +638,58 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+        },
+
+        assignDriverToOrder: async (orderId: string, driverId: string) => {
+          const driver = get().drivers.find((d) => d.id === driverId || (d as any)._id === driverId || d.phone === driverId);
+          if (!driver) return false;
+
+          set((state) => {
+            const updatedOrders = state.orders.map((o) => {
+              if (o.id === orderId) {
+                return {
+                  ...o,
+                  assignedDriverId: driver.id,
+                  assignedDriverName: driver.fullName,
+                  assignedDriverPhone: driver.phone,
+                  assignedLogisticsUser: driver.fullName,
+                  status: 'Assigned' as OrderStatus,
+                };
+              }
+              return o;
+            });
+
+            const log: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `User (${state.currentUserRole})`,
+              city: state.currentCity,
+              action: 'Driver Assignment',
+              category: 'ORDER_STATUS',
+              severity: 'INFO',
+              details: `Assigned driver ${driver.fullName} (${driver.phone}) to order ${orderId}.`,
+            };
+
+            return {
+              orders: updatedOrders,
+              auditLogs: [log, ...state.auditLogs],
+            };
+          });
+
+          // Sync to Backend API
+          try {
+            await fetch(`${BACKEND_URL}/orders/${orderId}/assign-driver`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ driverId: driver.id }),
+            });
+          } catch (e) {
+            console.warn("Offline fallback for driver assignment:", e);
+          }
+
+          get().runSystemAudit();
+          return true;
         },
 
         scanAssetBarcode: (orderId, assetId, scanType) => {

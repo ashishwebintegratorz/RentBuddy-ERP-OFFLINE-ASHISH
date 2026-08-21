@@ -3,6 +3,7 @@ import {
   login,
   changeSelfPassword,
   getProfile,
+  checkDriverPhone,
   sendDriverOtp,
   verifyDriverOtp,
   loginDriverWithPin,
@@ -20,6 +21,7 @@ router.get('/profile', authenticateToken, getProfile);
 router.put('/password', authenticateToken, changeSelfPassword);
 
 // Rider Mobile App Auth Endpoints (mapped for Flutter Rider App)
+router.post('/driver/check-phone', checkDriverPhone);
 router.post('/driver/send-otp', otpLimiter, validatePhoneForOtp, sendDriverOtp);
 router.post('/driver/verify-otp', validateOtpPayload, verifyDriverOtp);
 router.post('/driver/login-with-pin', loginLimiter, loginDriverWithPin);

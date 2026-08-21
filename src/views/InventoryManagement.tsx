@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import type { Asset, AssetStatus } from '../types';
 import { compressImage } from '../utils/compressor';
+import BarcodeStickerModal from '../components/BarcodeStickerModal';
 import {
   Search,
   Plus,
@@ -12,7 +13,9 @@ import {
   Power,
   Ban,
   CheckCircle2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  QrCode,
+  Printer
 } from 'lucide-react';
 
 export default function InventoryManagement() {
@@ -31,6 +34,7 @@ export default function InventoryManagement() {
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [stickerAsset, setStickerAsset] = useState<Asset | null>(null);
 
   // Edit Asset Modal state
   const [showEditAsset, setShowEditAsset] = useState(false);
@@ -323,6 +327,17 @@ export default function InventoryManagement() {
                     <td className="p-4 font-mono font-bold text-emerald-400">{roi}%</td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStickerAsset(asset);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-red-600/10 text-red-400 hover:bg-red-600/20 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-red-500/20"
+                          title="Print Barcode & QR Label Sticker"
+                        >
+                          <QrCode className="w-3 h-3 text-red-400" /> QR Label
+                        </button>
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -911,6 +926,14 @@ export default function InventoryManagement() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Barcode & QR Code Printable Sticker Modal */}
+      {stickerAsset && (
+        <BarcodeStickerModal
+          asset={stickerAsset}
+          onClose={() => setStickerAsset(null)}
+        />
       )}
 
     </div>

@@ -352,9 +352,15 @@ export default function CustomerManagement() {
 
           {/* Profile Header */}
           <div className="flex items-center gap-4">
-            <img src={selectedCustomer.documents.selfie} className="w-14 h-14 rounded-xl object-cover border border-slate-700" alt="Selfie" />
+            {selectedCustomer.documents?.selfie ? (
+              <img src={selectedCustomer.documents.selfie} className="w-14 h-14 rounded-xl object-cover border border-slate-700" alt="Selfie" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-red-600/20 border border-red-500/30 text-red-300 font-bold flex items-center justify-center text-lg">
+                {(selectedCustomer.fullName || 'CU').substring(0, 2).toUpperCase()}
+              </div>
+            )}
             <div>
-              <h4 className="font-bold text-white text-base">{selectedCustomer.fullName}</h4>
+              <h4 className="font-bold text-white text-base">{selectedCustomer.fullName || 'Customer'}</h4>
               <div className="mt-1 flex gap-1.5 items-center">
                 {getStatusBadge(selectedCustomer.status)}
               </div>
@@ -365,22 +371,22 @@ export default function CustomerManagement() {
           <div className="space-y-2.5 text-xs bg-slate-950/40 p-3 rounded-xl border border-slate-900">
             <div className="flex items-center gap-2 text-slate-300">
               <Phone className="w-3.5 h-3.5 text-slate-500" />
-              <span>{selectedCustomer.mobileNumber}</span>
+              <span>{selectedCustomer.mobileNumber || 'N/A'}</span>
               {selectedCustomer.alternateNumber && (
                 <span className="text-[10px] text-slate-500">({selectedCustomer.alternateNumber})</span>
               )}
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <Mail className="w-3.5 h-3.5 text-slate-500" />
-              <span>{selectedCustomer.email}</span>
+              <span>{selectedCustomer.email || 'N/A'}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <Building className="w-3.5 h-3.5 text-slate-500" />
-              <span>{selectedCustomer.occupation} at {selectedCustomer.employer}</span>
+              <span>{selectedCustomer.occupation || 'Professional'} {selectedCustomer.employer ? `at ${selectedCustomer.employer}` : ''}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <IndianRupee className="w-3.5 h-3.5 text-slate-500" />
-              <span>Income: ₹{selectedCustomer.monthlyIncome.toLocaleString()}/mo</span>
+              <span>Income: ₹{(selectedCustomer.monthlyIncome || 0).toLocaleString()}/mo</span>
             </div>
           </div>
 
@@ -390,11 +396,11 @@ export default function CustomerManagement() {
             <div className="space-y-2">
               <div className="p-2 rounded bg-slate-900/30 border border-slate-800/40">
                 <span className="font-semibold block text-[10px] text-red-400">Current Address</span>
-                <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.currentAddress}</span>
+                <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.currentAddress || 'Indore Hub Area'}</span>
               </div>
               <div className="p-2 rounded bg-slate-900/30 border border-slate-800/40">
                 <span className="font-semibold block text-[10px] text-emerald-400">Billing Address</span>
-                <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.billingAddress}</span>
+                <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.billingAddress || selectedCustomer.currentAddress || 'Indore Hub Area'}</span>
               </div>
             </div>
           </div>
@@ -408,18 +414,45 @@ export default function CustomerManagement() {
 
             {/* Document link simulations */}
             <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <a href={selectedCustomer.documents.aadhaarFront} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-red-400" /> Aadhaar Front
-              </a>
-              <a href={selectedCustomer.documents.aadhaarBack} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-red-400" /> Aadhaar Back
-              </a>
-              <a href={selectedCustomer.documents.panCard} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-red-400" /> PAN Card
-              </a>
-              <a href={selectedCustomer.documents.rentAgreement} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
-                <FileText className="w-3 h-3 text-red-400" /> Rent Agreement
-              </a>
+              {selectedCustomer.documents?.aadhaarFront ? (
+                <a href={selectedCustomer.documents.aadhaarFront} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-red-400" /> Aadhaar Front
+                </a>
+              ) : (
+                <div className="p-1.5 bg-slate-950/40 rounded border border-slate-900 text-slate-600 flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-slate-600" /> Aadhaar Front (N/A)
+                </div>
+              )}
+
+              {selectedCustomer.documents?.aadhaarBack ? (
+                <a href={selectedCustomer.documents.aadhaarBack} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-red-400" /> Aadhaar Back
+                </a>
+              ) : (
+                <div className="p-1.5 bg-slate-950/40 rounded border border-slate-900 text-slate-600 flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-slate-600" /> Aadhaar Back (N/A)
+                </div>
+              )}
+
+              {selectedCustomer.documents?.panCard ? (
+                <a href={selectedCustomer.documents.panCard} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-red-400" /> PAN Card
+                </a>
+              ) : (
+                <div className="p-1.5 bg-slate-950/40 rounded border border-slate-900 text-slate-600 flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-slate-600" /> PAN Card (N/A)
+                </div>
+              )}
+
+              {selectedCustomer.documents?.rentAgreement ? (
+                <a href={selectedCustomer.documents.rentAgreement} target="_blank" rel="noreferrer" className="p-1.5 bg-slate-950/60 rounded border border-slate-800 text-slate-400 hover:text-white flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-red-400" /> Rent Agreement
+                </a>
+              ) : (
+                <div className="p-1.5 bg-slate-950/40 rounded border border-slate-900 text-slate-600 flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-slate-600" /> Rent Agreement (N/A)
+                </div>
+              )}
             </div>
 
             {/* Verification Actions */}

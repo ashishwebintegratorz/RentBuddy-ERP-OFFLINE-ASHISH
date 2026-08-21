@@ -8,6 +8,8 @@ import {
 const router = express.Router();
 
 router.post('/scan/verify', verifyAssetBarcode);
+router.post('/verify-scan', verifyAssetBarcode);
+router.post('/verify', verifyAssetBarcode);
 router.post('/scan/checkout', checkoutAssets);
 router.post('/scan/checkin', checkinAssets);
 

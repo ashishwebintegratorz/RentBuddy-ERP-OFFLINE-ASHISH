@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import { Asset } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';
+import BarcodeStickerModal from '../components/BarcodeStickerModal';
 import {
   QrCode,
   Search,
@@ -12,7 +13,8 @@ import {
   Truck,
   AlertOctagon,
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Tag
 } from 'lucide-react';
 
 export default function BarcodeTracking() {
@@ -22,6 +24,7 @@ export default function BarcodeTracking() {
   const [scanSuccess, setScanSuccess] = useState(false);
   const [scanError, setScanError] = useState(false);
   const [activeTab, setActiveTab] = useState<'scan' | 'labels'>('scan');
+  const [stickerModalAsset, setStickerModalAsset] = useState<Asset | null>(null);
 
   // Real Camera scan state
   const [cameraActive, setCameraActive] = useState(false);
@@ -344,10 +347,10 @@ export default function BarcodeTracking() {
             {scannedAsset && (
               <div className="mt-5 border-t border-slate-800/80 pt-4 flex justify-end">
                 <button
-                  onClick={() => alert(`Sticker sent to printer! Code: ${scannedAsset.barcode}`)}
-                  className="bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs px-4 py-2 flex items-center gap-2 cursor-pointer"
+                  onClick={() => setStickerModalAsset(scannedAsset)}
+                  className="bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg shadow-red-600/20"
                 >
-                  <Printer className="w-4 h-4" /> Print Sticker Label
+                  <Printer className="w-4 h-4" /> Print Barcode & QR Sticker Label
                 </button>
               </div>
             )}
@@ -360,7 +363,7 @@ export default function BarcodeTracking() {
         <div className="space-y-5">
           <div className="glass-panel p-4 rounded-2xl flex justify-between items-center">
             <div className="text-xs text-slate-400">
-              Generating printable barcode sheet for <strong className="text-slate-200">{currentCity}</strong> ({cityAssets.length} assets).
+              Printable barcode & QR sheet for <strong className="text-slate-200">{currentCity}</strong> ({cityAssets.length} assets). Click any card to preview & print individual label.
             </div>
             <button
               onClick={() => window.print()}
@@ -373,29 +376,41 @@ export default function BarcodeTracking() {
           {/* Label printing grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {cityAssets.slice(0, 12).map(asset => (
-              <div key={asset.id} className="p-3 bg-white text-slate-900 rounded-xl space-y-2 border border-slate-200 flex flex-col justify-between">
+              <div
+                key={asset.id}
+                onClick={() => setStickerModalAsset(asset)}
+                className="p-3 bg-white text-slate-900 rounded-xl space-y-2 border border-slate-200 flex flex-col justify-between cursor-pointer hover:shadow-lg hover:border-red-400 transition-all group"
+              >
                 <div>
                   <div className="flex justify-between items-start">
                     <span className="font-black text-[9px] uppercase tracking-wider text-slate-500 bg-slate-100 px-1 py-0.5 rounded">RentBuddy</span>
                     <span className="text-[9px] font-bold text-slate-400 font-mono">{asset.id}</span>
                   </div>
-                  <h4 className="font-bold text-[11px] text-slate-900 mt-1 line-clamp-1">{asset.brand} {asset.model}</h4>
+                  <h4 className="font-bold text-[11px] text-slate-900 mt-1 line-clamp-1 group-hover:text-red-600 transition-colors">{asset.brand} {asset.model}</h4>
                   <p className="text-[9px] text-slate-500">{asset.category}</p>
                 </div>
 
-                <div className="py-2 flex flex-col items-center justify-center space-y-1 bg-slate-50 rounded border border-dashed border-slate-200">
+                <div className="py-2.5 flex flex-col items-center justify-center space-y-1 bg-slate-50 rounded border border-dashed border-slate-200 px-2">
                   {renderBarcodeLines(asset.barcode)}
-                  <span className="text-[8px] font-mono font-bold text-slate-600 tracking-widest uppercase mt-0.5">{asset.barcode}</span>
+                  <span className="text-[9px] font-mono font-black text-slate-900 tracking-widest uppercase mt-0.5">{asset.barcode}</span>
                 </div>
 
-                <div className="flex justify-between items-center text-[8px] text-slate-400 font-semibold border-t border-slate-100 pt-1.5">
+                <div className="flex justify-between items-center text-[8px] text-slate-500 font-semibold border-t border-slate-100 pt-1.5">
                   <span>W: {asset.warehouse.substring(0, 8)}..</span>
-                  <span>Rack: {asset.rackNumber}</span>
+                  <span className="text-red-600 font-bold">🖨️ Click to Print</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {/* Barcode & QR Code Printable Sticker Modal */}
+      {stickerModalAsset && (
+        <BarcodeStickerModal
+          asset={stickerModalAsset}
+          onClose={() => setStickerModalAsset(null)}
+        />
       )}
 
     </div>

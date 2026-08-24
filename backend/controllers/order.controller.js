@@ -244,6 +244,71 @@ export const scanAssetBarcode = async (req, res) => {
   }
 };
 
+// Accept Order by Driver
+export const acceptOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    order.deliveryStatus = 'assigned';
+    if (order.status === 'CONFIRMED' || !order.status) {
+      order.status = 'ASSIGNED';
+    }
+    await order.save();
+
+    await Log.create({
+      id: `LOG-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      userRole: 'Rider',
+      action: 'ORDER_ACCEPTED',
+      details: `Rider accepted Order ${order.id}`
+    });
+
+    return res.json({ success: true, message: 'Order accepted successfully', data: order });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Cancel Order & Restore Inventory Assets to Available Stock
+export const cancelOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { reason } = req.body;
+
+    const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    order.status = 'CANCELLED';
+    order.deliveryStatus = 'cancelled';
+    order.cancellationReason = reason || 'Customer requested cancellation at staging';
+    order.cancelledAt = new Date();
+    await order.save();
+
+    // Restore assets in database
+    if (order.items && order.items.length > 0) {
+      const assetIds = order.items.map(it => it.assetId || it.id).filter(Boolean);
+      if (assetIds.length > 0) {
+        await Asset.updateMany(
+          { $or: [{ id: { $in: assetIds } }, { _id: { $in: assetIds } }] },
+          { $set: { status: 'Available', currentCustomer: null, currentOrderId: null } }
+        );
+      }
+    }
+
+    console.log(`\n🛑 [RentBuddy Order Engine] Order #${orderId} CANCELLED. All items restored to Available stock.`);
+
+    return res.json({
+      success: true,
+      message: `Order #${orderId} cancelled and stock restored to Available inventory`,
+      data: order
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Update Order Status
 export const updateOrderStatus = async (req, res) => {
   try {
@@ -275,15 +340,23 @@ export const getDriverActiveOrders = async (req, res) => {
     if (driverId) {
       const cleanPhone = driverId.replace(/[^0-9]/g, '');
       query = {
-        $or: [
-          { assignedDriverId: driverId },
-          { assignedDriverPhone: cleanPhone },
-          { assignedDriverPhone: driverId },
-          { status: { $in: ['ASSIGNED', 'OUT_FOR_DELIVERY', 'IN_TRANSIT', 'PICKUP_PENDING'] } }
+        $and: [
+          {
+            $or: [
+              { assignedDriverId: driverId },
+              { assignedDriverPhone: cleanPhone },
+              { assignedDriverPhone: driverId }
+            ]
+          },
+          { status: { $nin: ['DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] } },
+          { deliveryStatus: { $nin: ['delivered', 'completed', 'returned', 'cancelled'] } }
         ]
       };
     } else {
-      query = { status: { $in: ['ASSIGNED', 'OUT_FOR_DELIVERY', 'IN_TRANSIT', 'CONFIRMED'] } };
+      query = {
+        status: { $in: ['ASSIGNED', 'OUT_FOR_DELIVERY', 'IN_TRANSIT', 'CONFIRMED'] },
+        deliveryStatus: { $nin: ['delivered', 'completed', 'returned', 'cancelled'] }
+      };
     }
 
     const orders = await Order.find(query).sort({ createdAt: -1 });
@@ -302,22 +375,30 @@ export const getDriverActiveOrders = async (req, res) => {
         address: `Plot 45, Scheme 54 Logistics Park, ${ord.city || 'Indore'}`
       },
       items: ord.items || [],
-      expectedAssets: (ord.items && ord.items.length > 0) ? ord.items.map((it, idx) => ({
-        assetId: it.assetId || it.id || `AST-${String(idx + 1).padStart(3, '0')}`,
-        assetName: it.name || it.productName || it.title || it.assetName || 'Solid Wood Furniture Unit',
-        category: it.category || 'Living Room Furniture',
-        quantity: it.quantity || 1,
-        barcode: it.barcode || it.assetTag || `RB-${(ord.city || 'IND').slice(0, 3).toUpperCase()}-${it.assetId || String(idx + 1).padStart(3, '0')}`,
-        scannedAtCheckout: it.scannedAtCheckout || false
-      })) : [{
-        assetId: 'RB-FUR-101',
-        assetName: 'Royal Velvet 3-Seater Sofa & Center Table',
-        category: 'Living Room Furniture',
-        quantity: 1,
-        barcode: `RB-ASSET-${(ord.id || '857969').replace(/[^0-9]/g, '').slice(-4) || '1001'}`,
-        scannedAtCheckout: false
-      }],
-      deliveryStatus: ord.deliveryStatus || 'driver_notified',
+      orderBarcode: `RB-${(ord.customerName || 'CUST').trim().split(' ')[0].replace(/[^a-zA-Z]/g, '').toUpperCase() || 'CUST'}-${(ord.id || '647641').replace(/[^0-9]/g, '')}`,
+      expectedAssets: (ord.items && ord.items.length > 0) ? ord.items.map((it, idx) => {
+        const custFirst = (ord.customerName || 'CUST').trim().split(' ')[0].replace(/[^a-zA-Z]/g, '').toUpperCase() || 'CUST';
+        const cleanOrd = (ord.id || '647641').replace(/[^0-9]/g, '') || '647641';
+        const consignmentTag = `RB-${custFirst}-${cleanOrd}`;
+        return {
+          assetId: it.assetId || it.id || `AST-${cleanOrd}-${String(idx + 1).padStart(2, '0')}`,
+          assetName: it.name || it.productName || it.title || it.assetName || (idx === 0 ? 'Solid Wood Furniture Unit' : 'Royal Velvet 3-Seater Sofa'),
+          category: it.category || 'Living Room Furniture',
+          quantity: it.quantity || 1,
+          barcode: consignmentTag,
+          scannedAtCheckout: it.scannedAtCheckout || ord.scannedAtCheckout || ord.scannedAtLoading || false
+        };
+      }) : [
+        {
+          assetId: `RB-AST-${(ord.id || '647641').replace(/[^0-9]/g, '')}-01`,
+          assetName: 'Solid Wood Furniture Unit',
+          category: 'Living Room Furniture',
+          quantity: 1,
+          barcode: `RB-${(ord.customerName || 'CUST').trim().split(' ')[0].replace(/[^a-zA-Z]/g, '').toUpperCase() || 'CUST'}-${(ord.id || '647641').replace(/[^0-9]/g, '')}`,
+          scannedAtCheckout: ord.scannedAtCheckout || ord.scannedAtLoading || false
+        }
+      ],
+      deliveryStatus: ord.deliveryStatus || (ord.scannedAtLoading ? 'out_for_delivery' : (ord.status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' : 'assigned')),
       status: ord.status,
       scannedAtCheckout: ord.scannedAtCheckout || ord.scannedAtLoading || false,
       scannedAtDelivery: ord.scannedAtDelivery || false,
@@ -342,17 +423,65 @@ export const getDriverActiveOrders = async (req, res) => {
 // Driver Order History
 export const getDriverOrderHistory = async (req, res) => {
   try {
-    const driverId = req.query.driverId || req.query.phone;
-    const query = { status: { $in: ['DELIVERED', 'COMPLETED', 'RETURNED'] } };
+    const driverId = req.query.driverId || req.query.phone || (req.user && (req.user.id || req.user.phone));
+    let query = {
+      $or: [
+        { status: { $in: ['DELIVERED', 'COMPLETED', 'RETURNED'] } },
+        { deliveryStatus: { $in: ['delivered', 'completed', 'returned'] } }
+      ]
+    };
+
     if (driverId) {
-      query.$or = [
-        { assignedDriverId: driverId },
-        { assignedDriverPhone: driverId }
-      ];
+      const cleanPhone = driverId.replace(/[^0-9]/g, '');
+      query = {
+        $and: [
+          {
+            $or: [
+              { assignedDriverId: driverId },
+              { assignedDriverPhone: cleanPhone },
+              { assignedDriverPhone: driverId },
+              { assignedLogisticsUser: { $exists: true } }
+            ]
+          },
+          {
+            $or: [
+              { status: { $in: ['DELIVERED', 'COMPLETED', 'RETURNED'] } },
+              { deliveryStatus: { $in: ['delivered', 'completed', 'returned'] } }
+            ]
+          }
+        ]
+      };
     }
 
-    const orders = await Order.find(query).sort({ updatedAt: -1 }).limit(50);
-    return res.json({ success: true, data: { orders } });
+    const orders = await Order.find(query).sort({ deliveredAt: -1, updatedAt: -1 }).limit(50);
+    const formattedOrders = orders.map(ord => ({
+      _id: ord.id || ord._id.toString(),
+      id: ord.id,
+      orderNumber: ord.id,
+      status: ord.status,
+      deliveryStatus: 'delivered',
+      customer: {
+        name: ord.customerName || 'Customer',
+        phone: ord.customerMobile || '',
+        address: (ord.deliveryProof && ord.deliveryProof.propertyDetails && ord.deliveryProof.propertyDetails.fullAddress) || 'Customer Destination'
+      },
+      customerName: ord.customerName || 'Customer',
+      customerMobile: ord.customerMobile || '',
+      payableAmount: ord.netDeposit || ord.totalDeposit || ord.totalMonthlyRent || 3000,
+      totalAmount: ord.netDeposit || ord.totalDeposit || ord.totalMonthlyRent || 3000,
+      store: {
+        name: 'RentBuddy Indore Central Hub Depot',
+        address: 'Plot 45, Scheme 54 Logistics Park, Indore'
+      },
+      deliveryAddress: {
+        addressLine: 'Indore Hub',
+        city: 'Indore'
+      },
+      items: ord.items || [],
+      deliveredAt: ord.deliveredAt || ord.updatedAt
+    }));
+
+    return res.json({ success: true, data: { orders: formattedOrders } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

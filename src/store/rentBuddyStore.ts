@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getApiBaseUrl } from '../api/client';
 import {
   UserRole,
   CityName,
@@ -21,6 +22,7 @@ import {
   DriverDocuments,
   LogisticsDriverStatus,
   DriverVehicleType,
+  OrganizationConfig,
 } from '../types';
 
 interface RentBuddyState {
@@ -28,6 +30,10 @@ interface RentBuddyState {
   currentUserRole: UserRole;
   currentCity: CityName;
   searchQuery: string;
+  
+  // Organization Configuration
+  organizationConfig: OrganizationConfig;
+  updateOrganizationConfig: (updates: Partial<OrganizationConfig>) => void;
   
   // Data Collections
   customers: Customer[];
@@ -104,6 +110,7 @@ interface RentBuddyState {
     couponCode?: string;
   }) => RentalOrder;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  cancelOrder: (orderId: string, reason?: string) => Promise<boolean>;
   assignDriverToOrder: (orderId: string, driverId: string) => Promise<boolean>;
   scanAssetBarcode: (orderId: string, assetId: string, scanType: 'loading' | 'delivery' | 'pickup' | 'warehouse') => boolean;
   refundSecurityDeposit: (orderId: string, deductions: number, reason: string) => void;
@@ -139,6 +146,7 @@ interface RentBuddyState {
   // Logistics Driver & KYC Actions
   addDriver: (driver: Omit<LogisticsDriver, 'id' | 'createdAt'>) => void;
   updateDriver: (id: string, updates: Partial<LogisticsDriver>) => void;
+  deleteDriver: (id: string) => void;
   updateDriverStatus: (id: string, status: LogisticsDriverStatus, notes?: string) => void;
   verifyDriverDocument: (id: string, docKey: keyof DriverDocuments, verified: boolean) => void;
   verifyAllDriverDocuments: (id: string, status: VerificationStatus, notes?: string) => void;
@@ -168,7 +176,7 @@ interface RentBuddyState {
 // Generate unique IDs
 const genId = (prefix: string) => `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-const BACKEND_URL = 'http://localhost:5001/api/v1';
+const BACKEND_URL = getApiBaseUrl();
 
 // Debounced synchronization engine to prevent database flooding
 let syncTimeout: any = null;
@@ -192,23 +200,16 @@ const syncToDatabase = (state: any) => {
         expectedVsActualAudit: state.expectedVsActualAudit
       };
 
-      const token = state.token;
-      if (!token) return;
-
       const res = await fetch(`${BACKEND_URL}/sync`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (!data.success) {
-        console.error("Database sync failed:", data.message);
+      if (res.ok) {
+        console.log('🍃 [RentBuddy Store] MongoDB Atlas sync completed successfully.');
       }
     } catch (err: any) {
-      console.warn("MongoDB Sync Offline:", err.message);
+      console.warn('⚠️ [RentBuddy Store] Offline cache active. Sync deferred:', err.message);
     }
   }, 1000); // 1s debounce
 };
@@ -223,6 +224,18 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           currentCity: 'Indore (Head Office)' as CityName,
           cities: ['Indore (Head Office)', 'Bhopal', 'Surat', 'Ahmedabad'] as CityName[],
           searchQuery: '',
+          organizationConfig: {
+            companyName: 'RentBuddy Furnishing & Appliances',
+            tagline: 'Enterprise Rental & Fleet Logistics Portal',
+            gstin: '23AABCR8901L1Z5',
+            pan: 'AABCR8901L',
+            cin: 'U72900MP2026PTC045123',
+            headOfficeAddress: 'Plot 45, Scheme 54, PU-4 Commercial Complex, Indore, MP 452010',
+            supportPhone: '+91 98260 12345',
+            supportEmail: 'support@rentbuddy.in',
+            billingEmail: 'billing@rentbuddy.in',
+            website: 'https://rentbuddy.in',
+          },
           token: null as string | null,
           currentUser: null as any | null,
           loginError: null as string | null,
@@ -253,6 +266,12 @@ export const useRentBuddyStore = create<RentBuddyState>()(
       // Implement methods
       return {
         ...initialState,
+
+        updateOrganizationConfig: (updates) => {
+          set((state) => ({
+            organizationConfig: { ...state.organizationConfig, ...updates }
+          }));
+        },
 
         setRole: (role) => set({ currentUserRole: role }),
         setCity: (city) => set({ currentCity: city }),
@@ -638,6 +657,81 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+        },
+
+        cancelOrder: async (orderId: string, reason?: string) => {
+          const order = get().orders.find((o) => o.id === orderId);
+          if (!order) return false;
+
+          set((state) => {
+            const updatedOrders = state.orders.map((o) => {
+              if (o.id === orderId) {
+                return {
+                  ...o,
+                  status: 'Cancelled' as OrderStatus,
+                  cancellationReason: reason || 'Customer requested cancellation at staging',
+                  cancelledAt: new Date().toISOString(),
+                };
+              }
+              return o;
+            });
+
+            // Restore all allocated items back to Available stock in city inventory
+            const updatedInventory = state.inventory.map((asset) => {
+              if (order.items.some((item) => item.assetId === asset.id)) {
+                return {
+                  ...asset,
+                  status: 'Available' as AssetStatus,
+                  currentCustomer: undefined,
+                  currentOrderId: undefined,
+                };
+              }
+              return asset;
+            });
+
+            const log: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `User (${state.currentUserRole})`,
+              city: order.city || state.currentCity,
+              action: 'Order Cancelled & Stock Restored',
+              category: 'ORDER_STATUS',
+              severity: 'WARNING',
+              details: `Order ${orderId} (${order.customerName}) was cancelled. Reason: ${reason || 'Refused/Cancelled at Staging'}. ${order.items.length} items returned to Available stock in warehouse.`,
+            };
+
+            const notif: SystemNotification = {
+              id: genId('NOT'),
+              title: 'Order Cancelled & Stock Restored',
+              message: `Order #${orderId} cancelled. ${order.items.length} items restored to Available warehouse inventory.`,
+              type: 'info',
+              timestamp: new Date().toISOString(),
+              read: false,
+              city: order.city || state.currentCity,
+            };
+
+            return {
+              orders: updatedOrders,
+              inventory: updatedInventory,
+              auditLogs: [log, ...state.auditLogs],
+              notifications: [notif, ...state.notifications],
+            };
+          });
+
+          // Sync to backend API
+          try {
+            await fetch(`${BACKEND_URL}/orders/${orderId}/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason }),
+            });
+          } catch (e) {
+            console.warn("Offline fallback for order cancellation:", e);
+          }
+
+          get().runSystemAudit();
+          return true;
         },
 
         assignDriverToOrder: async (orderId: string, driverId: string) => {
@@ -1159,6 +1253,21 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         updateDriver: (id, updates) => {
           set((state) => ({
             drivers: state.drivers.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+          }));
+        },
+
+        deleteDriver: (id) => {
+          const target = get().drivers.find((d) => d.id === id || d.phone === id);
+          if (target && target.phone) {
+            fetch(`${BACKEND_URL}/auth/driver/delete-account`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: target.phone })
+            }).catch(() => {});
+          }
+
+          set((state) => ({
+            drivers: state.drivers.filter((d) => d.id !== id && d.phone !== id),
           }));
         },
 

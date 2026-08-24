@@ -52,7 +52,16 @@ export const checkDriverPhone = async (req, res) => {
     let city = 'Indore';
 
     if (getDbStatus()) {
-      const driver = await Driver.findOne({ phone: cleanPhone });
+      const driver = await Driver.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `+91-${cleanPhone}` },
+          { phone: { $regex: cleanPhone } },
+          { alternatePhone: { $regex: cleanPhone } },
+          { id: { $regex: cleanPhone.slice(-4) } }
+        ]
+      });
       if (driver) {
         isRegistered = true;
         hasPin = !!(driver.pin || driver.hasPin);
@@ -181,11 +190,19 @@ export const loginDriverWithPin = async (req, res) => {
 
     let driver = null;
     if (getDbStatus()) {
-      driver = await Driver.findOne({ phone: cleanPhone });
+      driver = await Driver.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `+91-${cleanPhone}` },
+          { phone: { $regex: cleanPhone } },
+          { alternatePhone: { $regex: cleanPhone } }
+        ]
+      });
     }
 
-    // Check PIN matching or fallback test pin
-    if (driver && driver.pin && driver.pin !== pin.trim() && pin.trim() !== '1234') {
+    // Check PIN matching strictly against driver record
+    if (driver && driver.pin && driver.pin !== pin.trim()) {
       return errorResponse(res, 'Invalid 4-digit security PIN', 401);
     }
 
@@ -196,7 +213,8 @@ export const loginDriverWithPin = async (req, res) => {
       city: driver?.city || 'Indore (Head Office)'
     });
 
-    const avatarUrl = driver?.documents?.profilePhoto || driver?.documents?.selfiePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
+    const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%23e11d48"><circle cx="50" cy="50" r="50" fill="%23f1f5f9"/><circle cx="50" cy="38" r="20" fill="%2394a3b8"/><path d="M15 90c0-19.33 15.67-35 35-35s35 15.67 35 35" fill="%2394a3b8"/></svg>';
+    const avatarUrl = driver?.documents?.profilePhoto || driver?.documents?.selfiePhoto || defaultAvatar;
 
     const userPayload = {
       _id: driver?._id || `driver-${cleanPhone}`,
@@ -204,7 +222,7 @@ export const loginDriverWithPin = async (req, res) => {
       riderId: driver?.id || `DRV-${cleanPhone.slice(-4)}`,
       phone: cleanPhone,
       role: 'driver',
-      name: driver?.fullName || 'Faisal Rabani',
+      name: driver?.fullName || 'Fleet Driver',
       avatar: avatarUrl,
       isOnline: driver?.status === 'Active',
       hasPin: true
@@ -262,10 +280,19 @@ export const completeDriverOnboarding = async (req, res) => {
     };
 
     if (getDbStatus()) {
-      driver = await Driver.findOne({ phone: cleanPhone });
+      driver = await Driver.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `+91-${cleanPhone}` },
+          { phone: { $regex: cleanPhone } },
+          { alternatePhone: { $regex: cleanPhone } }
+        ]
+      });
 
       if (driver) {
         driver.fullName = driverName;
+        driver.phone = cleanPhone;
         driver.city = driverCity;
         driver.vehicleNumber = vehicleNumber || driver.vehicleNumber || 'MP 09 RB 1234';
         driver.vehicleType = vehicleType || driver.vehicleType || 'Two Wheeler / Bike';
@@ -329,6 +356,46 @@ export const completeDriverOnboarding = async (req, res) => {
       user: userPayload,
       driver
     });
+  } catch (err) {
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+export const deleteDriverAccount = async (req, res) => {
+  try {
+    const rawPhone = req.body.phone || req.query.phone || (req.user && req.user.phone) || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '').slice(-10);
+
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return errorResponse(res, 'A valid 10-digit mobile number is required to delete account', 400);
+    }
+
+    if (getDbStatus()) {
+      // 1. Remove from Driver collection
+      await Driver.deleteMany({
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `+91-${cleanPhone}` },
+          { phone: { $regex: cleanPhone } },
+          { alternatePhone: { $regex: cleanPhone } }
+        ]
+      });
+
+      // 2. Unlink driver from active/assigned orders (keep delivery history/POD intact)
+      await Order.updateMany(
+        { assignedDriverPhone: { $regex: cleanPhone } },
+        {
+          $set: {
+            assignedDriverPhone: '',
+            assignedDriverName: 'Unassigned',
+            assignedLogisticsUser: 'Unassigned'
+          }
+        }
+      );
+    }
+
+    return successResponse(res, 'Driver account permanently deleted from the system');
   } catch (err) {
     return errorResponse(res, err.message, 500);
   }

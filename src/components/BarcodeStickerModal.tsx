@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Printer, Tag, Check, User, Phone, MapPin, Calendar, CreditCard, Layers, Receipt, Percent, Box, Warehouse, Clock, ArrowRight } from 'lucide-react';
+import { useRentBuddyStore } from '../store/rentBuddyStore';
 import rentBuddyLogo from '../assets/rentbuddy1.png';
 
 interface BarcodeStickerModalProps {
@@ -31,6 +32,7 @@ interface BarcodeStickerModalProps {
 }
 
 export default function BarcodeStickerModal({ asset, onClose }: BarcodeStickerModalProps) {
+  const { organizationConfig } = useRentBuddyStore();
   const barcodeValue = (asset.barcode || asset.id || 'RB-ASSET-001').toUpperCase().trim();
   const isOrderSticker = Boolean(asset.orderId && asset.customerName);
 
@@ -54,7 +56,7 @@ export default function BarcodeStickerModal({ asset, onClose }: BarcodeStickerMo
   const totalGstPerMonth = cgstAmount + sgstAmount;
   const netMonthlyRentWithGst = baseMonthlyRent + totalGstPerMonth;
   const totalInitialPayable = netMonthlyRentWithGst + deposit;
-  const companyGstin = asset.gstin || '23AABCR8901L1Z5';
+  const companyGstin = asset.gstin || organizationConfig.gstin || '23AABCR8901L1Z5';
 
   // Generate 100% Solid Vector SVG Barcode
   const generateSvgBarcodeString = (code: string) => {

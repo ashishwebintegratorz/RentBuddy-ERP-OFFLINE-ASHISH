@@ -181,7 +181,7 @@ export default function InventoryManagement() {
   // Filter lists based on City, Category, Status, Search
   const filteredAssets = (inventory || []).filter(a => {
     if (!a) return false;
-    const matchesCity = !a.city || a.city === currentCity;
+    const matchesCity = (a.city || '').toLowerCase() === currentCity.toLowerCase();
     const matchesCategory = selectedCategory === 'All' || a.category === selectedCategory;
     const matchesStatus = selectedStatus === 'All' || a.status === selectedStatus;
     const matchesSearch = (a.brand || '').toLowerCase().includes(search.toLowerCase()) ||

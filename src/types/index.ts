@@ -25,7 +25,8 @@ export type OrderStatus =
   | 'Delivered'
   | 'Return Pickup'
   | 'Returned'
-  | 'Completed';
+  | 'Completed'
+  | 'Cancelled';
 
 export type InspectionResult = 'Excellent' | 'Minor Repair' | 'Major Repair' | 'Scrap';
 
@@ -63,6 +64,7 @@ export interface Customer {
   landlordId: string;
   status: CustomerStatus;
   verificationStatus: VerificationStatus;
+  city?: CityName;
   documents: CustomerDocuments;
   createdAt: string;
 }
@@ -122,6 +124,7 @@ export interface RentalOrder {
   discountValue: number;
   netMonthlyRent: number;
   status: OrderStatus;
+  deliveryStatus?: string;
   city?: string;
   deliveryAddress?: string;
   assignedLogisticsUser?: string;
@@ -137,6 +140,9 @@ export interface RentalOrder {
   isPrepared?: boolean;
   preparedAt?: string;
   packedBy?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  deliveredAt?: string;
   depositRefundStatus: 'Held' | 'Pending Inspection' | 'Approved' | 'Refunded';
   depositDeductions: number;
   createdAt: string;
@@ -286,5 +292,19 @@ export interface LogisticsDriver {
   blockedReason?: string;
   verificationNotes?: string;
   createdAt: string;
+}
+
+export interface OrganizationConfig {
+  companyName: string;
+  tagline: string;
+  gstin: string;
+  pan: string;
+  cin: string;
+  headOfficeAddress: string;
+  supportPhone: string;
+  supportEmail: string;
+  billingEmail: string;
+  website: string;
+  logoUrl?: string;
 }
 

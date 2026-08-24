@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import { Customer, CustomerStatus, VerificationStatus } from '../types';
 import { compressImage } from '../utils/compressor';
+import { SVG_AVATAR_PLACEHOLDER, SVG_DOCUMENT_PLACEHOLDER } from '../utils/placeholderAssets';
 import {
   Search,
   Plus,
@@ -135,11 +136,11 @@ export default function CustomerManagement() {
     addCustomer({
       ...newCust,
       documents: {
-        aadhaarFront: aadhaarFront || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        aadhaarBack: aadhaarBack || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        panCard: panCard || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        rentAgreement: rentAgreement || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=300',
-        selfie: selfie || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        aadhaarFront: aadhaarFront || SVG_DOCUMENT_PLACEHOLDER,
+        aadhaarBack: aadhaarBack || SVG_DOCUMENT_PLACEHOLDER,
+        panCard: panCard || SVG_DOCUMENT_PLACEHOLDER,
+        rentAgreement: rentAgreement || SVG_DOCUMENT_PLACEHOLDER,
+        selfie: selfie || SVG_AVATAR_PLACEHOLDER,
       }
     }, checkoutCart);
 

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
+import { getApiBaseUrl } from '../api/client';
 import { Shield, KeyRound, UserPlus, Users, Settings as Gear, ShieldCheck, Eye, EyeOff, RefreshCw, Trash, User } from 'lucide-react';
 import type { UserRole, CityName } from '../types';
 
 export default function Settings() {
   const { token, currentUser, cities } = useRentBuddyStore();
-  const BACKEND_URL = 'http://localhost:5001/api/v1';
+  const BACKEND_URL = getApiBaseUrl();
   
   // Self Password Change states
   const [oldPassword, setOldPassword] = useState('');

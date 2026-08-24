@@ -13,7 +13,7 @@ interface QuotationItem {
 }
 
 export default function Quotations() {
-  const { inventory, currentCity } = useRentBuddyStore();
+  const { inventory, currentCity, organizationConfig } = useRentBuddyStore();
 
   // Quotation form states
   const [custName, setCustName] = useState('');
@@ -463,12 +463,12 @@ export default function Quotations() {
                         <span className="font-extrabold text-white text-lg font-mono">R</span>
                       </div>
                       <div>
-                        <h2 className="text-base font-extrabold text-white tracking-tight leading-none print:text-slate-950">RentBuddy</h2>
-                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider print:text-slate-500">Enterprise Rental Hub</span>
+                        <h2 className="text-base font-extrabold text-white tracking-tight leading-none print:text-slate-950">{organizationConfig.companyName}</h2>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider print:text-slate-500">{organizationConfig.tagline}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-medium max-w-[200px] leading-relaxed print:text-slate-600">
-                      Indore HQ Warehouse Area, Bypass Highway, Indore, MP 452016.
+                    <p className="text-[10px] text-slate-400 font-medium max-w-[240px] leading-relaxed print:text-slate-600">
+                      {organizationConfig.headOfficeAddress}
                     </p>
                   </div>
 

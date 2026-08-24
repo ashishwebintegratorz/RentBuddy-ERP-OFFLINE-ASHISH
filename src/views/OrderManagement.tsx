@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
+import { getApiBaseUrl } from '../api/client';
 import type { RentalOrder, OrderStatus } from '../types';
 import {
   Search,
@@ -313,7 +314,7 @@ export default function OrderManagement() {
                 if (driverObj) {
                   updateOrderStatus(selectedOrder.id, 'Assigned');
                   // update backend assignment
-                  fetch(`http://localhost:5001/api/v1/orders/${selectedOrder.id}/assign-driver`, {
+                  fetch(`${getApiBaseUrl()}/orders/${selectedOrder.id}/assign-driver`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ driverId: driverObj.id })

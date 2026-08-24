@@ -53,11 +53,15 @@ export default function PointOfSale() {
   const [discountType, setDiscountType] = useState<'flat' | 'percent'>('flat');
   const [checkedOutOrder, setCheckedOutOrder] = useState<any>(null);
 
-  // Filter verified customer list for search
-  const filteredCustomers = customerSearch ? (customers || []).filter(
+  // Filter verified customer list for search strictly by active city hub
+  const cityCustomers = (customers || []).filter(
+    c => (c.city || '').toLowerCase().includes((currentCity || '').toLowerCase())
+  );
+
+  const filteredCustomers = customerSearch ? cityCustomers.filter(
     c => (c.fullName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
          (c.mobileNumber || '').includes(customerSearch)
-  ) : (customers || []);
+  ) : cityCustomers;
 
   const activeCustomer = (customers || []).find(c => c.id === selectedCustId);
 

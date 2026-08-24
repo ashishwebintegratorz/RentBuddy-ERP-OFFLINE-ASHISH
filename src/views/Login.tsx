@@ -153,14 +153,6 @@ export default function Login() {
           </button>
         </form>
 
-        {/* Demo Credentials Tip box */}
-        <div className="mt-6 border border-dashed border-red-500/30 bg-red-500/5 rounded-xl p-3.5 text-center space-y-1">
-          <p className="text-[10px] text-slate-400 font-medium">Default Administrator Credentials:</p>
-          <div className="text-[11px] font-bold text-red-400 font-mono select-all">
-            Username: admin <span className="text-slate-500 font-sans mx-1">|</span> Password: RentbuddySecure2026!
-          </div>
-        </div>
-
         {/* Biometric / SSO */}
         <div className="mt-6 pt-6 border-t border-slate-800/80 flex flex-col items-center space-y-3">
           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Or access with</span>

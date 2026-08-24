@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  sendDeliveryOtp,
   uploadDeliveryProof,
   completeDelivery,
   submitFeedback
@@ -7,6 +8,8 @@ import {
 
 const router = express.Router();
 
+router.post('/send-otp', sendDeliveryOtp);
+router.post('/send-delivery-otp', sendDeliveryOtp);
 router.post('/proof', uploadDeliveryProof);
 router.post('/complete', completeDelivery);
 router.post('/feedback', submitFeedback);

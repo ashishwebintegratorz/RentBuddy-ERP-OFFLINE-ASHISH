@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import { LogisticsDriver, OrderStatus, RentalOrder } from '../types';
 import BarcodeStickerModal from '../components/BarcodeStickerModal';
@@ -43,13 +43,59 @@ export default function LogisticsLog() {
     currentCity,
     cities,
     assignDriverToOrder,
-    updateOrderStatus
+    updateOrderStatus,
+    cancelOrder
   } = useRentBuddyStore();
 
   const [selectedCity, setSelectedCity] = useState<string>('All');
-  const [activeTab, setActiveTab] = useState<'preparation' | 'dispatch' | 'transit' | 'completed' | 'returns'>('preparation');
+  const [activeTab, setActiveTab] = useState<'preparation' | 'dispatch' | 'transit' | 'completed' | 'returns' | 'cancelled'>('preparation');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   
+  // Real-time background sync with backend MongoDB orders every 2.5 seconds
+  useEffect(() => {
+    let isMounted = true;
+    const syncBackendOrders = async () => {
+      try {
+        const res = await fetch('/api/v1/orders');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && isMounted) {
+          const currentStoreOrders = useRentBuddyStore.getState().orders;
+          const merged = currentStoreOrders.map(localOrd => {
+            const serverOrd = json.data.find((s: any) => s.id === localOrd.id || s._id === localOrd.id);
+            if (serverOrd) {
+              return {
+                ...localOrd,
+                status: serverOrd.status as OrderStatus,
+                deliveryStatus: serverOrd.deliveryStatus,
+                assignedDriverId: serverOrd.assignedDriverId || localOrd.assignedDriverId,
+                assignedDriverName: serverOrd.assignedDriverName || localOrd.assignedDriverName,
+                assignedDriverPhone: serverOrd.assignedDriverPhone || localOrd.assignedDriverPhone,
+                scannedAtLoading: serverOrd.scannedAtLoading ?? localOrd.scannedAtLoading,
+                scannedAtDelivery: serverOrd.scannedAtDelivery ?? localOrd.scannedAtDelivery,
+                deliveryProofPhoto: serverOrd.deliveryProofPhoto || serverOrd.deliveryProof?.photos?.[0] || localOrd.deliveryProofPhoto,
+                deliveredAt: serverOrd.deliveredAt || localOrd.deliveredAt
+              };
+            }
+            return localOrd;
+          });
+          useRentBuddyStore.setState({ orders: merged });
+        }
+      } catch (_) {}
+    };
+
+    syncBackendOrders();
+    const interval = setInterval(syncBackendOrders, 2500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Cancel Order Modal State
+  const [cancellingOrder, setCancellingOrder] = useState<RentalOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('Customer cancelled order before dispatch');
+  const [isCancelling, setIsCancelling] = useState(false);
+
   // Assign Driver Modal State
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [orderToAssign, setOrderToAssign] = useState<RentalOrder | null>(null);
@@ -89,32 +135,50 @@ export default function LogisticsLog() {
     return (o.city || currentCity).toLowerCase().includes(selectedCity.toLowerCase());
   });
 
-  // Stage 1: Order Preparation & Packing (Orders needing packing + barcode attachment)
-  const preparationOrders = cityFilteredOrders.filter(
-    o => (!o.isPrepared && o.status !== 'Delivered' && o.status !== 'Completed' && o.status !== 'Returned' && o.status !== 'Assigned' && o.status !== 'Out for Delivery')
-  );
+  // Stage classification helpers with robust case-insensitivity
+  const isCancelled = (o: RentalOrder) => 
+    (o.status || '').toLowerCase() === 'cancelled' || (o.deliveryStatus || '').toLowerCase() === 'cancelled';
 
-  // Stage 2: Ready for Dispatch & Rider Assignment
-  const readyForDispatchOrders = cityFilteredOrders.filter(
-    o => (o.isPrepared || o.status === 'Ready for Dispatch' || o.status === 'Pending') &&
-         (!o.assignedDriverId && o.status !== 'Delivered' && o.status !== 'Completed' && o.status !== 'Returned' && o.status !== 'Out for Delivery')
-  );
+  const isDelivered = (o: RentalOrder) => 
+    !isCancelled(o) && (
+      (o.status || '').toLowerCase() === 'delivered' || 
+      (o.status || '').toLowerCase() === 'completed' || 
+      (o.deliveryStatus || '').toLowerCase() === 'delivered' || 
+      (o.deliveryStatus || '').toLowerCase() === 'completed' ||
+      Boolean(o.deliveryProofPhoto)
+    );
 
-  // Stage 3: In-Transit (Assigned, Loaded, Out for Delivery)
-  const inTransitOrders = cityFilteredOrders.filter(
-    o => (o.assignedDriverId || o.status === 'Assigned' || o.status === 'Out for Delivery') &&
-         (o.status !== 'Delivered' && o.status !== 'Completed' && o.status !== 'Returned')
-  );
+  const isReturn = (o: RentalOrder) => 
+    !isCancelled(o) && ((o.status || '').toLowerCase() === 'return pickup' || (o.status || '').toLowerCase() === 'returned');
 
-  // Stage 4: Delivered & Completed
-  const completedOrders = cityFilteredOrders.filter(
-    o => o.status === 'Delivered' || o.status === 'Completed'
-  );
+  const isInTransit = (o: RentalOrder) => 
+    !isCancelled(o) && !isDelivered(o) && !isReturn(o) && (
+      Boolean(o.assignedDriverId) || 
+      Boolean(o.assignedDriverPhone) ||
+      (o.status || '').toLowerCase() === 'assigned' || 
+      (o.status || '').toLowerCase() === 'out for delivery' ||
+      (o.status || '').toLowerCase() === 'in_transit' ||
+      (o.status || '').toLowerCase() === 'out_for_delivery' ||
+      o.scannedAtLoading
+    );
 
-  // Stage 5: Return Pickups (Rental Expiry)
-  const returnOrders = cityFilteredOrders.filter(
-    o => o.status === 'Return Pickup' || o.status === 'Returned'
-  );
+  const isReadyForDispatch = (o: RentalOrder) => 
+    !isCancelled(o) && !isDelivered(o) && !isReturn(o) && !isInTransit(o) && (
+      o.isPrepared || 
+      (o.status || '').toLowerCase() === 'ready for dispatch' || 
+      (o.status || '').toLowerCase() === 'ready_for_dispatch'
+    );
+
+  const isPreparation = (o: RentalOrder) => 
+    !isCancelled(o) && !isDelivered(o) && !isReturn(o) && !isInTransit(o) && !isReadyForDispatch(o);
+
+  // Pipeline order lists
+  const preparationOrders = cityFilteredOrders.filter(isPreparation);
+  const readyForDispatchOrders = cityFilteredOrders.filter(isReadyForDispatch);
+  const inTransitOrders = cityFilteredOrders.filter(isInTransit);
+  const completedOrders = cityFilteredOrders.filter(isDelivered);
+  const returnOrders = cityFilteredOrders.filter(isReturn);
+  const cancelledOrders = cityFilteredOrders.filter(isCancelled);
 
   // Filter drivers for selected city
   const cityDrivers = drivers.filter(d => {
@@ -183,6 +247,31 @@ export default function LogisticsLog() {
         setActiveTab('transit');
       }, 1500);
     }
+  };
+
+  const handlePrintConsignmentLabel = (order: RentalOrder) => {
+    const custFirst = (order.customerName || 'CUST').trim().split(' ')[0].replace(/[^a-zA-Z]/g, '').toUpperCase() || 'CUST';
+    const cleanOrd = (order.id || '647641').replace(/[^0-9]/g, '') || '647641';
+    const consignmentBarcode = `RB-${custFirst}-${cleanOrd}`;
+
+    setStickerAssetForPrint({
+      id: order.id,
+      barcode: consignmentBarcode,
+      brand: 'RentBuddy Furniture Consignment',
+      model: `${order.items?.length || 1} Furniture Units (${(order.items || []).map((i: any) => i.name || i.category || 'Asset').join(', ') || 'Solid Wood Furniture'})`,
+      category: 'Living Room & Bedroom Furniture',
+      warehouse: `${order.city || currentCity} Central Depot`,
+      rackNumber: 'A-01',
+      orderId: order.id,
+      customerName: order.customerName,
+      customerMobile: order.customerMobile,
+      deliveryAddress: order.deliveryAddress,
+      city: order.city || currentCity,
+      durationMonths: order.durationMonths || 6,
+      monthlyRent: order.netMonthlyRent || order.totalMonthlyRent || 2500,
+      depositPaid: order.totalDeposit || 4000,
+      startDate: order.startDate || new Date().toISOString().split('T')[0],
+    });
   };
 
   return (
@@ -311,6 +400,22 @@ export default function LogisticsLog() {
           </span>
         </button>
 
+        {/* Stage 6: Cancelled */}
+        <button
+          onClick={() => setActiveTab('cancelled')}
+          className={`flex-1 min-w-[170px] py-3 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'cancelled'
+              ? 'bg-rose-800 text-white shadow-lg shadow-rose-800/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
+          }`}
+        >
+          <X className="w-4 h-4 text-rose-400" />
+          <span>6. Cancelled & Restored</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/40 font-mono font-bold text-rose-300">
+            {cancelledOrders.length}
+          </span>
+        </button>
+
       </div>
 
       {/* TAB CONTENT AREA */}
@@ -421,41 +526,37 @@ export default function LogisticsLog() {
                       </div>
                     </div>
 
-                    {/* Actions: Print Label & Mark Prepared */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2">
+                    {/* Actions: Print Label, Call Customer, Cancel & Mark Prepared */}
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
                       <button
-                        onClick={() => {
-                          const firstItem = order.items[0];
-                          const assetInfo = inventory.find(a => a.id === firstItem?.assetId);
-                          setStickerAssetForPrint({
-                            id: assetInfo?.id || firstItem?.assetId || order.id,
-                            barcode: assetInfo?.barcode || firstItem?.assetId || order.id,
-                            brand: assetInfo?.brand,
-                            model: assetInfo?.model,
-                            category: assetInfo?.category || firstItem?.category,
-                            warehouse: assetInfo?.warehouse || `${order.city || currentCity} Central Depot`,
-                            rackNumber: assetInfo?.rackNumber || 'A-01',
-                            orderId: order.id,
-                            customerName: order.customerName,
-                            customerMobile: order.customerMobile,
-                            deliveryAddress: order.deliveryAddress,
-                            city: order.city || currentCity,
-                            durationMonths: order.durationMonths,
-                            monthlyRent: order.netMonthlyRent || order.totalMonthlyRent,
-                            depositPaid: order.totalDeposit,
-                            startDate: order.startDate
-                          });
-                        }}
-                        className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer"
+                        onClick={() => handlePrintConsignmentLabel(order)}
+                        className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer"
+                        title="Print Consignment Barcode Sticker & Tax Invoice"
                       >
-                        <Printer className="w-3.5 h-3.5 text-amber-400" /> Print Label
+                        <Printer className="w-3.5 h-3.5 text-amber-400" /> Print Slip
+                      </button>
+
+                      <a
+                        href={`tel:${order.customerMobile}`}
+                        className="py-2 px-3 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                        title={`Call Customer: ${order.customerMobile}`}
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-400" /> Call Customer
+                      </a>
+
+                      <button
+                        onClick={() => setCancellingOrder(order)}
+                        className="py-2 px-3 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                        title="Cancel Order & Restore Furniture to Available Stock"
+                      >
+                        <X className="w-3.5 h-3.5 text-red-400" /> Cancel
                       </button>
 
                       <button
                         onClick={() => handleMarkAsPrepared(order)}
-                        className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-600/20 cursor-pointer transition-all hover:scale-[1.02]"
+                        className="flex-1 min-w-[140px] py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-600/20 cursor-pointer transition-all hover:scale-[1.02]"
                       >
-                        <Check className="w-3.5 h-3.5" /> Mark as Packed & Ready ➔
+                        <Check className="w-3.5 h-3.5" /> Mark Packed ➔
                       </button>
                     </div>
 
@@ -516,13 +617,34 @@ export default function LogisticsLog() {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {order.items.length} Furniture Units Ready
-                      </span>
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        onClick={() => handlePrintConsignmentLabel(order)}
+                        className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-800 cursor-pointer"
+                        title="Print Consignment Barcode Sticker & Tax Invoice"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-red-400" /> Print Slip
+                      </button>
+
+                      <a
+                        href={`tel:${order.customerMobile}`}
+                        className="py-2 px-3 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                        title={`Call Customer: ${order.customerMobile}`}
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-400" /> Call Customer
+                      </a>
+
+                      <button
+                        onClick={() => setCancellingOrder(order)}
+                        className="py-2 px-3 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                        title="Cancel Order & Restore Furniture to Available Stock"
+                      >
+                        <X className="w-3.5 h-3.5 text-red-400" /> Cancel
+                      </button>
+
                       <button
                         onClick={() => handleOpenAssignModal(order)}
-                        className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-red-600/20 hover:scale-[1.02] transition-all cursor-pointer"
+                        className="flex-1 min-w-[140px] px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/20 hover:scale-[1.02] transition-all cursor-pointer"
                       >
                         <Send className="w-3.5 h-3.5" /> Assign to Rider ➔
                       </button>
@@ -555,42 +677,53 @@ export default function LogisticsLog() {
             ) : (
               <div className="grid grid-cols-1 gap-4">
                 {inTransitOrders.map((order) => {
-                  const isLoaded = order.scannedAtLoading;
-                  const isDelivered = order.scannedAtDelivery;
+                  const isLoaded = Boolean(order.scannedAtLoading);
+                  const isDeliveredScan = Boolean(order.scannedAtDelivery);
+                  const hasPhoto = Boolean(order.deliveryProofPhoto);
 
                   return (
                     <div
                       key={order.id}
-                      className="p-5 glass-panel rounded-2xl border border-slate-800 space-y-4"
+                      className="p-5 glass-panel rounded-2xl border border-slate-800 space-y-4 shadow-lg"
                     >
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                          <div className="p-2.5 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
                             <Truck className="w-5 h-5" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-white text-sm">{order.id}</h3>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                              <h3 className="font-bold text-white text-base font-mono">{order.id}</h3>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                                 {isLoaded ? '🚚 Out for Doorstep Delivery' : '📦 Dispatched (Awaiting Depot Scan)'}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                              Customer: <strong className="text-slate-200">{order.customerName}</strong> ({order.customerMobile}) • {order.deliveryAddress}
+                            <p className="text-[11px] text-slate-300 mt-1">
+                              Customer: <strong className="text-white font-bold">{order.customerName}</strong> ({order.customerMobile}) • {order.deliveryAddress}
                             </p>
                           </div>
                         </div>
 
-                        {/* Assigned Rider Info & Direct Call Button */}
-                        <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                          <div className="text-right">
-                            <span className="text-[9px] text-slate-500 uppercase font-bold block">Assigned Rider:</span>
-                            <span className="font-bold text-slate-200 text-xs">{order.assignedLogisticsUser || order.assignedDriverName || 'Fleet Driver'}</span>
+                        {/* Call Customer & Call Rider Action Panel */}
+                        <div className="flex items-center gap-2 flex-wrap bg-slate-950 p-2 rounded-2xl border border-slate-800">
+                          <a
+                            href={`tel:${order.customerMobile}`}
+                            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                            title={`Call Customer: ${order.customerMobile}`}
+                          >
+                            <Phone className="w-3.5 h-3.5" /> Call Customer
+                          </a>
+
+                          <div className="px-2 text-right">
+                            <span className="text-[9px] text-slate-400 uppercase font-bold block">Assigned Rider:</span>
+                            <span className="font-bold text-cyan-300 text-xs">{order.assignedLogisticsUser || order.assignedDriverName || 'Fleet Driver'}</span>
                           </div>
+
                           {order.assignedDriverPhone && (
                             <a
                               href={`tel:${order.assignedDriverPhone}`}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow"
+                              className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                              title={`Call Rider: ${order.assignedDriverPhone}`}
                             >
                               <Phone className="w-3.5 h-3.5" /> Call Rider
                             </a>
@@ -598,54 +731,77 @@ export default function LogisticsLog() {
                         </div>
                       </div>
 
-                      {/* AMAZON/FLIPKART LIVE TRACKING PROGRESS STEPPER */}
-                      <div className="p-4 bg-slate-950/40 rounded-xl border border-slate-900 space-y-3">
+                      {/* AMAZON/FLIPKART HIGH-CONTRAST LIVE TRACKING PROGRESS STEPPER */}
+                      <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-slate-400 uppercase tracking-wider">Live Delivery Stages:</span>
-                          <span className="font-mono text-cyan-400 font-semibold">Deadline: {order.deliveryDeadline || 'Today, 5:00 PM'}</span>
+                          <span className="font-bold text-slate-300 uppercase tracking-wider">Live Delivery Stages:</span>
+                          <span className="font-mono text-cyan-400 font-bold">Deadline: {order.deliveryDeadline || 'Today, 5:00 PM'}</span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 pt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
                           
                           {/* Step 1: Dispatched */}
-                          <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <div className="p-3 rounded-2xl bg-slate-900 border-2 border-emerald-500 flex items-center gap-2.5 shadow-md">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                             <div>
-                              <div className="font-bold text-slate-200 text-[11px]">1. Driver Assigned</div>
-                              <div className="text-[9px] text-slate-500 font-mono">Notified on App</div>
+                              <div className="font-bold text-white text-xs">1. Driver Assigned</div>
+                              <div className="text-[10px] text-emerald-400 font-bold font-mono">Notified on App</div>
                             </div>
                           </div>
 
                           {/* Step 2: Depot Barcode Scan */}
-                          <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                            isLoaded ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' : 'bg-slate-900/40 border-slate-800 text-slate-500'
+                          <div className={`p-3 rounded-2xl border-2 flex items-center gap-2.5 shadow-md transition-all ${
+                            isLoaded 
+                              ? 'bg-slate-900 border-emerald-500' 
+                              : 'bg-slate-950 border-slate-800'
                           }`}>
-                            <CheckCircle2 className={`w-4 h-4 shrink-0 ${isLoaded ? 'text-emerald-400' : 'text-slate-600'}`} />
+                            <CheckCircle2 className={`w-5 h-5 shrink-0 ${isLoaded ? 'text-emerald-400' : 'text-slate-600'}`} />
                             <div>
-                              <div className="font-bold text-[11px]">{isLoaded ? '✓ Depot Scan Verified' : '2. Depot Loading Scan'}</div>
-                              <div className="text-[9px] font-mono">{isLoaded ? 'Loaded to Vehicle' : 'Pending at Warehouse'}</div>
+                              <div className={`font-bold text-xs ${isLoaded ? 'text-white' : 'text-slate-400'}`}>
+                                {isLoaded ? '✓ Depot Scan Verified' : '2. Depot Loading Scan'}
+                              </div>
+                              <div className={`text-[10px] font-mono font-bold ${isLoaded ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                {isLoaded ? 'Loaded to Vehicle' : 'Pending at Warehouse'}
+                              </div>
                             </div>
                           </div>
 
                           {/* Step 3: Doorstep Handover Scan */}
-                          <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                            isDelivered ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' : 'bg-slate-900/40 border-slate-800 text-slate-500'
+                          <div className={`p-3 rounded-2xl border-2 flex items-center gap-2.5 shadow-md transition-all ${
+                            isDeliveredScan 
+                              ? 'bg-slate-900 border-emerald-500' 
+                              : 'bg-slate-950 border-slate-800'
                           }`}>
-                            <CheckCircle2 className={`w-4 h-4 shrink-0 ${isDelivered ? 'text-emerald-400' : 'text-slate-600'}`} />
+                            <CheckCircle2 className={`w-5 h-5 shrink-0 ${isDeliveredScan ? 'text-emerald-400' : 'text-slate-600'}`} />
                             <div>
-                              <div className="font-bold text-[11px]">{isDelivered ? '✓ Doorstep Verified' : '3. Doorstep Scan'}</div>
-                              <div className="text-[9px] font-mono">{isDelivered ? 'Verified Handover' : 'Pending at Customer'}</div>
+                              <div className={`font-bold text-xs ${isDeliveredScan ? 'text-white' : 'text-slate-400'}`}>
+                                {isDeliveredScan ? '✓ Doorstep Verified' : '3. Doorstep Scan'}
+                              </div>
+                              <div className={`text-[10px] font-mono font-bold ${isDeliveredScan ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                {isDeliveredScan ? 'Verified Handover' : 'Pending at Customer'}
+                              </div>
                             </div>
                           </div>
 
                           {/* Step 4: Photo Proof (POD) */}
-                          <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                            order.deliveryProofPhoto ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' : 'bg-slate-900/40 border-slate-800 text-slate-500'
-                          }`}>
-                            <Camera className={`w-4 h-4 shrink-0 ${order.deliveryProofPhoto ? 'text-emerald-400' : 'text-slate-600'}`} />
+                          <div className={`p-3 rounded-2xl border-2 flex items-center gap-2.5 shadow-md transition-all ${
+                            hasPhoto 
+                              ? 'bg-slate-900 border-emerald-500 cursor-pointer hover:border-emerald-400' 
+                              : 'bg-slate-950 border-slate-800'
+                          }`}
+                            onClick={() => {
+                              if (hasPhoto) setPreviewPhotoOrder(order);
+                            }}
+                          >
+                            <Camera className={`w-5 h-5 shrink-0 ${hasPhoto ? 'text-emerald-400' : 'text-slate-600'}`} />
                             <div>
-                              <div className="font-bold text-[11px]">{order.deliveryProofPhoto ? '✓ Photo POD Attached' : '4. Room Setup Photo'}</div>
-                              <div className="text-[9px] font-mono">{order.deliveryProofPhoto ? 'Proof Available' : 'Pending Upload'}</div>
+                              <div className={`font-bold text-xs ${hasPhoto ? 'text-white flex items-center gap-1' : 'text-slate-400'}`}>
+                                {hasPhoto ? '✓ Photo POD Attached' : '4. Room Setup Photo'}
+                                {hasPhoto && <Eye className="w-3 h-3 text-emerald-400" />}
+                              </div>
+                              <div className={`text-[10px] font-mono font-bold ${hasPhoto ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                {hasPhoto ? 'Click to View Photo' : 'Pending Upload'}
+                              </div>
                             </div>
                           </div>
 
@@ -665,65 +821,78 @@ export default function LogisticsLog() {
         {/* ========================================================================= */}
         {activeTab === 'completed' && (
           <div className="space-y-4">
-            <div className="glass-panel p-4 rounded-2xl flex justify-between items-center bg-emerald-950/20 border border-emerald-500/20">
-              <div className="text-xs text-emerald-200">
+            <div className="p-4 rounded-2xl flex justify-between items-center bg-emerald-50 border border-emerald-200 shadow-sm">
+              <div className="text-xs text-emerald-900 font-medium">
                 ✅ <strong>Delivered & Active Rentals</strong> — All orders with verified 2-way barcode scans and room setup photo proof (POD).
               </div>
-              <span className="text-[11px] font-mono text-emerald-400 font-bold">{completedOrders.length} Completed</span>
+              <span className="text-xs font-mono text-emerald-800 font-bold bg-emerald-100 px-3 py-1 rounded-lg border border-emerald-300">{completedOrders.length} Completed</span>
             </div>
 
             {completedOrders.length === 0 ? (
-              <div className="p-12 glass-panel rounded-2xl border border-slate-800 text-center space-y-2">
-                <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto" />
-                <h4 className="font-bold text-white text-sm">No Delivered Orders Yet</h4>
-                <p className="text-slate-400 text-xs">Completed deliveries will appear here with proof photo inspection.</p>
+              <div className="p-12 bg-white rounded-2xl border border-slate-200 text-center space-y-2 shadow-sm">
+                <CheckCircle2 className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-bold text-slate-800 text-sm">No Delivered Orders Yet</h4>
+                <p className="text-slate-500 text-xs">Completed deliveries will appear here with proof photo inspection.</p>
               </div>
             ) : (
-              <div className="glass-panel rounded-2xl overflow-hidden shadow-xl border border-slate-800">
+              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-950/60 text-slate-400 border-b border-slate-800">
-                      <th className="p-3.5 font-bold uppercase tracking-wider">Order ID</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider">Customer</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider">Delivered Rider</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider">2-Way Scan Verification</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider">POD Photo</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider">Status</th>
+                    <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                      <th className="p-4 font-bold uppercase tracking-wider text-slate-700">Order ID</th>
+                      <th className="p-4 font-bold uppercase tracking-wider text-slate-700">Customer & Call</th>
+                      <th className="p-4 font-bold uppercase tracking-wider text-slate-700">Delivered Rider</th>
+                      <th className="p-4 font-bold uppercase tracking-wider text-slate-700">2-Way Scan Verification</th>
+                      <th className="p-4 font-bold uppercase tracking-wider text-slate-700">POD Proof Photo</th>
+                      <th className="p-4 font-bold uppercase tracking-wider text-slate-700">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-100">
                     {completedOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-slate-800/10">
-                        <td className="p-3.5 font-mono font-bold text-white">{order.id}</td>
-                        <td className="p-3.5">
-                          <div className="font-bold text-slate-200">{order.customerName}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{order.customerMobile}</div>
+                      <tr key={order.id} className="hover:bg-slate-50/80 transition-all bg-white">
+                        <td className="p-4 font-mono font-extrabold text-slate-900 text-sm tracking-wide">{order.id}</td>
+                        <td className="p-4">
+                          <div className="font-extrabold text-slate-900 text-sm">{order.customerName}</div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-xs text-slate-600 font-mono font-bold">{order.customerMobile}</span>
+                            <a
+                              href={`tel:${order.customerMobile}`}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                              title={`Call ${order.customerName}`}
+                            >
+                              <Phone className="w-3 h-3" /> Call Customer
+                            </a>
+                          </div>
                         </td>
-                        <td className="p-3.5">
-                          <div className="font-semibold text-cyan-300">{order.assignedLogisticsUser || order.assignedDriverName || 'Fleet Driver'}</div>
-                          <div className="text-[10px] text-slate-500">{order.city || currentCity} Hub</div>
+                        <td className="p-4">
+                          <div className="font-bold text-slate-800 text-xs">{order.assignedLogisticsUser || order.assignedDriverName || 'Fleet Driver'}</div>
+                          <div className="text-xs text-slate-500 font-medium">{order.city || currentCity} Hub</div>
                         </td>
-                        <td className="p-3.5">
+                        <td className="p-4">
                           <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold flex items-center gap-1">
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-400 text-emerald-800 text-xs font-bold flex items-center gap-1 font-mono shadow-sm">
                               ✓ Depot Scan
                             </span>
-                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold flex items-center gap-1">
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-400 text-emerald-800 text-xs font-bold flex items-center gap-1 font-mono shadow-sm">
                               ✓ Doorstep Scan
                             </span>
                           </div>
                         </td>
-                        <td className="p-3.5">
-                          <button
-                            onClick={() => setPreviewPhotoOrder(order)}
-                            className="px-2.5 py-1 rounded-lg bg-cyan-950/40 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-900/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Camera className="w-3 h-3" /> View POD Proof
-                          </button>
+                        <td className="p-4">
+                          {order.deliveryProofPhoto ? (
+                            <button
+                              onClick={() => setPreviewPhotoOrder(order)}
+                              className="px-3 py-1.5 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-400 hover:bg-cyan-100 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-cyan-600" /> View Room Setup Photo
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-500 font-mono font-semibold">OTP Verified Handover</span>
+                          )}
                         </td>
-                        <td className="p-3.5">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            ✓ {order.status}
+                        <td className="p-4">
+                          <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-400 uppercase font-mono tracking-wider">
+                            ✓ DELIVERED
                           </span>
                         </td>
                       </tr>
@@ -771,6 +940,69 @@ export default function LogisticsLog() {
                     <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-900 text-[11px] flex justify-between items-center">
                       <span className="text-slate-400">Barcode to Scan on Pickup:</span>
                       <span className="font-mono font-bold text-red-400">{order.items[0]?.assetId || 'RB-BARCODE'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STAGE 6: CANCELLED & RESTORED INVENTORY                                   */}
+        {/* ========================================================================= */}
+        {activeTab === 'cancelled' && (
+          <div className="space-y-4">
+            <div className="glass-panel p-4 rounded-2xl flex justify-between items-center bg-rose-950/20 border border-rose-500/20">
+              <div className="text-xs text-rose-200">
+                🛑 <strong>Cancelled Orders & Stock Release Log</strong> — Orders cancelled by customers or warehouse staging. All allocated furniture units have been released back to Available inventory.
+              </div>
+              <span className="text-[11px] font-mono text-rose-400 font-bold">{cancelledOrders.length} Cancelled Orders</span>
+            </div>
+
+            {cancelledOrders.length === 0 ? (
+              <div className="p-12 glass-panel rounded-2xl border border-slate-800 text-center space-y-2">
+                <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto" />
+                <h4 className="font-bold text-white text-sm">No Cancelled Orders</h4>
+                <p className="text-slate-400 text-xs">All customer orders are processing smoothly through active staging and dispatch.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {cancelledOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="p-5 glass-panel rounded-2xl border border-rose-500/20 space-y-3 bg-rose-950/10"
+                  >
+                    <div className="flex items-start justify-between border-b border-slate-800/80 pb-3">
+                      <div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-mono">
+                          ✕ Cancelled & Restored
+                        </span>
+                        <h3 className="font-bold text-white text-sm mt-1">{order.id}</h3>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">Destination: {order.city || currentCity} Hub</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                          ✓ Stock Released
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 space-y-1">
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-200">
+                        <span>{order.customerName}</span>
+                        <span className="font-mono text-cyan-400">{order.customerMobile}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 line-clamp-1">{order.deliveryAddress || `${order.city || currentCity} Delivery Area`}</p>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-950/40 rounded-xl border border-slate-900 text-[11px] space-y-1">
+                      <div className="text-slate-400 font-medium">
+                        Reason: <span className="text-rose-300 font-semibold">{order.cancellationReason || 'Cancelled at staging'}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        {order.items?.length || 1} furniture units returned to Available warehouse stock.
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1054,6 +1286,106 @@ export default function LogisticsLog() {
           asset={stickerAssetForPrint as any}
           onClose={() => setStickerAssetForPrint(null)}
         />
+      )}
+
+      {/* Cancel Order & Stock Restoration Modal */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-[500px] glass-panel border border-red-500/30 rounded-3xl p-6 shadow-2xl space-y-5 text-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-red-950/60 border border-red-500/30 text-red-400">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Cancel Order & Restore Stock</h3>
+                  <p className="text-[11px] text-slate-400 font-mono">Order ID: {cancellingOrder.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCancellingOrder(null)}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Order Details & Items Info */}
+            <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-900 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-200">{cancellingOrder.customerName}</span>
+                <span className="font-mono text-cyan-400">{cancellingOrder.customerMobile}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 line-clamp-1">{cancellingOrder.deliveryAddress || `${cancellingOrder.city || currentCity} Delivery Area`}</p>
+              
+              <div className="pt-2 border-t border-slate-900">
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                  📦 Items to be Restored to Available Stock ({cancellingOrder.items?.length || 1} units):
+                </span>
+                <div className="space-y-1">
+                  {(cancellingOrder.items || []).map((item, idx) => (
+                    <div key={idx} className="text-[11px] text-slate-300 flex items-center gap-1.5 font-mono">
+                      <span className="text-emerald-400">✓</span>
+                      <span>{(item as any).name || item.category || 'Furniture Item'}</span>
+                      <span className="text-[9px] text-slate-500">({item.assetId})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Cancellation Reason Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 block">Reason for Cancellation:</label>
+              <select
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl p-2.5 text-xs font-medium focus:border-red-500 outline-none"
+              >
+                <option value="Customer refused delivery / cancelled at staging">Customer refused delivery / cancelled at staging</option>
+                <option value="Customer unreachable or wrong phone number">Customer unreachable or wrong phone number</option>
+                <option value="Item damaged during packaging inspection">Item damaged during packaging inspection</option>
+                <option value="Customer requested date reschedule or cancellation">Customer requested date reschedule or cancellation</option>
+                <option value="Payment / Security deposit verification failure">Payment / Security deposit verification failure</option>
+              </select>
+            </div>
+
+            <div className="p-3 bg-red-950/20 border border-red-500/20 rounded-xl text-[11px] text-red-300">
+              ⚠️ <strong>Note:</strong> All {cancellingOrder.items?.length || 1} furniture units will be immediately marked as <strong>"Available"</strong> in the {cancellingOrder.city || currentCity} warehouse inventory for new customer rentals.
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setCancellingOrder(null)}
+                className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl font-bold text-xs"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                disabled={isCancelling}
+                onClick={async () => {
+                  if (!cancellingOrder) return;
+                  setIsCancelling(true);
+                  await cancelOrder(cancellingOrder.id, cancelReason);
+                  setIsCancelling(false);
+                  setCancellingOrder(null);
+                }}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/30"
+              >
+                {isCancelling ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <X className="w-4 h-4" /> Confirm & Restore Stock
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

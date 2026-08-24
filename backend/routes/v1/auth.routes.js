@@ -7,7 +7,8 @@ import {
   sendDriverOtp,
   verifyDriverOtp,
   loginDriverWithPin,
-  completeDriverOnboarding
+  completeDriverOnboarding,
+  deleteDriverAccount
 } from '../../controllers/auth.controller.js';
 import { authenticateToken } from '../../middlewares/auth.middleware.js';
 import { loginLimiter, otpLimiter } from '../../middlewares/rateLimiter.middleware.js';
@@ -26,5 +27,7 @@ router.post('/driver/send-otp', otpLimiter, validatePhoneForOtp, sendDriverOtp);
 router.post('/driver/verify-otp', validateOtpPayload, verifyDriverOtp);
 router.post('/driver/login-with-pin', loginLimiter, loginDriverWithPin);
 router.post('/driver/complete-onboarding', completeDriverOnboarding);
+router.post('/driver/delete-account', deleteDriverAccount);
+router.delete('/driver/delete-account', deleteDriverAccount);
 
 export default router;

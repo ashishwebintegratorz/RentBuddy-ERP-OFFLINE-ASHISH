@@ -2,9 +2,21 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import 'dotenv/config';
 
-const uri = process.env.MONGODB_URI || 'mongodb+srv://rentbuddycdn_db_user:q3D4hcfyUhsNBSVu@cluster0.nkhra1f.mongodb.net/?appName=Cluster0';
+const uri = process.env.MONGODB_URI;
+const adminUsername = process.env.INITIAL_ADMIN_USERNAME || process.argv[2] || 'admin';
+const adminPassword = process.env.INITIAL_ADMIN_PASSWORD || process.argv[3];
+const adminFullName = process.env.INITIAL_ADMIN_NAME || 'RentBuddy Administrator';
 
 async function seedAdmin() {
+  if (!uri) {
+    console.error('❌ MONGODB_URI environment variable is required.');
+    process.exit(1);
+  }
+  if (!adminPassword) {
+    console.error('❌ Admin password must be provided via INITIAL_ADMIN_PASSWORD env variable or CLI argument (node seed_admin.js <username> <password>).');
+    process.exit(1);
+  }
+
   try {
     console.log('Connecting to MongoDB Atlas...');
     await mongoose.connect(uri);
@@ -20,13 +32,13 @@ async function seedAdmin() {
 
     const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
     const admin = await User.findOneAndUpdate(
-      { username: 'admin' },
+      { username: adminUsername },
       {
-        username: 'admin',
+        username: adminUsername,
         password: hashedPassword,
-        fullName: 'Ashish Admin (Super Admin)',
+        fullName: adminFullName,
         role: 'Super Admin',
         city: 'Indore (Head Office)'
       },
@@ -35,8 +47,8 @@ async function seedAdmin() {
 
     console.log('======================================================');
     console.log('✅ Admin Account Configured in MongoDB Atlas:');
-    console.log('👤 Username : admin');
-    console.log('🔑 Password : admin123');
+    console.log(`👤 Username : ${adminUsername}`);
+    console.log('🔑 Password : [CONFIGURED SECURELY]');
     console.log('🛡️  Role     : Super Admin');
     console.log('🏙️  City     : Indore (Head Office)');
     console.log('======================================================');

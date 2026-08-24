@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
+import { getApiBaseUrl } from '../api/client';
+import { SVG_AVATAR_PLACEHOLDER, SVG_DOCUMENT_PLACEHOLDER, SVG_VEHICLE_PLACEHOLDER } from '../utils/placeholderAssets';
 import { LogisticsDriver, DriverVehicleType } from '../types';
 import { compressImage } from '../utils/compressor';
 import {
@@ -28,6 +30,8 @@ import {
   CreditCard,
   KeyRound
 } from 'lucide-react';
+
+const generateSecurePin = () => Math.floor(1000 + Math.random() * 9000).toString();
 
 export default function LogisticsDetailDocument() {
   const {
@@ -58,6 +62,17 @@ export default function LogisticsDetailDocument() {
   const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'vehicle' | 'profile' | 'account'>('license');
   const [verificationNotesInput, setVerificationNotesInput] = useState('');
 
+  // Sync drivers to MongoDB Atlas so Flutter Rider login always recognizes ERP onboarded drivers
+  React.useEffect(() => {
+    if (drivers && drivers.length > 0) {
+      fetch(`${getApiBaseUrl()}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drivers })
+      }).catch(() => {});
+    }
+  }, [drivers]);
+
   // Selected driver for view document modal
   const selectedDriver = drivers.find(d => d.id === selectedDriverId || d.phone === selectedDriverId || (d as any)._id === selectedDriverId);
 
@@ -67,7 +82,7 @@ export default function LogisticsDetailDocument() {
     phone: '',
     alternatePhone: '',
     upiId: '',
-    pin: '1234',
+    pin: generateSecurePin(),
     city: currentCity,
     vehicleType: 'Two Wheeler / Bike' as DriverVehicleType,
     vehicleNumber: '',
@@ -146,16 +161,16 @@ export default function LogisticsDetailDocument() {
       return;
     }
 
-    const defaultMockDoc = 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600';
-    const defaultMockPhoto = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300';
-    const defaultMockVehicle = 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600';
+    const defaultMockDoc = SVG_DOCUMENT_PLACEHOLDER;
+    const defaultMockPhoto = SVG_AVATAR_PLACEHOLDER;
+    const defaultMockVehicle = SVG_VEHICLE_PLACEHOLDER;
 
     addDriver({
       fullName: newDriverForm.fullName,
       phone: newDriverForm.phone,
       alternatePhone: newDriverForm.alternatePhone,
       upiId: newDriverForm.upiId || `${newDriverForm.phone}@upi`,
-      pin: newDriverForm.pin || '1234',
+      pin: newDriverForm.pin || generateSecurePin(),
       city: newDriverForm.city,
       vehicleType: newDriverForm.vehicleType,
       vehicleNumber: newDriverForm.vehicleNumber.toUpperCase(),
@@ -191,7 +206,7 @@ export default function LogisticsDetailDocument() {
       phone: '',
       alternatePhone: '',
       upiId: '',
-      pin: '1234',
+      pin: generateSecurePin(),
       city: currentCity,
       vehicleType: 'Two Wheeler / Bike' as DriverVehicleType,
       vehicleNumber: '',
@@ -440,7 +455,7 @@ export default function LogisticsDetailDocument() {
                       {/* Avatar Photo */}
                       <div className="relative">
                         <img
-                          src={driver.documents?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
+                          src={driver.documents?.profilePhoto || SVG_AVATAR_PLACEHOLDER}
                           alt={driver.fullName}
                           className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-700/80 shadow-md group-hover:border-red-400/60 transition-colors"
                         />
@@ -607,12 +622,11 @@ export default function LogisticsDetailDocument() {
       {selectedDriver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div className="glass-panel w-full max-w-4xl max-h-[92vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
-            
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
               <div className="flex items-center gap-3">
                 <img
-                  src={selectedDriver.documents?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
+                  src={selectedDriver.documents?.profilePhoto || SVG_AVATAR_PLACEHOLDER}
                   alt={selectedDriver.fullName}
                   className="w-12 h-12 rounded-xl object-cover border border-slate-700"
                 />
@@ -623,80 +637,76 @@ export default function LogisticsDetailDocument() {
                       {selectedDriver.id}
                     </span>
                     {selectedDriver.isBlocked ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
                         Blocked
                       </span>
                     ) : selectedDriver.verificationStatus === 'Verified' ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Verified Driver
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Verified KYC
                       </span>
                     ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Pending KYC Review
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Verification Pending
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {selectedDriver.vehicleType} • <span className="font-mono text-amber-400">{selectedDriver.vehicleNumber}</span> • Joined {selectedDriver.joiningDate}
+                  <p className="text-xs text-slate-400">
+                    Vehicle: <span className="text-slate-200 font-medium">{selectedDriver.vehicleType}</span> ({selectedDriver.vehicleNumber || 'No Plate'}) • City: <span className="text-slate-200 font-medium">{selectedDriver.city}</span>
                   </p>
                 </div>
               </div>
 
-              <button
-                onClick={() => setSelectedDriverId(null)}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenEditModal(selectedDriver)}
+                  className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                  title="Edit Rider Information"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setSelectedDriverId(null)}
+                  className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Modal Body - Tabbed Document Inspection */}
+            {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               
-              {/* Document Categories Tabs */}
-              <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+              {/* Document Nav Tabs */}
+              <div className="flex gap-2 border-b border-slate-800 pb-3">
                 {[
-                  { id: 'license', label: 'Driving License (DL)', icon: FileText, verified: selectedDriver.documents?.licenseVerified },
-                  { id: 'aadhaar', label: 'Aadhaar Card', icon: ShieldCheck, verified: selectedDriver.documents?.aadhaarVerified },
-                  { id: 'vehicle', label: 'Vehicle Photo & Plate', icon: Truck, verified: selectedDriver.documents?.rcVerified },
-                  { id: 'profile', label: 'Profile Photo (Selfie)', icon: ShieldCheck, verified: true },
-                  { id: 'account', label: 'UPI & Login PIN', icon: CreditCard, verified: true },
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeDocTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveDocTab(tab.id as any)}
-                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                        isActive
-                          ? 'bg-red-600 text-white shadow-lg shadow-red-600/30 border border-red-400/40'
-                          : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span>{tab.label}</span>
-                      {tab.verified ? (
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" title="Verified" />
-                      ) : (
-                        <span className="w-2 h-2 rounded-full bg-amber-400" title="Pending" />
-                      )}
-                    </button>
-                  );
-                })}
+                  { id: 'license', label: 'Driving License', verified: selectedDriver.documents?.licenseVerified },
+                  { id: 'aadhaar', label: 'Aadhaar Card', verified: selectedDriver.documents?.aadhaarVerified },
+                  { id: 'vehicle', label: 'Vehicle Photo & RC', verified: selectedDriver.documents?.rcVerified },
+                  { id: 'profile', label: 'Rider Profile Photo', verified: true },
+                  { id: 'account', label: 'Payout Account & Security', verified: true },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveDocTab(tab.id as any)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeDocTab === tab.id
+                        ? 'bg-red-600 text-white shadow-lg shadow-red-950/40'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {tab.verified ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              {/* Document Details & Image Previews */}
+              {/* Tab Content */}
               {activeDocTab === 'license' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-800/50 border border-slate-700 text-xs">
                     <div>
-                      <span className="text-slate-400 text-[11px] block">License Number / Status</span>
-                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'DL Uploaded'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[11px] block">Vehicle Category</span>
-                      <span className="font-mono font-bold text-amber-400 text-sm">{selectedDriver.vehicleType || 'Two Wheeler / Bike'}</span>
+                      <span className="text-slate-400 text-[11px] block">Driving License Number</span>
+                      <span className="font-mono font-bold text-white text-sm">{selectedDriver.documents?.licenseNumber || 'License Attached'}</span>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end">
                       <button
@@ -715,7 +725,7 @@ export default function LogisticsDetailDocument() {
 
                   <div className="max-w-md mx-auto space-y-1.5">
                     <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-                      <span>Driving License (DL) Copy</span>
+                      <span>Front Side of License</span>
                       <button
                         onClick={() => setPreviewImage({ url: selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || '', title: 'Driving License' })}
                         className="text-red-400 hover:text-red-300 flex items-center gap-1"
@@ -728,7 +738,7 @@ export default function LogisticsDetailDocument() {
                       className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center shadow-lg"
                     >
                       <img
-                        src={selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&q=80&w=600'}
+                        src={selectedDriver.documents?.licenseFront || selectedDriver.documents?.drivingLicenseFront || SVG_DOCUMENT_PLACEHOLDER}
                         alt="Driving License"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -777,7 +787,7 @@ export default function LogisticsDetailDocument() {
                       className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center shadow-lg"
                     >
                       <img
-                        src={selectedDriver.documents?.aadhaarFront || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=600'}
+                        src={selectedDriver.documents?.aadhaarFront || SVG_DOCUMENT_PLACEHOLDER}
                         alt="Aadhaar Card"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -826,7 +836,7 @@ export default function LogisticsDetailDocument() {
                       className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-[4/3] flex items-center justify-center shadow-lg"
                     >
                       <img
-                        src={selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=600'}
+                        src={selectedDriver.documents?.vehiclePhoto || selectedDriver.documents?.vehicleRC || selectedDriver.documents?.vehicleRc || SVG_VEHICLE_PLACEHOLDER}
                         alt="Vehicle Photo"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
@@ -858,7 +868,7 @@ export default function LogisticsDetailDocument() {
                       className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-square max-w-[280px] mx-auto shadow-lg"
                     >
                       <img
-                        src={selectedDriver.documents?.profilePhoto || selectedDriver.documents?.selfiePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=400'}
+                        src={selectedDriver.documents?.profilePhoto || selectedDriver.documents?.selfiePhoto || SVG_AVATAR_PLACEHOLDER}
                         alt="Profile Photo"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />

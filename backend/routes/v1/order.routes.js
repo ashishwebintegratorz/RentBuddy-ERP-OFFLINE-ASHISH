@@ -6,9 +6,11 @@ import {
   prepareOrder,
   assignDriverToOrder,
   scanAssetBarcode,
+  acceptOrder,
   updateOrderStatus,
   getDriverActiveOrders,
-  getDriverOrderHistory
+  getDriverOrderHistory,
+  cancelOrder
 } from '../../controllers/order.controller.js';
 
 const router = express.Router();
@@ -21,6 +23,10 @@ router.post('/', createOrder);
 router.put('/:id/prepare', prepareOrder);
 router.post('/:id/assign-driver', assignDriverToOrder);
 router.post('/:id/scan-asset', scanAssetBarcode);
+router.post('/:id/cancel', cancelOrder);
+router.put('/:id/cancel', cancelOrder);
+router.put('/:id/accept', acceptOrder);
+router.post('/:id/accept', acceptOrder);
 router.put('/:id/status', updateOrderStatus);
 
 export default router;

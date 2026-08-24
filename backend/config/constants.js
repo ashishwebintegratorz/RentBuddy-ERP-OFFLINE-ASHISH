@@ -4,8 +4,15 @@ dotenv.config();
 export const PORT = process.env.PORT || 5001;
 export const NODE_ENV = process.env.NODE_ENV || 'development';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_rentbuddy_2026_!!';
+if (NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET environment variable is strictly required in production.');
+}
+
+export const JWT_SECRET = process.env.JWT_SECRET || (NODE_ENV === 'production' ? '' : 'dev_jwt_secret_rentbuddy_local_only');
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+// CORS Allowed Origins
+export const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 // ImageKit Configuration
 export const IMAGEKIT_PUBLIC_KEY = process.env.IMAGEKIT_PUBLIC_KEY || '';
@@ -26,8 +33,8 @@ export const USER_ROLES = [
 
 export const DEFAULT_ADMIN = {
   username: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
-  password: process.env.DEFAULT_ADMIN_PASSWORD || 'RentbuddySecure2026!',
-  fullName: 'Ashish Admin',
+  password: process.env.DEFAULT_ADMIN_PASSWORD || '',
+  fullName: process.env.DEFAULT_ADMIN_NAME || 'RentBuddy Administrator',
   role: 'Super Admin',
   city: 'Indore (Head Office)'
 };

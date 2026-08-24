@@ -96,6 +96,47 @@ export default function Dashboard({ setView }: DashboardProps) {
 
   const defaultersCount = (customers || []).filter(c => c && c.status === 'Defaulter').length;
 
+  // Dynamic Asset Health Breakdown
+  const excCount = cityAssets.filter(a => a.lifecycle?.currentCondition === 'Excellent' || (!a.lifecycle?.currentCondition && a.status === 'Available')).length;
+  const fairCount = cityAssets.filter(a => a.lifecycle?.currentCondition === 'Good' || a.lifecycle?.currentCondition === 'Fair' || a.status === 'Rented' || a.status === 'Under Repair').length;
+  const poorCount = cityAssets.filter(a => a.lifecycle?.currentCondition === 'Poor' || a.status === 'Lost' || a.status === 'Scrapped').length;
+  const healthTotal = (excCount + fairCount + poorCount) || 1;
+  const excPct = Math.round((excCount / healthTotal) * 100);
+  const fairPct = Math.round((fairCount / healthTotal) * 100);
+  const poorPct = Math.max(0, 100 - excPct - fairPct);
+
+  // Dynamic Top Categories Breakdown
+  const categoryCounts = (orders || []).flatMap(o => o.items || []).reduce((acc: Record<string, number>, item) => {
+    const cat = item.category || 'General Appliance';
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {});
+  const topCategories = Object.entries(categoryCounts).length > 0
+    ? Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    : [['Beds & Mattresses', 0], ['Sofa Sets', 0], ['Appliances', 0]];
+  const maxCatCount = Math.max(1, ...(topCategories.map(c => c[1] as number)));
+
+  // Dynamic City Revenue Share
+  const cityRevenueMap = (invoices || []).reduce((acc: Record<string, number>, inv) => {
+    const cust = customers.find(c => c.id === inv.customerId);
+    const cCity = cust?.city || currentCity;
+    acc[cCity] = (acc[cCity] || 0) + (inv.rentalCharges || 0);
+    return acc;
+  }, {});
+  const totalRev = Object.values(cityRevenueMap).reduce((a, b) => a + b, 0) || 1;
+  const cityShares = Object.entries(cityRevenueMap).length > 0
+    ? Object.entries(cityRevenueMap).map(([city, rev]) => ({
+        city: city.replace(' (Head Office)', ' HO'),
+        rev,
+        pct: Math.round((rev / totalRev) * 100)
+      }))
+    : [{ city: 'Indore HO', rev: 0, pct: 100 }];
+
+  // Dynamic Collection Rate Calculation
+  const totalBilled = (invoices || []).reduce((sum, i) => sum + (i.totalAmount || 0), 0);
+  const totalCollected = (invoices || []).filter(i => i.status === 'Paid').reduce((sum, i) => sum + (i.totalAmount || 0), 0);
+  const collectionRate = totalBilled > 0 ? Math.min(100, Math.round((totalCollected / totalBilled) * 1000) / 10) : 100;
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
       
@@ -565,17 +606,17 @@ export default function Dashboard({ setView }: DashboardProps) {
             {/* Ring Chart */}
             <svg viewBox="0 0 36 36" className="w-[100px] h-[100px] transform -rotate-90">
               {/* Excellent Condition ring */}
-              <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray="50, 100" />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray={`${excPct}, 100`} />
               {/* Good/Repair ring */}
-              <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="4" strokeDasharray="35, 100" strokeDashoffset="-50" />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" strokeWidth="4" strokeDasharray={`${fairPct}, 100`} strokeDashoffset={`-${excPct}`} />
               {/* Lost/Scrap ring */}
-              <circle cx="18" cy="18" r="14" fill="none" stroke="#f43f5e" strokeWidth="4" strokeDasharray="15, 100" strokeDashoffset="-85" />
+              <circle cx="18" cy="18" r="14" fill="none" stroke="#f43f5e" strokeWidth="4" strokeDasharray={`${poorPct}, 100`} strokeDashoffset={`-${excPct + fairPct}`} />
             </svg>
             {/* Labels overlay */}
             <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[9px] font-semibold">
-              <span className="text-emerald-400 font-mono">🟢 Exc</span>
-              <span className="text-amber-400 font-mono">🟡 Fair</span>
-              <span className="text-rose-400 font-mono">🔴 Poor</span>
+              <span className="text-emerald-400 font-mono">🟢 {excPct}% Exc</span>
+              <span className="text-amber-400 font-mono">🟡 {fairPct}% Fair</span>
+              <span className="text-rose-400 font-mono">🔴 {poorPct}% Poor</span>
             </div>
           </div>
         </div>
@@ -584,37 +625,24 @@ export default function Dashboard({ setView }: DashboardProps) {
         <div className="glass-card p-4 rounded-2xl flex flex-col justify-between h-[230px]">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Top Categories</h3>
-            <span className="text-[10px] text-slate-400 font-mono">Indore HO Hub</span>
+            <span className="text-[10px] text-slate-400 font-mono">{currentCity} Hub</span>
           </div>
           <div className="flex-1 w-full bg-slate-950/40 rounded-xl relative p-3 flex flex-col justify-center space-y-3">
-            {/* Category rows */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-300">
-                <span>1. Beds & Mattress</span>
-                <span className="font-mono">42 Rents</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-red-500 w-[85%] rounded-full"></div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-300">
-                <span>2. Sofa Sets</span>
-                <span className="font-mono">29 Rents</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-red-500 w-[62%] rounded-full"></div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-300">
-                <span>3. Refrigerator</span>
-                <span className="font-mono">18 Rents</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-500 w-[40%] rounded-full"></div>
-              </div>
-            </div>
+            {topCategories.map(([catName, count], idx) => {
+              const barWidthPct = Math.round(((count as number) / maxCatCount) * 100) || 5;
+              const barColors = ['bg-red-500', 'bg-purple-500', 'bg-cyan-500'];
+              return (
+                <div key={catName} className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-slate-300">
+                    <span className="truncate max-w-[140px]">{idx + 1}. {catName}</span>
+                    <span className="font-mono">{count} Rents</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                    <div className={`h-full ${barColors[idx % barColors.length]} rounded-full transition-all duration-500`} style={{ width: `${barWidthPct}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -627,20 +655,36 @@ export default function Dashboard({ setView }: DashboardProps) {
           <div className="flex-1 w-full bg-slate-950/40 rounded-xl relative p-2 flex items-center justify-center">
             {/* Multi-Segment Dial */}
             <svg viewBox="0 0 32 32" className="w-[100px] h-[100px] transform rotate-45">
-              {/* Segment 1: Indore (Head Office) (55%) */}
-              <circle cx="16" cy="16" r="12" fill="none" stroke="#6366f1" strokeWidth="5" strokeDasharray="55, 100" />
-              {/* Segment 2: Bhopal (20%) */}
-              <circle cx="16" cy="16" r="12" fill="none" stroke="#10b981" strokeWidth="5" strokeDasharray="20, 100" strokeDashoffset="-55" />
-              {/* Segment 3: Surat (15%) */}
-              <circle cx="16" cy="16" r="12" fill="none" stroke="#f59e0b" strokeWidth="5" strokeDasharray="15, 100" strokeDashoffset="-75" />
-              {/* Segment 4: Ahmedabad (10%) */}
-              <circle cx="16" cy="16" r="12" fill="none" stroke="#a855f7" strokeWidth="5" strokeDasharray="10, 100" strokeDashoffset="-90" />
+              {cityShares.map((cs, i) => {
+                const colors = ['#6366f1', '#10b981', '#f59e0b', '#a855f7'];
+                let offset = 0;
+                for (let k = 0; k < i; k++) {
+                  offset += cityShares[k].pct;
+                }
+                return (
+                  <circle
+                    key={cs.city}
+                    cx="16"
+                    cy="16"
+                    r="12"
+                    fill="none"
+                    stroke={colors[i % colors.length]}
+                    strokeWidth="5"
+                    strokeDasharray={`${cs.pct}, 100`}
+                    strokeDashoffset={`-${offset}`}
+                  />
+                );
+              })}
             </svg>
             <div className="absolute bottom-1.5 left-1 right-1 flex justify-between text-[8px] font-semibold">
-              <span className="text-red-400 font-mono">IND HO 55%</span>
-              <span className="text-emerald-400 font-mono">BHO 20%</span>
-              <span className="text-amber-400 font-mono">SUR 15%</span>
-              <span className="text-purple-400 font-mono">AHM 10%</span>
+              {cityShares.slice(0, 4).map((cs, i) => {
+                const textColors = ['text-indigo-400', 'text-emerald-400', 'text-amber-400', 'text-purple-400'];
+                return (
+                  <span key={cs.city} className={`${textColors[i % textColors.length]} font-mono`}>
+                    {cs.city} {cs.pct}%
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -649,7 +693,7 @@ export default function Dashboard({ setView }: DashboardProps) {
         <div className="glass-card p-4 rounded-2xl flex flex-col justify-between h-[230px]">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Customer Growth</h3>
-            <span className="text-[10px] text-slate-400 font-mono">+12% MoM</span>
+            <span className="text-[10px] text-slate-400 font-mono">{activeCustomers} Active</span>
           </div>
           <div className="flex-1 w-full bg-slate-950/40 rounded-xl relative p-2 flex items-end">
             <svg viewBox="0 0 100 50" className="w-full h-[120px] overflow-visible">
@@ -664,7 +708,7 @@ export default function Dashboard({ setView }: DashboardProps) {
               <circle cx="100" cy="10" r="3" fill="#10b981" stroke="white" strokeWidth="1" />
             </svg>
             <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[9px] text-slate-500 font-mono">
-              <span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+              <span>Q1</span><span>Q2</span><span>Q3</span><span>Q4</span>
             </div>
           </div>
         </div>
@@ -673,17 +717,17 @@ export default function Dashboard({ setView }: DashboardProps) {
         <div className="glass-card p-4 rounded-2xl flex flex-col justify-between h-[230px]">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Collection Rate</h3>
-            <span className="text-[10px] text-emerald-400 font-semibold font-mono">94.2%</span>
+            <span className="text-[10px] text-emerald-400 font-semibold font-mono">{collectionRate}%</span>
           </div>
           <div className="flex-1 w-full bg-slate-950/40 rounded-xl relative p-2 flex items-center justify-center">
             {/* Semi-circular dial */}
             <svg viewBox="0 0 32 32" className="w-[110px] h-[110px] transform -rotate-180">
               <circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="4" strokeDasharray="37.7, 75.4" strokeLinecap="round" />
-              <circle cx="16" cy="16" r="12" fill="none" stroke="#10b981" strokeWidth="4.2" strokeDasharray={`${0.942 * 37.7}, 75.4`} strokeLinecap="round" />
+              <circle cx="16" cy="16" r="12" fill="none" stroke="#10b981" strokeWidth="4.2" strokeDasharray={`${(collectionRate / 100) * 37.7}, 75.4`} strokeLinecap="round" />
             </svg>
             <div className="absolute text-center mt-6">
-              <span className="text-xl font-bold text-white font-mono block">94.2%</span>
-              <span className="text-[8px] text-slate-500 uppercase tracking-wider font-semibold block">Collected (30d)</span>
+              <span className="text-xl font-bold text-white font-mono block">{collectionRate}%</span>
+              <span className="text-[8px] text-slate-500 uppercase tracking-wider font-semibold block">Collected (Invoices)</span>
             </div>
           </div>
         </div>

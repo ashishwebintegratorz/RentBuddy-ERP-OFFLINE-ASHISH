@@ -1272,25 +1272,38 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         },
 
         updateDriverStatus: (id, status, notes) => {
+          const target = get().drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+          if (target) {
+            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/status`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                status,
+                verificationStatus: target.verificationStatus,
+                verificationNotes: notes
+              })
+            }).catch(() => {});
+          }
+
           set((state) => {
-            const target = state.drivers.find((d) => d.id === id);
-            if (!target) return {};
+            const foundTarget = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+            if (!foundTarget) return {};
 
             const audit: AuditLog = {
               id: genId('RB-AUD'),
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
               userName: `Fleet Admin (${state.currentUserRole})`,
-              city: target.city,
+              city: foundTarget.city,
               action: 'Driver Status Updated',
               category: 'COMPLIANCE',
               severity: status === 'Blocked' ? 'WARNING' : 'INFO',
-              details: `Driver ${target.fullName} (${id}) status changed to "${status}". Notes: ${notes || 'N/A'}`,
+              details: `Driver ${foundTarget.fullName} (${id}) status changed to "${status}". Notes: ${notes || 'N/A'}`,
             };
 
             return {
               drivers: state.drivers.map((d) =>
-                d.id === id
+                d.id === id || (d as any)._id === id || d.phone === id
                   ? {
                       ...d,
                       status,
@@ -1306,109 +1319,131 @@ export const useRentBuddyStore = create<RentBuddyState>()(
 
         verifyDriverDocument: (id, docKey, verified) => {
           set((state) => {
-            return {
-              drivers: state.drivers.map((d) => {
-                if (d.id !== id) return d;
-                const docs = { ...d.documents, [docKey]: verified };
-                const allVerified = docs.licenseVerified && docs.aadhaarVerified && docs.panVerified && docs.rcVerified && docs.insuranceVerified;
-                return {
-                  ...d,
-                  documents: docs,
-                  verificationStatus: allVerified ? 'Verified' : 'Pending',
-                  status: allVerified ? 'Active' : d.status,
-                };
-              }),
-            };
+            const updatedDrivers = state.drivers.map((d) => {
+              if (d.id !== id && (d as any)._id !== id && d.phone !== id) return d;
+              const docs = { ...d.documents, [docKey]: verified };
+              const allVerified = docs.licenseVerified && docs.aadhaarVerified && docs.panVerified && docs.rcVerified && docs.insuranceVerified;
+              const newDriver: LogisticsDriver = {
+                ...d,
+                documents: docs,
+                verificationStatus: (allVerified ? 'Verified' : 'Pending') as VerificationStatus,
+                status: allVerified ? 'Active' : d.status,
+              };
+              fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/documents`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ documents: docs })
+              }).catch(() => {});
+              return newDriver;
+            });
+            return { drivers: updatedDrivers };
           });
         },
 
         verifyAllDriverDocuments: (id, status, notes) => {
           set((state) => {
-            const target = state.drivers.find((d) => d.id === id);
+            const target = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
             if (!target) return {};
 
-            const isVerified = status === 'Verified';
+            const isApproved = status === 'Verified';
+            const docs = {
+              ...target.documents,
+              licenseVerified: isApproved,
+              aadhaarVerified: isApproved,
+              panVerified: isApproved,
+              rcVerified: isApproved,
+              insuranceVerified: isApproved,
+              policeVerified: isApproved,
+            };
+
+            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/status`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                status: isApproved ? 'Active' : 'Pending Verification',
+                verificationStatus: status,
+                verificationNotes: notes
+              })
+            }).catch(() => {});
+
+            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/documents`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ documents: docs })
+            }).catch(() => {});
+
             const audit: AuditLog = {
               id: genId('RB-AUD'),
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
-              userName: `Fleet KYC Team (${state.currentUserRole})`,
+              userName: `Fleet Admin (${state.currentUserRole})`,
               city: target.city,
-              action: isVerified ? 'Driver KYC Approved' : 'Driver KYC Rejected',
+              action: 'Bulk Driver Verification',
               category: 'COMPLIANCE',
-              severity: isVerified ? 'INFO' : 'WARNING',
-              details: `KYC verification for driver ${target.fullName} (${id}) marked as "${status}". Notes: ${notes || 'N/A'}`,
-            };
-
-            const notif: SystemNotification = {
-              id: genId('NOT'),
-              title: isVerified ? 'Driver Verified' : 'Driver KYC Flagged',
-              message: `Driver ${target.fullName} (${id}) KYC documents marked as ${status}.`,
-              type: isVerified ? 'success' : 'error',
-              timestamp: new Date().toISOString(),
-              read: false,
-              city: target.city,
+              severity: isApproved ? 'INFO' : 'WARNING',
+              details: `Set verification status to "${status}" for driver ${target.fullName} (${id}). Notes: ${notes || 'N/A'}`,
             };
 
             return {
-              drivers: state.drivers.map((d) => {
-                if (d.id !== id) return d;
-                return {
-                  ...d,
-                  verificationStatus: status,
-                  status: isVerified ? 'Active' : status === 'Rejected' ? 'Suspended' : d.status,
-                  verificationNotes: notes || d.verificationNotes,
-                  documents: {
-                    ...d.documents,
-                    licenseVerified: isVerified,
-                    aadhaarVerified: isVerified,
-                    panVerified: isVerified,
-                    rcVerified: isVerified,
-                    insuranceVerified: isVerified,
-                    policeVerified: isVerified,
-                  },
-                };
-              }),
+              drivers: state.drivers.map((d) =>
+                d.id === id || (d as any)._id === id || d.phone === id
+                  ? {
+                      ...d,
+                      verificationStatus: status,
+                      status: isApproved ? 'Active' : 'Pending Verification',
+                      verificationNotes: notes !== undefined ? notes : d.verificationNotes,
+                      documents: docs,
+                    }
+                  : d
+              ),
               auditLogs: [audit, ...state.auditLogs],
-              notifications: [notif, ...state.notifications],
             };
           });
         },
 
         toggleBlockDriver: (id, isBlocked, reason) => {
+          const target = get().drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+          if (target) {
+            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/block`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isBlocked, blockedReason: reason })
+            }).catch(() => {});
+          }
+
           set((state) => {
-            const target = state.drivers.find((d) => d.id === id);
-            if (!target) return {};
+            const foundTarget = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+            if (!foundTarget) return {};
 
             const audit: AuditLog = {
               id: genId('RB-AUD'),
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
               userName: `Super Admin (${state.currentUserRole})`,
-              city: target.city,
+              city: foundTarget.city,
               action: isBlocked ? 'Driver Blocked' : 'Driver Unblocked',
               category: 'COMPLIANCE',
               severity: isBlocked ? 'CRITICAL' : 'INFO',
               details: isBlocked
-                ? `Driver ${target.fullName} (${id}) was BLOCKED from accepting deliveries. Reason: ${reason || 'Administrative restriction'}`
-                : `Driver ${target.fullName} (${id}) was UNBLOCKED and restored to active fleet status.`,
+                ? `Driver ${foundTarget.fullName} (${id}) was BLOCKED from accepting deliveries. Reason: ${reason || 'Administrative restriction'}`
+                : `Driver ${foundTarget.fullName} (${id}) was UNBLOCKED and restored to active fleet status.`,
             };
 
             const notif: SystemNotification = {
               id: genId('NOT'),
               title: isBlocked ? 'Driver Suspended / Blocked' : 'Driver Restored',
               message: isBlocked
-                ? `Driver ${target.fullName} (${id}) has been BLOCKED: ${reason || 'Policy breach'}`
-                : `Driver ${target.fullName} (${id}) unblocked successfully.`,
+                ? `Driver ${foundTarget.fullName} (${id}) has been BLOCKED: ${reason || 'Policy breach'}`
+                : `Driver ${foundTarget.fullName} (${id}) unblocked successfully.`,
               type: isBlocked ? 'error' : 'success',
               timestamp: new Date().toISOString(),
               read: false,
-              city: target.city,
+              city: foundTarget.city,
             };
 
             return {
               drivers: state.drivers.map((d) =>
-                d.id === id
+                d.id === id || (d as any)._id === id || d.phone === id
                   ? {
                       ...d,
                       isBlocked,
@@ -1424,8 +1459,14 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         },
 
         updateDriverDocuments: (id, updatedDocs) => {
+          fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/documents`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documents: updatedDocs })
+          }).catch(() => {});
+
           set((state) => {
-            const target = state.drivers.find((d) => d.id === id);
+            const target = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
             if (!target) return {};
 
             const audit: AuditLog = {

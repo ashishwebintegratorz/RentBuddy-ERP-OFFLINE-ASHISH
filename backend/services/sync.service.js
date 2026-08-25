@@ -152,11 +152,19 @@ class SyncService {
     if (drivers && Array.isArray(drivers) && drivers.length > 0) {
       for (const d of drivers) {
         if (d.phone || d.id) {
+          const cleanPhone = (d.phone || '').replace(/[^0-9]/g, '').slice(-10);
+          const filter = {
+            $or: [
+              ...(d.id ? [{ id: d.id }] : []),
+              ...(d.phone ? [{ phone: d.phone }] : []),
+              ...(cleanPhone ? [{ phone: cleanPhone }, { phone: `+91${cleanPhone}` }, { phone: `+91-${cleanPhone}` }] : [])
+            ]
+          };
           tasks.push(
             Driver.findOneAndUpdate(
-              d.phone ? { phone: d.phone } : { id: d.id },
-              d,
-              { upsert: true }
+              filter,
+              { $set: d },
+              { upsert: true, new: true }
             )
           );
         }

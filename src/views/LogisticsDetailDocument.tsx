@@ -270,7 +270,8 @@ export default function LogisticsDetailDocument() {
   const handleConfirmBlockToggle = () => {
     if (!driverToBlock) return;
     const newBlockedState = !driverToBlock.isBlocked;
-    toggleBlockDriver(driverToBlock.id, newBlockedState, blockReasonInput);
+    const targetId = driverToBlock.id || (driverToBlock as any)._id || driverToBlock.phone;
+    toggleBlockDriver(targetId, newBlockedState, blockReasonInput);
     setShowBlockModal(false);
     setDriverToBlock(null);
   };

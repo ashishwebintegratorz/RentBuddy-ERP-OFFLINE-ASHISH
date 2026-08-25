@@ -63,6 +63,12 @@ export const checkDriverPhone = async (req, res) => {
         ]
       });
       if (driver) {
+        if (driver.isBlocked || driver.status === 'Blocked' || driver.status === 'Suspended') {
+          return errorResponse(res, 'Your account has been suspended by the Administrator. Please contact RentBuddy Fleet Management / Admin to restore your access.', 403, {
+            isBlocked: true,
+            blockedReason: driver.blockedReason || 'Administrative restriction'
+          });
+        }
         isRegistered = true;
         hasPin = !!(driver.pin || driver.hasPin);
         name = driver.fullName || 'Rider';
@@ -90,18 +96,32 @@ export const sendDriverOtp = async (req, res) => {
       return errorResponse(res, 'A valid 10-digit mobile number is required', 400);
     }
 
-    const { otp, expiresAt } = otpService.generateOtp(cleanPhone);
-
     let exists = false;
     let hasPin = false;
 
     if (getDbStatus()) {
-      const driver = await Driver.findOne({ phone: cleanPhone });
+      const driver = await Driver.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `+91-${cleanPhone}` },
+          { phone: { $regex: cleanPhone } },
+          { alternatePhone: { $regex: cleanPhone } }
+        ]
+      });
       if (driver) {
+        if (driver.isBlocked || driver.status === 'Blocked' || driver.status === 'Suspended') {
+          return errorResponse(res, 'Your account has been suspended by the Administrator. Please contact RentBuddy Fleet Management / Admin to restore your access.', 403, {
+            isBlocked: true,
+            blockedReason: driver.blockedReason || 'Administrative restriction'
+          });
+        }
         exists = true;
         hasPin = !!(driver.pin || driver.hasPin);
       }
     }
+
+    const { otp, expiresAt } = otpService.generateOtp(cleanPhone);
 
     return successResponse(res, 'OTP sent successfully', {
       phone: cleanPhone,
@@ -131,7 +151,21 @@ export const verifyDriverOtp = async (req, res) => {
 
     let driver = null;
     if (getDbStatus()) {
-      driver = await Driver.findOne({ phone: cleanPhone });
+      driver = await Driver.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: `+91${cleanPhone}` },
+          { phone: `+91-${cleanPhone}` },
+          { phone: { $regex: cleanPhone } },
+          { alternatePhone: { $regex: cleanPhone } }
+        ]
+      });
+      if (driver && (driver.isBlocked || driver.status === 'Blocked' || driver.status === 'Suspended')) {
+        return errorResponse(res, 'Your account has been suspended by the Administrator. Please contact RentBuddy Fleet Management / Admin to restore your access.', 403, {
+          isBlocked: true,
+          blockedReason: driver.blockedReason || 'Administrative restriction'
+        });
+      }
       if (!driver) {
         // Create new driver record for first-time onboarding
         driver = await Driver.create({
@@ -198,6 +232,13 @@ export const loginDriverWithPin = async (req, res) => {
           { phone: { $regex: cleanPhone } },
           { alternatePhone: { $regex: cleanPhone } }
         ]
+      });
+    }
+
+    if (driver && (driver.isBlocked || driver.status === 'Blocked' || driver.status === 'Suspended')) {
+      return errorResponse(res, 'Your account has been suspended by the Administrator. Please contact RentBuddy Fleet Management / Admin to restore your access.', 403, {
+        isBlocked: true,
+        blockedReason: driver.blockedReason || 'Administrative restriction'
       });
     }
 

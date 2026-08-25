@@ -274,7 +274,17 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         },
 
         setRole: (role) => set({ currentUserRole: role }),
-        setCity: (city) => set({ currentCity: city }),
+        setCity: (city) => {
+          try {
+            localStorage.setItem('rentbuddy_active_city', city);
+          } catch (_) {}
+          set({ currentCity: city });
+          fetch(`${BACKEND_URL}/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentCity: city })
+          }).catch(() => {});
+        },
         addCity: (city) => {
           set((state) => {
             if (state.cities.includes(city)) return {};
@@ -414,6 +424,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+
+          // Immediately sync with MongoDB
+          fetch(`${BACKEND_URL}/assets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newAsset)
+          }).catch(() => {});
         },
 
         updateAsset: (id, updates) => {
@@ -437,6 +454,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+
+          // Immediately persist updates to backend MongoDB
+          fetch(`${BACKEND_URL}/assets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+          }).catch(() => {});
         },
 
         updateAssetStatus: (id, status) => {
@@ -460,6 +484,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+
+          // Immediately persist status to backend MongoDB
+          fetch(`${BACKEND_URL}/assets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+          }).catch(() => {});
         },
 
         moveAssetWarehouse: (id, warehouse) => {
@@ -473,9 +504,9 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               userName: `User (${state.currentUserRole})`,
               city: state.currentCity,
               action: 'Asset relocation',
-              category: 'ASSET_MOVE',
+              category: 'INVENTORY',
               severity: 'INFO',
-              details: `Moved asset ${aDetail?.category} [${id}] to warehouse ${warehouse}.`,
+              details: `Relocated asset ${aDetail?.category} [${id}] to warehouse "${warehouse}".`,
             };
             return {
               inventory: list,
@@ -483,6 +514,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+
+          // Immediately persist warehouse to backend MongoDB
+          fetch(`${BACKEND_URL}/assets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ warehouse })
+          }).catch(() => {});
         },
 
         // Checkout / POS Checkout Actions
@@ -503,15 +541,17 @@ export const useRentBuddyStore = create<RentBuddyState>()(
 
           const totalDeposit = orderItemsDetails.reduce((sum, item) => sum + item.securityDeposit, 0);
           const totalMonthlyRent = orderItemsDetails.reduce((sum, item) => sum + item.monthlyRentalPrice, 0);
+          const totalTenureRent = totalMonthlyRent * checkoutData.durationMonths;
           
           let discountAmount = 0;
           if (checkoutData.discountType === 'percent') {
-            discountAmount = Math.round(totalMonthlyRent * (checkoutData.discountValue / 100));
+            discountAmount = Math.round(totalTenureRent * (checkoutData.discountValue / 100));
           } else {
             discountAmount = checkoutData.discountValue;
           }
 
-          const netMonthlyRent = Math.max(100, totalMonthlyRent - discountAmount);
+          const netTenureRent = Math.max(100, totalTenureRent - discountAmount);
+          const netMonthlyRent = Math.round(netTenureRent / checkoutData.durationMonths);
 
           let depositDiscountAmount = 0;
           const depType = checkoutData.depositDiscountType || 'flat';
@@ -529,6 +569,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             customerId: cust.id,
             customerName: cust.fullName,
             customerMobile: cust.mobileNumber,
+            city: cust.city || get().currentCity,
+            deliveryAddress: cust.deliveryAddress || cust.currentAddress,
             items: orderItemsDetails,
             durationMonths: checkoutData.durationMonths,
             startDate: new Date().toISOString().split('T')[0],
@@ -553,25 +595,25 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             createdAt: new Date().toISOString(),
           };
 
-          // Generate first invoice (Deposit + first month rent)
+          // Generate first invoice (Deposit + Total contract tenure rent)
           const invoiceId = genId('RB-INV');
           const firstInvoice: Invoice = {
             id: invoiceId,
             orderId: orderId,
             customerId: cust.id,
             customerName: cust.fullName,
-            billingPeriod: 'Initial Rent & Deposit Hold',
+            billingPeriod: `${checkoutData.durationMonths} Months Tenure Rent & Deposit Hold`,
             dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             depositAmount: totalDeposit,
             depositDiscount: depositDiscountAmount,
             netDeposit: netDeposit,
-            rentalCharges: netMonthlyRent,
+            rentalCharges: netTenureRent,
             lateFee: 0,
             discount: discountAmount,
             discountType: checkoutData.discountType,
             discountValue: checkoutData.discountValue,
             couponCode: checkoutData.couponCode,
-            totalAmount: netDeposit + netMonthlyRent,
+            totalAmount: netDeposit + netTenureRent,
             status: 'Pending',
             createdAt: new Date().toISOString(),
           };
@@ -579,8 +621,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           set((state) => {
             // Update items status in inventory to Reserved
             const updatedInventory = state.inventory.map((asset) => {
-              if (checkoutData.items.some((item) => item.assetId === asset.id)) {
-                return { ...asset, status: 'Reserved' as AssetStatus };
+              if (checkoutData.items.some((item) => item.assetId === asset.id || item.assetId === (asset as any)._id || item.assetId === asset.barcode)) {
+                return { 
+                  ...asset, 
+                  status: 'Reserved' as AssetStatus,
+                  currentOrderId: orderId,
+                  currentCustomer: cust.fullName 
+                };
               }
               return asset;
             });
@@ -590,7 +637,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
               userName: `User (${state.currentUserRole})`,
-              city: state.currentCity,
+              city: cust.city || state.currentCity,
               action: 'Order checkout (POS)',
               category: 'ORDER_STATUS',
               severity: 'INFO',
@@ -604,6 +651,31 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               auditLogs: [log, ...state.auditLogs],
             };
           });
+
+          // 1. Immediately persist Order and Asset status to backend API
+          try {
+            fetch(`${BACKEND_URL}/orders`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newOrder)
+            }).catch(() => {});
+
+            // Update each asset on backend
+            for (const item of checkoutData.items) {
+              fetch(`${BACKEND_URL}/assets/${item.assetId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  status: 'Reserved',
+                  currentOrderId: orderId,
+                  currentCustomer: cust.fullName
+                })
+              }).catch(() => {});
+            }
+          } catch (_) {}
+
+          // 2. Trigger instant debounced database sync
+          syncToDatabase(get());
 
           get().runSystemAudit();
           return newOrder;
@@ -735,8 +807,19 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         },
 
         assignDriverToOrder: async (orderId: string, driverId: string) => {
+          const order = get().orders.find((o) => o.id === orderId);
           const driver = get().drivers.find((d) => d.id === driverId || (d as any)._id === driverId || d.phone === driverId);
-          if (!driver) return false;
+          if (!driver || !order) return false;
+
+          // City cross-check validation
+          const getBaseCity = (cityName?: string) => (cityName || '').split('(')[0].trim().toLowerCase();
+          const orderCity = getBaseCity(order.city || get().currentCity);
+          const driverCity = getBaseCity(driver.city);
+
+          if (orderCity && driverCity && orderCity !== driverCity && !orderCity.includes(driverCity) && !driverCity.includes(orderCity)) {
+            console.warn(`[RentBuddy Logistics] Driver assignment rejected: Driver ${driver.fullName} (${driver.city}) does not belong to Order city (${order.city || get().currentCity}).`);
+            return false;
+          }
 
           set((state) => {
             const updatedOrders = state.orders.map((o) => {
@@ -758,11 +841,11 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
               userName: `User (${state.currentUserRole})`,
-              city: state.currentCity,
+              city: order.city || driver.city || state.currentCity,
               action: 'Driver Assignment',
               category: 'ORDER_STATUS',
               severity: 'INFO',
-              details: `Assigned driver ${driver.fullName} (${driver.phone}) to order ${orderId}.`,
+              details: `Assigned driver ${driver.fullName} (${driver.phone}) from ${driver.city} hub to order ${orderId} (${order.city || state.currentCity}).`,
             };
 
             return {
@@ -1763,6 +1846,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 ? data.data
                 : data;
 
+              const activeCity = localStorage.getItem('rentbuddy_active_city') || get().currentCity || db.currentCity || 'Indore (Head Office)';
+
               // Overwrite local memory state with synced real MongoDB collections
               set({
                 inventory: db.assets || [],
@@ -1774,7 +1859,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 notifications: db.notifications || [],
                 drivers: db.drivers || [],
                 cities: db.cities && db.cities.length > 0 ? db.cities : get().cities,
-                currentCity: db.currentCity || get().currentCity,
+                currentCity: activeCity,
                 currentUserRole: db.currentUserRole || get().currentUserRole,
                 expectedVsActualAudit: db.expectedVsActualAudit || {
                   expectedCount: (db.assets || []).length,

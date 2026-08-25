@@ -72,6 +72,7 @@ const CustomerSchema = new mongoose.Schema({
   landlordId: String,
   status: String,
   verificationStatus: String,
+  city: { type: String, default: 'Indore (Head Office)' },
   documents: Object
 }, { strict: false, timestamps: true });
 

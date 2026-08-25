@@ -16,6 +16,8 @@ import {
   CheckCircle
 } from 'lucide-react';
 
+import { matchCityContext } from '../utils/cityUtils';
+
 interface DashboardProps {
   setView: (view: string) => void;
 }
@@ -54,14 +56,18 @@ export default function Dashboard({ setView }: DashboardProps) {
   };
 
   // Filter collections by current active city for local metrics
-  const cityAssets = (inventory || []).filter(a => a && (!a.city || a.city === currentCity));
+  const cityAssets = (inventory || []).filter(a => a && matchCityContext(a.city, currentCity));
+  const cityCustomers = (customers || []).filter(c => c && matchCityContext(c.city || c.deliveryAddress || c.currentAddress, currentCity));
   const activeAgreements = (orders || []).filter(o => o && o.status === 'Delivered');
-  const cityActiveAgreements = (orders || []).filter(o => o && o.status === 'Delivered' && (inventory.find(a => a.id === o.items?.[0]?.assetId)?.city === currentCity));
+  const cityActiveAgreements = (orders || []).filter(o => o && o.status === 'Delivered' && (
+    matchCityContext(inventory.find(a => a.id === o.items?.[0]?.assetId)?.city, currentCity) ||
+    matchCityContext(customers.find(c => c.id === o.customerId)?.city, currentCity)
+  ));
 
   // Compute metrics
-  const totalCustomers = (customers || []).length;
-  const activeCustomers = (customers || []).filter(c => c && (c.status === 'Good Customer' || c.status === 'VIP' || c.status === 'Verified' || c.verificationStatus === 'Verified')).length;
-  const newCustomersThisMonth = (customers || []).filter(c => {
+  const totalCustomers = cityCustomers.length;
+  const activeCustomers = cityCustomers.filter(c => c && (c.status === 'Good Customer' || c.status === 'VIP' || c.status === 'Verified' || c.verificationStatus === 'Verified')).length;
+  const newCustomersThisMonth = cityCustomers.filter(c => {
     if (!c || !c.createdAt) return false;
     const time = new Date(c.createdAt).getTime();
     if (isNaN(time)) return false;
@@ -126,10 +132,10 @@ export default function Dashboard({ setView }: DashboardProps) {
   const totalRev = Object.values(cityRevenueMap).reduce((a, b) => a + b, 0) || 1;
   const cityShares = Object.entries(cityRevenueMap).length > 0
     ? Object.entries(cityRevenueMap).map(([city, rev]) => ({
-        city: city.replace(' (Head Office)', ' HO'),
-        rev,
-        pct: Math.round((rev / totalRev) * 100)
-      }))
+      city: city.replace(' (Head Office)', ' HO'),
+      rev,
+      pct: Math.round((rev / totalRev) * 100)
+    }))
     : [{ city: 'Indore HO', rev: 0, pct: 100 }];
 
   // Dynamic Collection Rate Calculation
@@ -139,7 +145,7 @@ export default function Dashboard({ setView }: DashboardProps) {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
-      
+
       {/* City Banner & Manual Audit Trigger */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-4 rounded-2xl">
         <div>
@@ -162,11 +168,10 @@ export default function Dashboard({ setView }: DashboardProps) {
           <button
             onClick={handleRunAudit}
             disabled={auditing}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
-              auditSuccess
+            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-md ${auditSuccess
                 ? 'bg-emerald-500/25 border border-emerald-500/40 text-emerald-300'
                 : 'bg-[#00ab55] hover:bg-[#008f44] text-white shadow-emerald-500/10'
-            }`}
+              }`}
           >
             {auditing ? (
               <>
@@ -190,7 +195,7 @@ export default function Dashboard({ setView }: DashboardProps) {
         {/* Left Welcome Banner */}
         <div className="lg:col-span-2 bg-gradient-to-r from-[#005249] to-[#007b55] rounded-3xl p-8 relative overflow-hidden flex flex-col justify-between min-h-[220px] text-white shadow-xl shadow-emerald-950/10 border border-emerald-500/10">
           <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#00a76f]/20 rounded-full blur-3xl pointer-events-none"></div>
-          
+
           <div className="max-w-md space-y-3 z-10">
             <h2 className="text-2xl font-extrabold tracking-tight">
               Welcome back 👋
@@ -202,9 +207,9 @@ export default function Dashboard({ setView }: DashboardProps) {
               You are managing the live logistics context and telemetry audits for <strong className="text-white">{currentCity} Hub</strong>. All barcodes scanned are indexed locally for integrity checks.
             </p>
           </div>
-          
+
           <div className="mt-4 flex items-center gap-3 z-10">
-            <button 
+            <button
               onClick={handleRunAudit}
               className="bg-[#00ab55] hover:bg-[#008f44] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-emerald-900/30 cursor-pointer"
             >
@@ -495,7 +500,7 @@ export default function Dashboard({ setView }: DashboardProps) {
 
       {/* SVG Analytics Charts (8 interactive widgets layout) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
+
         {/* Chart 1: Revenue Trend (Line SVG) */}
         <div className="glass-card p-4 rounded-2xl flex flex-col justify-between h-[230px]">
           <div className="flex items-center justify-between mb-2">
@@ -736,24 +741,22 @@ export default function Dashboard({ setView }: DashboardProps) {
 
       {/* Tabs and Bottom Dashboard Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left Column: System Audit Log & Fraud Monitor */}
         <div className="lg:col-span-2 glass-panel p-5 rounded-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
             <div className="flex gap-4">
               <button
                 onClick={() => setSelectedAuditTab('kpis')}
-                className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer ${
-                  selectedAuditTab === 'kpis' ? 'text-red-400 border-red-500' : 'text-slate-500 border-transparent hover:text-slate-300'
-                }`}
+                className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer ${selectedAuditTab === 'kpis' ? 'text-red-400 border-red-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+                  }`}
               >
                 expected vs Actual Audit
               </button>
               <button
                 onClick={() => setSelectedAuditTab('fraud')}
-                className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
-                  selectedAuditTab === 'fraud' ? 'text-rose-400 border-rose-500' : 'text-slate-500 border-transparent hover:text-slate-300'
-                }`}
+                className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${selectedAuditTab === 'fraud' ? 'text-rose-400 border-rose-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+                  }`}
               >
                 active Anomaly Warnings
                 {expectedVsActualAudit.fraudAlertCount > 0 && (
@@ -762,9 +765,8 @@ export default function Dashboard({ setView }: DashboardProps) {
               </button>
               <button
                 onClick={() => setSelectedAuditTab('simulation')}
-                className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer ${
-                  selectedAuditTab === 'simulation' ? 'text-purple-400 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'
-                }`}
+                className={`text-xs font-bold uppercase tracking-wider pb-1 transition-all border-b-2 cursor-pointer ${selectedAuditTab === 'simulation' ? 'text-purple-400 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'
+                  }`}
               >
                 Inconsistency Simulator
               </button>
@@ -787,7 +789,7 @@ export default function Dashboard({ setView }: DashboardProps) {
                   <div className="text-[10px] text-slate-400 mt-1 uppercase font-semibold">Missing/Lost Assets</div>
                 </div>
               </div>
-              
+
               <div className="bg-slate-950/40 rounded-xl p-4 border border-slate-900 space-y-2.5 text-xs">
                 <h4 className="font-semibold text-slate-300 flex items-center gap-1.5">
                   🛡️ Continuous Database Audit Policy

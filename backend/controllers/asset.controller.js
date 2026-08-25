@@ -307,3 +307,68 @@ export const checkinAssets = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Get all assets
+export const getAllAssets = async (req, res) => {
+  try {
+    const assets = await Asset.find({});
+    return res.json({ success: true, count: assets.length, data: assets });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Create new asset
+export const createAsset = async (req, res) => {
+  try {
+    const assetData = req.body;
+    if (!assetData.id) {
+      assetData.id = `RB-AST-${Date.now()}`;
+    }
+    const created = await Asset.findOneAndUpdate(
+      { id: assetData.id },
+      { $set: assetData },
+      { upsert: true, new: true }
+    );
+    return res.status(201).json({ success: true, message: 'Asset created successfully', data: created });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Update asset by ID or Barcode
+export const updateAssetById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const updated = await Asset.findOneAndUpdate(
+      { $or: [{ id }, { barcode: id }, ...(id.match(/^[0-9a-fA-F]{24}$/) ? [{ _id: id }] : [])] },
+      { $set: updates },
+      { new: true, upsert: true }
+    );
+
+    console.log(`🍃 [Asset Controller] Updated asset [${id}] in MongoDB Atlas:`, updates);
+
+    return res.json({
+      success: true,
+      message: `Asset ${id} updated successfully.`,
+      data: updated
+    });
+  } catch (error) {
+    console.error('Update asset error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Delete asset by ID
+export const deleteAssetById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Asset.findOneAndDelete({ $or: [{ id }, { barcode: id }] });
+    return res.json({ success: true, message: `Asset ${id} deleted successfully.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+

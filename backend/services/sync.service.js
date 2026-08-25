@@ -57,6 +57,22 @@ class SyncService {
       assets = await Asset.find({});
       customers = await Customer.find({});
       citiesConfig = { value: initialCities };
+    } else if (customers && customers.length > 0) {
+      // Ensure all customer records have their appropriate city populated
+      for (const cust of customers) {
+        if (!cust.city || cust.city === 'Indore Hub Area') {
+          let assignedCity = 'Indore (Head Office)';
+          if (cust.id === 'RB-CUST-1002' || (cust.fullName && cust.fullName.includes('Priya')) || (cust.deliveryAddress && cust.deliveryAddress.includes('Surat'))) {
+            assignedCity = 'Surat';
+          } else if (cust.id === 'RB-CUST-1003' || (cust.fullName && cust.fullName.includes('Amitabh')) || (cust.deliveryAddress && (cust.deliveryAddress.includes('Bhopal') || cust.deliveryAddress.includes('Arera')))) {
+            assignedCity = 'Bhopal';
+          } else if (cust.id === 'RB-CUST-1004' || (cust.fullName && cust.fullName.includes('Ananya')) || (cust.deliveryAddress && (cust.deliveryAddress.includes('Ahmedabad') || cust.deliveryAddress.includes('Prahlad')))) {
+            assignedCity = 'Ahmedabad';
+          }
+          cust.city = assignedCity;
+          await Customer.updateOne({ _id: cust._id }, { $set: { city: assignedCity } });
+        }
+      }
     }
 
     return {

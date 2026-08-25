@@ -26,58 +26,106 @@ export const getOrderById = async (req, res) => {
   }
 };
 
-// Create Order with KYC Gate
+// Create Order (POS / Online Checkout) & Synchronize Asset Reservations
 export const createOrder = async (req, res) => {
   try {
-    const { customerId, items, deliveryAddress, city, zone, durationMonths, startDate, endDate, totalDeposit, totalMonthlyRent } = req.body;
+    const { 
+      id,
+      customerId, 
+      customerName,
+      customerMobile,
+      items, 
+      deliveryAddress, 
+      city, 
+      zone, 
+      durationMonths, 
+      startDate, 
+      endDate, 
+      totalDeposit, 
+      netDeposit,
+      totalMonthlyRent,
+      netMonthlyRent,
+      discountAmount,
+      discountType,
+      discountValue,
+      status
+    } = req.body;
 
-    // 1. Check Customer KYC Status (KYC Gate)
-    const customer = await Customer.findOne({ id: customerId }) || await Customer.findById(customerId);
-    if (customer && customer.verificationStatus !== 'Verified') {
-      return res.status(400).json({
-        success: false,
-        message: `KYC Pending: Customer ${customer.fullName || customerId} is not verified yet. Order cannot enter logistics queue until KYC is completed.`,
-        kycStatus: customer.verificationStatus
+    const customer = customerId ? (await Customer.findOne({ id: customerId }) || await Customer.findById(customerId)) : null;
+    const finalCustName = customer ? customer.fullName : (customerName || 'Customer');
+    const finalCustMobile = customer ? customer.mobileNumber : (customerMobile || '');
+    const finalCity = city || (customer ? customer.city : 'Indore');
+    const finalAddress = deliveryAddress || (customer ? customer.deliveryAddress || customer.currentAddress : '');
+
+    const orderId = id || `RB-ORD-${Date.now().toString().slice(-6)}`;
+    
+    // Check if order already exists (upsert logic)
+    let order = await Order.findOne({ id: orderId });
+    if (!order) {
+      order = new Order({
+        id: orderId,
+        customerId: customer ? customer.id : customerId,
+        customerName: finalCustName,
+        customerMobile: finalCustMobile,
+        deliveryAddress: finalAddress,
+        city: finalCity,
+        zone: zone || 'Zone A (North)',
+        items: items || [],
+        durationMonths: durationMonths || 3,
+        startDate: startDate || new Date().toISOString().split('T')[0],
+        endDate: endDate || new Date(Date.now() + (durationMonths || 3) * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        totalDeposit: totalDeposit || 0,
+        netDeposit: netDeposit !== undefined ? netDeposit : totalDeposit || 0,
+        totalMonthlyRent: totalMonthlyRent || 0,
+        netMonthlyRent: netMonthlyRent !== undefined ? netMonthlyRent : totalMonthlyRent || 0,
+        discountAmount: discountAmount || 0,
+        discountType: discountType || 'flat',
+        discountValue: discountValue || 0,
+        status: status || 'Pending',
+        deliveryStatus: 'READY_FOR_DISPATCH',
+        expectedAssets: (items || []).map(it => ({
+          assetId: it.assetId || it.id,
+          assetName: it.name || it.title || it.assetName || it.category || 'Asset',
+          barcode: it.barcode || it.assetBarcode || `BAR-${it.assetId || it.id || '001'}`,
+          scannedAtCheckout: false,
+          scannedAtDelivery: false
+        }))
       });
+      await order.save();
+    } else {
+      Object.assign(order, req.body);
+      await order.save();
     }
 
-    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-    const newOrder = new Order({
-      id: orderId,
-      customerId,
-      customerName: customer ? customer.fullName : (req.body.customerName || 'Customer'),
-      customerMobile: customer ? customer.mobileNumber : (req.body.customerMobile || ''),
-      deliveryAddress: deliveryAddress || (customer ? customer.deliveryAddress : ''),
-      city: city || (customer ? customer.city : 'Indore'),
-      zone: zone || 'Zone A (North)',
-      items: items || [],
-      durationMonths: durationMonths || 6,
-      startDate: startDate || new Date().toISOString().split('T')[0],
-      endDate: endDate || '',
-      totalDeposit: totalDeposit || 0,
-      totalMonthlyRent: totalMonthlyRent || 0,
-      status: 'CONFIRMED', // Eligible for logistics
-      deliveryStatus: 'READY_FOR_DISPATCH',
-      expectedAssets: (items || []).map(it => ({
-        assetId: it.assetId || it.id,
-        assetName: it.name || it.title || it.assetName,
-        barcode: it.barcode || it.assetBarcode || `BAR-${it.assetId || it.id || '001'}`,
-        scannedAtCheckout: false,
-        scannedAtDelivery: false
-      }))
-    });
-
-    await newOrder.save();
+    // Immediately reserve all allocated inventory assets in MongoDB Atlas
+    if (items && Array.isArray(items)) {
+      for (const it of items) {
+        const aId = it.assetId || it.id;
+        if (aId) {
+          await Asset.updateMany(
+            { $or: [{ id: aId }, { barcode: aId }, { _id: aId.length === 24 ? aId : undefined }].filter(Boolean) },
+            { 
+              $set: { 
+                status: 'Reserved',
+                currentOrderId: orderId,
+                currentCustomer: finalCustName
+              } 
+            }
+          );
+        }
+      }
+    }
 
     await Log.create({
       id: `LOG-${Date.now()}`,
       timestamp: new Date().toISOString(),
       userRole: 'Admin',
+      city: finalCity,
       action: 'ORDER_CREATED',
-      details: `Order ${orderId} created for customer ${newOrder.customerName}`
+      details: `Order ${orderId} created for ${finalCustName} in ${finalCity}. Assets reserved: ${(items || []).map(i => i.assetId || i.id).join(', ')}`
     });
 
-    return res.status(201).json({ success: true, message: 'Order created successfully', data: newOrder });
+    return res.status(201).json({ success: true, message: 'Order created and inventory reserved successfully', data: order });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -94,6 +142,19 @@ export const assignDriverToOrder = async (req, res) => {
 
     const driver = await Driver.findOne({ id: driverId }) || await Driver.findById(driverId) || await Driver.findOne({ phone: driverId });
     if (!driver) return res.status(404).json({ success: false, message: 'Driver not found' });
+
+    // City Match Cross-Check: Prevent cross-city driver dispatch
+    if (order.city && driver.city) {
+      const getBase = (str) => (str || '').toLowerCase().replace(/\(.*?\)/g, '').trim();
+      const orderCityBase = getBase(order.city);
+      const driverCityBase = getBase(driver.city);
+      if (orderCityBase && driverCityBase && !orderCityBase.includes(driverCityBase) && !driverCityBase.includes(orderCityBase)) {
+        return res.status(400).json({
+          success: false,
+          message: `City Mismatch: Driver "${driver.fullName}" is assigned to "${driver.city}" hub, but Order #${order.id} is for "${order.city}". Drivers can only accept deliveries within their registered city hub.`
+        });
+      }
+    }
 
     order.assignedDriverId = driver.id;
     order.assignedDriverName = driver.fullName;
@@ -335,44 +396,78 @@ export const updateOrderStatus = async (req, res) => {
 export const getDriverActiveOrders = async (req, res) => {
   try {
     const driverId = req.query.driverId || req.query.phone || (req.user && (req.user.id || req.user.phone));
-    let query = {};
+    const phone = req.query.phone || req.query.driverId;
 
-    if (driverId) {
-      const cleanPhone = driverId.replace(/[^0-9]/g, '');
-      query = {
-        $and: [
-          {
-            $or: [
-              { assignedDriverId: driverId },
-              { assignedDriverPhone: cleanPhone },
-              { assignedDriverPhone: driverId }
-            ]
-          },
-          { status: { $nin: ['DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] } },
-          { deliveryStatus: { $nin: ['delivered', 'completed', 'returned', 'cancelled'] } }
-        ]
-      };
-    } else {
-      query = {
-        status: { $in: ['ASSIGNED', 'OUT_FOR_DELIVERY', 'IN_TRANSIT', 'CONFIRMED'] },
-        deliveryStatus: { $nin: ['delivered', 'completed', 'returned', 'cancelled'] }
-      };
+    if (!driverId && !phone) {
+      return res.json({ success: true, data: { orders: [] }, count: 0 });
     }
+
+    const cleanPhone = (phone || driverId || '').replace(/[^0-9]/g, '').slice(-10);
+
+    // Look up driver in database to find all variations of ID/phone/name
+    const driver = await Driver.findOne({
+      $or: [
+        ...(driverId ? [{ id: driverId }, { _id: driverId.length === 24 ? driverId : undefined }].filter(Boolean) : []),
+        ...(cleanPhone ? [{ phone: cleanPhone }, { phone: `+91${cleanPhone}` }, { phone: `+91-${cleanPhone}` }] : [])
+      ]
+    });
+
+    const idFilters = [
+      ...(driverId ? [{ assignedDriverId: driverId }, { assignedDriverPhone: driverId }] : []),
+      ...(cleanPhone ? [
+        { assignedDriverPhone: cleanPhone },
+        { assignedDriverPhone: `+91${cleanPhone}` },
+        { assignedDriverPhone: `+91-${cleanPhone}` },
+        { assignedDriverId: cleanPhone },
+        { assignedDriverId: `+91${cleanPhone}` }
+      ] : [])
+    ];
+
+    if (driver) {
+      if (driver.id) idFilters.push({ assignedDriverId: driver.id });
+      if (driver._id) idFilters.push({ assignedDriverId: driver._id.toString() });
+      if (driver.phone) {
+        const dp = driver.phone.replace(/[^0-9]/g, '').slice(-10);
+        idFilters.push({ assignedDriverPhone: dp });
+      }
+      if (driver.fullName || driver.name) {
+        const dName = driver.fullName || driver.name;
+        idFilters.push({ assignedDriverName: dName });
+        idFilters.push({ assignedLogisticsUser: dName });
+      }
+    }
+
+    const query = {
+      $and: [
+        { $or: idFilters },
+        { 
+          status: { 
+            $nin: ['DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED', 'Delivered', 'Completed', 'Returned', 'Cancelled'] 
+          } 
+        },
+        { 
+          deliveryStatus: { 
+            $nin: ['delivered', 'completed', 'returned', 'cancelled', 'DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] 
+          } 
+        }
+      ]
+    };
 
     const orders = await Order.find(query).sort({ createdAt: -1 });
 
     // Format orders for Flutter Driver App
     const formattedOrders = orders.map(ord => ({
       _id: ord.id || ord._id.toString(),
+      id: ord.id || ord._id.toString(),
       orderNumber: ord.id,
       customer: {
         name: ord.customerName || 'Customer',
         phone: ord.customerMobile || '',
-        address: ord.deliveryAddress || ord.city || 'Indore Hub'
+        address: ord.deliveryAddress || ord.city || 'Delivery Address'
       },
       store: {
-        name: `RentBuddy ${ord.city || 'Indore'} Central Hub Depot`,
-        address: `Plot 45, Scheme 54 Logistics Park, ${ord.city || 'Indore'}`
+        name: `RentBuddy ${ord.city || 'Central'} Hub Depot`,
+        address: `Plot 45, Scheme 54 Logistics Park, ${ord.city || 'Central Area'}`
       },
       items: ord.items || [],
       orderBarcode: `RB-${(ord.customerName || 'CUST').trim().split(' ')[0].replace(/[^a-zA-Z]/g, '').toUpperCase() || 'CUST'}-${(ord.id || '647641').replace(/[^0-9]/g, '')}`,
@@ -398,8 +493,8 @@ export const getDriverActiveOrders = async (req, res) => {
           scannedAtCheckout: ord.scannedAtCheckout || ord.scannedAtLoading || false
         }
       ],
-      deliveryStatus: ord.deliveryStatus || (ord.scannedAtLoading ? 'out_for_delivery' : (ord.status === 'OUT_FOR_DELIVERY' ? 'out_for_delivery' : 'assigned')),
-      status: ord.status,
+      deliveryStatus: ord.deliveryStatus || 'driver_notified',
+      status: ord.status || 'ASSIGNED',
       scannedAtCheckout: ord.scannedAtCheckout || ord.scannedAtLoading || false,
       scannedAtDelivery: ord.scannedAtDelivery || false,
       deliveryProofPhoto: ord.deliveryProofPhoto || null,
@@ -420,68 +515,89 @@ export const getDriverActiveOrders = async (req, res) => {
   }
 };
 
-// Driver Order History
+// Driver Order History (Strictly Filtered by Driver Identity)
 export const getDriverOrderHistory = async (req, res) => {
   try {
     const driverId = req.query.driverId || req.query.phone || (req.user && (req.user.id || req.user.phone));
-    let query = {
+    const phone = req.query.phone || req.query.driverId;
+
+    if (!driverId && !phone) {
+      return res.json({ success: true, data: { orders: [] }, count: 0 });
+    }
+
+    const cleanPhone = (phone || driverId || '').replace(/[^0-9]/g, '').slice(-10);
+    const driver = await Driver.findOne({
       $or: [
-        { status: { $in: ['DELIVERED', 'COMPLETED', 'RETURNED'] } },
-        { deliveryStatus: { $in: ['delivered', 'completed', 'returned'] } }
+        ...(driverId ? [{ id: driverId }, { _id: driverId.length === 24 ? driverId : undefined }].filter(Boolean) : []),
+        ...(cleanPhone ? [{ phone: cleanPhone }, { phone: `+91${cleanPhone}` }, { phone: `+91-${cleanPhone}` }] : [])
+      ]
+    });
+
+    const idFilters = [
+      ...(driverId ? [{ assignedDriverId: driverId }, { assignedDriverPhone: driverId }] : []),
+      ...(cleanPhone ? [
+        { assignedDriverPhone: cleanPhone },
+        { assignedDriverPhone: `+91${cleanPhone}` },
+        { assignedDriverPhone: `+91-${cleanPhone}` },
+        { assignedDriverId: cleanPhone },
+        { assignedDriverId: `+91${cleanPhone}` }
+      ] : [])
+    ];
+
+    if (driver) {
+      if (driver.id) idFilters.push({ assignedDriverId: driver.id });
+      if (driver._id) idFilters.push({ assignedDriverId: driver._id.toString() });
+      if (driver.phone) {
+        const dp = driver.phone.replace(/[^0-9]/g, '').slice(-10);
+        idFilters.push({ assignedDriverPhone: dp });
+      }
+      if (driver.fullName || driver.name) {
+        const dName = driver.fullName || driver.name;
+        idFilters.push({ assignedDriverName: dName });
+        idFilters.push({ assignedLogisticsUser: dName });
+      }
+    }
+
+    const query = {
+      $and: [
+        { $or: idFilters },
+        {
+          $or: [
+            { status: { $in: ['DELIVERED', 'COMPLETED', 'RETURNED', 'Delivered', 'Completed', 'Returned'] } },
+            { deliveryStatus: { $in: ['delivered', 'completed', 'returned', 'DELIVERED', 'COMPLETED', 'RETURNED'] } }
+          ]
+        }
       ]
     };
-
-    if (driverId) {
-      const cleanPhone = driverId.replace(/[^0-9]/g, '');
-      query = {
-        $and: [
-          {
-            $or: [
-              { assignedDriverId: driverId },
-              { assignedDriverPhone: cleanPhone },
-              { assignedDriverPhone: driverId },
-              { assignedLogisticsUser: { $exists: true } }
-            ]
-          },
-          {
-            $or: [
-              { status: { $in: ['DELIVERED', 'COMPLETED', 'RETURNED'] } },
-              { deliveryStatus: { $in: ['delivered', 'completed', 'returned'] } }
-            ]
-          }
-        ]
-      };
-    }
 
     const orders = await Order.find(query).sort({ deliveredAt: -1, updatedAt: -1 }).limit(50);
     const formattedOrders = orders.map(ord => ({
       _id: ord.id || ord._id.toString(),
       id: ord.id,
       orderNumber: ord.id,
-      status: ord.status,
-      deliveryStatus: 'delivered',
       customer: {
         name: ord.customerName || 'Customer',
         phone: ord.customerMobile || '',
-        address: (ord.deliveryProof && ord.deliveryProof.propertyDetails && ord.deliveryProof.propertyDetails.fullAddress) || 'Customer Destination'
+        address: ord.deliveryAddress || ord.city || 'Delivery Address'
       },
-      customerName: ord.customerName || 'Customer',
-      customerMobile: ord.customerMobile || '',
-      payableAmount: ord.netDeposit || ord.totalDeposit || ord.totalMonthlyRent || 3000,
-      totalAmount: ord.netDeposit || ord.totalDeposit || ord.totalMonthlyRent || 3000,
       store: {
-        name: 'RentBuddy Indore Central Hub Depot',
-        address: 'Plot 45, Scheme 54 Logistics Park, Indore'
+        name: `RentBuddy ${ord.city || 'Central'} Hub Depot`,
+        address: `Plot 45, Scheme 54 Logistics Park, ${ord.city || 'Central Area'}`
       },
       deliveryAddress: {
-        addressLine: 'Indore Hub',
-        city: 'Indore'
+        addressLine: ord.deliveryAddress || `${ord.city || 'Central'} Hub`,
+        city: ord.city || 'Central Hub'
       },
       items: ord.items || [],
-      deliveredAt: ord.deliveredAt || ord.updatedAt
+      deliveryStatus: 'delivered',
+      status: 'DELIVERED',
+      deliveryProofPhoto: ord.deliveryProofPhoto || (ord.deliveryProof && ord.deliveryProof.photos && ord.deliveryProof.photos[0]) || null,
+      deliveredAt: ord.deliveredAt || ord.updatedAt || new Date().toISOString(),
+      payableAmount: ord.totalDeposit || ord.totalMonthlyRent || 3000,
+      totalAmount: ord.totalDeposit || ord.totalMonthlyRent || 3000,
     }));
 
-    return res.json({ success: true, data: { orders: formattedOrders } });
+    return res.json({ success: true, data: { orders: formattedOrders }, count: formattedOrders.length });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

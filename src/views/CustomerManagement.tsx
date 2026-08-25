@@ -19,6 +19,7 @@ import {
   History,
   ShieldAlert
 } from 'lucide-react';
+import { matchCityContext } from '../utils/cityUtils';
 
 export default function CustomerManagement() {
   const {
@@ -135,6 +136,9 @@ export default function CustomerManagement() {
 
     addCustomer({
       ...newCust,
+      city: currentCity === 'All Cities' || currentCity === 'All' ? 'Indore (Head Office)' : currentCity,
+      deliveryAddress: newCust.deliveryAddress || newCust.currentAddress || `${currentCity} Area`,
+      billingAddress: newCust.billingAddress || newCust.currentAddress || `${currentCity} Area`,
       documents: {
         aadhaarFront: aadhaarFront || SVG_DOCUMENT_PLACEHOLDER,
         aadhaarBack: aadhaarBack || SVG_DOCUMENT_PLACEHOLDER,
@@ -183,20 +187,21 @@ export default function CustomerManagement() {
   };
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
-  
+
   // History collections
   const customerOrders = orders.filter(o => o.customerId === selectedCustomerId);
   const customerInvoices = invoices.filter(i => i.customerId === selectedCustomerId);
   const customerComplaints = complaints.filter(c => c.customerId === selectedCustomerId);
 
-  // Filter list
+  // Filter list strictly by active city context (or all if All Cities)
   const filteredCustomers = customers.filter(c => {
-    const matchesSearch = c.fullName.toLowerCase().includes(search.toLowerCase()) ||
-                          c.mobileNumber.includes(search) ||
-                          c.id.toLowerCase().includes(search.toLowerCase()) ||
-                          c.panNumber.toLowerCase().includes(search.toLowerCase());
+    const matchesCity = matchCityContext(c.city || c.deliveryAddress || c.currentAddress, currentCity);
+    const matchesSearch = (c.fullName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.mobileNumber || '').includes(search) ||
+      (c.id || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.panNumber && c.panNumber.toLowerCase().includes(search.toLowerCase()));
     const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesCity && matchesSearch && matchesStatus;
   });
 
   const getStatusBadge = (status: CustomerStatus) => {
@@ -229,7 +234,7 @@ export default function CustomerManagement() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 flex gap-6 relative">
-      
+
       {/* Main Panel */}
       <div className="flex-1 space-y-4">
         {/* Filters Panel */}
@@ -285,9 +290,8 @@ export default function CustomerManagement() {
                 <tr
                   key={c.id}
                   onClick={() => setSelectedCustomerId(c.id)}
-                  className={`hover:bg-slate-800/15 cursor-pointer transition-colors ${
-                    selectedCustomerId === c.id ? 'bg-red-900/5' : ''
-                  }`}
+                  className={`hover:bg-slate-800/15 cursor-pointer transition-colors ${selectedCustomerId === c.id ? 'bg-red-900/5' : ''
+                    }`}
                 >
                   <td className="p-4">
                     <div className="flex items-center gap-3">
@@ -395,13 +399,13 @@ export default function CustomerManagement() {
           <div className="space-y-3 text-xs">
             <h5 className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Addresses</h5>
             <div className="space-y-2">
-              <div className="p-2 rounded bg-slate-900/30 border border-slate-800/40">
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
                 <span className="font-semibold block text-[10px] text-red-400">Current Address</span>
-                <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.currentAddress || 'Indore Hub Area'}</span>
+                <span className="text-slate-200 text-xs mt-0.5 block">{selectedCustomer.currentAddress || selectedCustomer.deliveryAddress || `${selectedCustomer.city || 'Regional'} Hub Area`}</span>
               </div>
-              <div className="p-2 rounded bg-slate-900/30 border border-slate-800/40">
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
                 <span className="font-semibold block text-[10px] text-emerald-400">Billing Address</span>
-                <span className="text-slate-300 text-[11px] mt-0.5 block">{selectedCustomer.billingAddress || selectedCustomer.currentAddress || 'Indore Hub Area'}</span>
+                <span className="text-slate-200 text-xs mt-0.5 block">{selectedCustomer.billingAddress || selectedCustomer.deliveryAddress || selectedCustomer.currentAddress || `${selectedCustomer.city || 'Regional'} Hub Area`}</span>
               </div>
             </div>
           </div>
@@ -728,9 +732,8 @@ export default function CustomerManagement() {
                         <button type="button" onClick={() => setRentAgreement('')} className="p-0.5 bg-rose-500 rounded text-white text-[8px] font-bold">Remove</button>
                       </div>
                     ) : (
-                      <label className={`h-16 w-full border border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                        rentImmediately ? 'border-rose-500/40 hover:border-rose-500 bg-rose-500/5' : 'border-slate-800 hover:border-red-500/50 bg-slate-950/60'
-                      }`}>
+                      <label className={`h-16 w-full border border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${rentImmediately ? 'border-rose-500/40 hover:border-rose-500 bg-rose-500/5' : 'border-slate-800 hover:border-red-500/50 bg-slate-950/60'
+                        }`}>
                         <span className="text-[9px] text-slate-500 font-bold">📄 Upload Rent Agreement</span>
                         <span className="text-[8px] text-slate-600 block">(PDF or Image)</span>
                         <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileChange(e, setRentAgreement)} />
@@ -830,7 +833,7 @@ export default function CustomerManagement() {
                         <option value={12}>12 Months</option>
                       </select>
                     </div>
-                                     {/* Discount Input & Toggle */}
+                    {/* Discount Input & Toggle */}
                     <div className="grid grid-cols-2 gap-2 text-[10px]">
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">

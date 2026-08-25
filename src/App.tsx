@@ -26,6 +26,7 @@ import { useRentBuddyStore } from './store/rentBuddyStore';
 function App() {
   const [currentView, setView] = useState('dashboard');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { runSystemAudit, theme, initializeStore, token } = useRentBuddyStore();
 
   // Run initial compliance audit and sync state from MongoDB Atlas
@@ -75,10 +76,8 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleGlobalNavigate = (viewId: string, itemId?: string) => {
+  const handleGlobalNavigate = (viewId: string, _itemId?: string) => {
     setView(viewId);
-    // You could save itemId in a state or store to highlight the row,
-    // but simply switching the view is a massive UX jump!
   };
 
   const renderActiveView = () => {
@@ -125,12 +124,21 @@ function App() {
   return (
     <div className="flex h-screen bg-[#0b0f19] text-slate-200 overflow-hidden font-sans select-none antialiased">
       {/* Sidebar layout */}
-      <Sidebar currentView={currentView} setView={setView} />
+      <Sidebar
+        currentView={currentView}
+        setView={setView}
+        isCollapsed={isSidebarCollapsed}
+      />
 
       {/* Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-950/20 relative">
         {/* Top Navbar */}
-        <Navbar currentView={currentView} onOpenSearch={() => setIsSearchOpen(true)} />
+        <Navbar
+          currentView={currentView}
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onToggleSidebar={() => setIsSidebarCollapsed(prev => !prev)}
+          isSidebarCollapsed={isSidebarCollapsed}
+        />
 
         {/* Dynamic View port wrapper */}
         <main className="flex-1 overflow-y-auto p-6 focus:outline-none scroll-smooth">

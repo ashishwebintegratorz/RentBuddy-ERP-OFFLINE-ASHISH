@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
 import { LogisticsDriver, OrderStatus, RentalOrder } from '../types';
 import BarcodeStickerModal from '../components/BarcodeStickerModal';
+import { getApiBaseUrl } from '../api/client';
 import {
   Truck,
   User,
@@ -56,29 +57,50 @@ export default function LogisticsLog() {
     let isMounted = true;
     const syncBackendOrders = async () => {
       try {
-        const res = await fetch('/api/v1/orders');
+        const BACKEND_BASE = getApiBaseUrl();
+        const res = await fetch(`${BACKEND_BASE}/orders`);
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && isMounted) {
           const currentStoreOrders = useRentBuddyStore.getState().orders;
-          const merged = currentStoreOrders.map(localOrd => {
-            const serverOrd = json.data.find((s: any) => s.id === localOrd.id || s._id === localOrd.id);
-            if (serverOrd) {
-              return {
-                ...localOrd,
-                status: serverOrd.status as OrderStatus,
-                deliveryStatus: serverOrd.deliveryStatus,
-                assignedDriverId: serverOrd.assignedDriverId || localOrd.assignedDriverId,
-                assignedDriverName: serverOrd.assignedDriverName || localOrd.assignedDriverName,
-                assignedDriverPhone: serverOrd.assignedDriverPhone || localOrd.assignedDriverPhone,
-                scannedAtLoading: serverOrd.scannedAtLoading ?? localOrd.scannedAtLoading,
-                scannedAtDelivery: serverOrd.scannedAtDelivery ?? localOrd.scannedAtDelivery,
-                deliveryProofPhoto: serverOrd.deliveryProofPhoto || serverOrd.deliveryProof?.photos?.[0] || localOrd.deliveryProofPhoto,
-                deliveredAt: serverOrd.deliveredAt || localOrd.deliveredAt
-              };
-            }
-            return localOrd;
+          const serverOrderIds = new Set(json.data.map((s: any) => s.id || s._id));
+
+          // 1. Keep local orders that are newly created
+          const localOnly = currentStoreOrders.filter(l => !serverOrderIds.has(l.id));
+
+          // 2. Map server orders, preserving local updates like isPrepared
+          const serverMerged = json.data.map((serverOrd: any) => {
+            const localOrd = currentStoreOrders.find(l => l.id === serverOrd.id || l.id === serverOrd._id);
+            const isOrderPrepared = serverOrd.isPrepared ?? localOrd?.isPrepared ?? (
+              serverOrd.status === 'READY_FOR_DISPATCH' || 
+              serverOrd.status === 'Ready for Dispatch' || 
+              Boolean(serverOrd.preparedAt)
+            );
+
+            return {
+              ...(localOrd || {}),
+              ...serverOrd,
+              id: serverOrd.id || serverOrd._id,
+              items: serverOrd.items || localOrd?.items || [],
+              customerName: serverOrd.customerName || localOrd?.customerName,
+              customerMobile: serverOrd.customerMobile || localOrd?.customerMobile,
+              deliveryAddress: serverOrd.deliveryAddress || localOrd?.deliveryAddress,
+              city: serverOrd.city || localOrd?.city || currentCity,
+              status: (serverOrd.status || localOrd?.status || 'Pending') as OrderStatus,
+              deliveryStatus: serverOrd.deliveryStatus || localOrd?.deliveryStatus,
+              isPrepared: isOrderPrepared,
+              preparedAt: serverOrd.preparedAt || localOrd?.preparedAt,
+              packedBy: serverOrd.packedBy || localOrd?.packedBy,
+              assignedDriverId: serverOrd.assignedDriverId || localOrd?.assignedDriverId,
+              assignedDriverName: serverOrd.assignedDriverName || localOrd?.assignedDriverName,
+              assignedDriverPhone: serverOrd.assignedDriverPhone || localOrd?.assignedDriverPhone,
+              scannedAtLoading: serverOrd.scannedAtLoading ?? localOrd?.scannedAtLoading ?? false,
+              scannedAtDelivery: serverOrd.scannedAtDelivery ?? localOrd?.scannedAtDelivery ?? false,
+              deliveryProofPhoto: serverOrd.deliveryProofPhoto || serverOrd.deliveryProof?.photos?.[0] || localOrd?.deliveryProofPhoto,
+              deliveredAt: serverOrd.deliveredAt || localOrd?.deliveredAt
+            };
           });
-          useRentBuddyStore.setState({ orders: merged });
+
+          useRentBuddyStore.setState({ orders: [...localOnly, ...serverMerged] });
         }
       } catch (_) {}
     };
@@ -180,23 +202,43 @@ export default function LogisticsLog() {
   const returnOrders = cityFilteredOrders.filter(isReturn);
   const cancelledOrders = cityFilteredOrders.filter(isCancelled);
 
-  // Filter drivers for selected city
+  // Filter drivers for selected city view banner
   const cityDrivers = drivers.filter(d => {
     if (selectedCity === 'All') return !d.isBlocked;
     return !d.isBlocked && (d.city || currentCity).toLowerCase().includes(selectedCity.toLowerCase());
   });
 
+  // Helper to extract base city name (e.g. "Indore" from "Indore (Head Office)")
+  const getBaseCity = (cityName?: string) => {
+    if (!cityName) return '';
+    return cityName.split('(')[0].trim().toLowerCase();
+  };
+
+  // Get eligible drivers strictly for the specific order being assigned
+  const getEligibleDriversForOrder = (order: RentalOrder | null) => {
+    if (!order) return [];
+    const targetCity = getBaseCity(order.city || currentCity);
+    return drivers.filter(d => {
+      if (d.isBlocked) return false;
+      const driverCity = getBaseCity(d.city || currentCity);
+      // Strict matching: driver must be in the same city as the order
+      return driverCity === targetCity || driverCity.includes(targetCity) || targetCity.includes(driverCity);
+    });
+  };
+
   // Handle Mark Order as Packed & Ready for Dispatch
   const handleMarkAsPrepared = async (order: RentalOrder) => {
     const storeState = useRentBuddyStore.getState() as any;
     
-    // Update locally in store
-    const updatedOrders = orders.map(o => {
-      if (o.id === order.id) {
+    // 1. Update locally in store immediately
+    const currentOrders = useRentBuddyStore.getState().orders;
+    const updatedOrders = currentOrders.map(o => {
+      if (o.id === order.id || o.id === (order as any)._id) {
         return {
           ...o,
           isPrepared: true,
           status: 'Ready for Dispatch' as OrderStatus,
+          deliveryStatus: 'ready_for_dispatch',
           preparedAt: new Date().toISOString(),
           packedBy: 'Warehouse Staging Team'
         };
@@ -206,14 +248,20 @@ export default function LogisticsLog() {
 
     useRentBuddyStore.setState({ orders: updatedOrders });
 
-    // Call backend API
+    // 2. Call backend API on port 5001
     try {
-      await fetch(`/api/v1/orders/${order.id}/prepare`, {
+      const BACKEND_BASE = getApiBaseUrl();
+      await fetch(`${BACKEND_BASE}/orders/${order.id}/prepare`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packedBy: 'Warehouse Staging Team' })
       });
-    } catch (_) {}
+    } catch (err) {
+      console.warn("Backend prepare order sync deferred:", err);
+    }
+
+    // Automatically transition to Stage 2: Rider Assignment & Dispatch
+    setActiveTab('dispatch');
 
     if (storeState.playNotificationSound) {
       storeState.playNotificationSound();
@@ -222,7 +270,8 @@ export default function LogisticsLog() {
 
   const handleOpenAssignModal = (order: RentalOrder) => {
     setOrderToAssign(order);
-    const availableDriver = cityDrivers.find(d => !d.isBlocked);
+    const eligibleDrivers = getEligibleDriversForOrder(order);
+    const availableDriver = eligibleDrivers.find(d => !d.isBlocked);
     setSelectedDriverId(availableDriver ? availableDriver.id : '');
     setDeliveryNotes('');
     setDeliveryDeadline('Today, 5:00 PM');
@@ -239,7 +288,7 @@ export default function LogisticsLog() {
 
     if (assigned) {
       const driver = drivers.find(d => d.id === selectedDriverId);
-      setAssignSuccessMessage(`✓ Dispatched Order ${orderToAssign.id} to ${driver?.fullName || 'Rider'}! Mobile app notified.`);
+      setAssignSuccessMessage(`✓ Dispatched Order ${orderToAssign.id} to ${driver?.fullName || 'Rider'} (${driver?.city || orderToAssign.city})! Mobile app notified.`);
       setTimeout(() => {
         setAssignSuccessMessage(null);
         setShowAssignModal(false);
@@ -1082,75 +1131,95 @@ export default function LogisticsLog() {
                   </div>
                 </div>
 
-                {/* Driver Selection with Telemetry & Active Load */}
-                <div className="space-y-1.5">
-                  <label className="text-slate-300 block font-bold">
-                    Select Available Rider in {orderToAssign.city || currentCity} *
-                  </label>
-                  {cityDrivers.length === 0 ? (
-                    <div className="p-3 bg-red-950/20 border border-red-500/30 text-red-300 rounded-xl text-[11px]">
-                      ⚠️ No drivers found for {orderToAssign.city || currentCity}. Please onboard a driver for this city first.
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                      {cityDrivers.map((driver) => {
-                        const isSelected = selectedDriverId === driver.id;
-                        const activeDriverOrders = orders.filter(
-                          o => (o.assignedDriverId === driver.id || o.assignedDriverPhone === driver.phone || o.assignedLogisticsUser === driver.fullName) &&
-                               (o.status === 'Assigned' || o.status === 'Out for Delivery')
-                        );
+                {/* Driver Selection with Strict City-Level Matching */}
+                {(() => {
+                  const eligibleDrivers = getEligibleDriversForOrder(orderToAssign);
+                  const orderCityDisplay = orderToAssign.city || currentCity;
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-slate-300 block font-bold text-xs">
+                          Select Rider in <span className="text-red-400 font-extrabold">{orderCityDisplay}</span> Hub *
+                        </label>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-900 border border-slate-800 text-slate-400">
+                          {eligibleDrivers.length} {eligibleDrivers.length === 1 ? 'Rider' : 'Riders'} in {orderCityDisplay}
+                        </span>
+                      </div>
 
-                        return (
-                          <div
-                            key={driver.id}
-                            onClick={() => setSelectedDriverId(driver.id)}
-                            className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-red-950/30 border-red-500 shadow-md shadow-red-500/10'
-                                : 'bg-slate-900/40 border-slate-800/80 hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-white text-xs shrink-0 overflow-hidden">
-                                {driver.documents?.profilePhotoUrl ? (
-                                  <img src={driver.documents.profilePhotoUrl} alt={driver.fullName} className="w-full h-full object-cover" />
-                                ) : (
-                                  driver.fullName.substring(0, 2).toUpperCase()
-                                )}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-bold text-slate-100 text-xs">{driver.fullName}</h4>
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-800 text-slate-300">
-                                    {driver.vehicleType || 'Bike'} • {driver.vehicleNumber || 'MP-09'}
-                                  </span>
-                                </div>
-                                <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
-                                  <span className="flex items-center text-amber-400 font-bold">
-                                    <Star className="w-3 h-3 fill-amber-400 text-amber-400 inline mr-0.5" />
-                                    {driver.rating || 4.9}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="font-mono">{driver.phone}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="text-right">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                activeDriverOrders.length === 0
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              }`}>
-                                {activeDriverOrders.length === 0 ? '🟢 Ready (0 Active)' : `🟡 ${activeDriverOrders.length} In-Transit`}
-                              </span>
-                            </div>
+                      {eligibleDrivers.length === 0 ? (
+                        <div className="p-4 bg-red-950/30 border border-red-500/40 text-red-300 rounded-2xl text-xs space-y-1.5 shadow-md">
+                          <div className="font-bold flex items-center gap-2 text-red-200 text-xs">
+                            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                            No Registered Riders Found for {orderCityDisplay}
                           </div>
-                        );
-                      })}
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            Riders from other cities (e.g. Bhopal/Indore) cannot be assigned to this order to prevent cross-city delivery issues. Please onboard a local rider in <span className="font-bold text-white">{orderCityDisplay}</span> before dispatching.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                          {eligibleDrivers.map((driver) => {
+                            const isSelected = selectedDriverId === driver.id;
+                            const activeDriverOrders = orders.filter(
+                              o => (o.assignedDriverId === driver.id || o.assignedDriverPhone === driver.phone || o.assignedLogisticsUser === driver.fullName) &&
+                                   (o.status === 'Assigned' || o.status === 'Out for Delivery')
+                            );
+
+                            return (
+                              <div
+                                key={driver.id}
+                                onClick={() => setSelectedDriverId(driver.id)}
+                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                                  isSelected
+                                    ? 'bg-red-950/30 border-red-500 shadow-md shadow-red-500/10'
+                                    : 'bg-slate-900/40 border-slate-800/80 hover:border-slate-700'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-white text-xs shrink-0 overflow-hidden">
+                                    {driver.documents?.profilePhotoUrl ? (
+                                      <img src={driver.documents.profilePhotoUrl} alt={driver.fullName} className="w-full h-full object-cover" />
+                                    ) : (
+                                      driver.fullName.substring(0, 2).toUpperCase()
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="font-bold text-slate-100 text-xs">{driver.fullName}</h4>
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-800 text-slate-300">
+                                        {driver.vehicleType || 'Bike'} • {driver.vehicleNumber || 'MP-09'}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                      <span className="flex items-center text-amber-400 font-bold">
+                                        <Star className="w-3 h-3 fill-amber-400 text-amber-400 inline mr-0.5" />
+                                        {driver.rating || 4.9}
+                                      </span>
+                                      <span>•</span>
+                                      <span className="font-mono">{driver.phone}</span>
+                                      <span>•</span>
+                                      <span className="text-red-400 font-semibold">📍 {driver.city || orderCityDisplay}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    activeDriverOrders.length === 0
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  }`}>
+                                    {activeDriverOrders.length === 0 ? '🟢 Ready (0 Active)' : `🟡 ${activeDriverOrders.length} In-Transit`}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Priority & Deadline */}
                 <div className="grid grid-cols-2 gap-3 pt-1">

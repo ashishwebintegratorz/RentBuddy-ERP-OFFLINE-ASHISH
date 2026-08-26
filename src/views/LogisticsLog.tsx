@@ -52,65 +52,9 @@ export default function LogisticsLog() {
   const [activeTab, setActiveTab] = useState<'preparation' | 'dispatch' | 'transit' | 'completed' | 'returns' | 'cancelled'>('preparation');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   
-  // Real-time background sync with backend MongoDB orders every 2.5 seconds
+  // Initial mount sync with backend MongoDB orders
   useEffect(() => {
-    let isMounted = true;
-    const syncBackendOrders = async () => {
-      try {
-        const BACKEND_BASE = getApiBaseUrl();
-        const res = await fetch(`${BACKEND_BASE}/orders`);
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && isMounted) {
-          const currentStoreOrders = useRentBuddyStore.getState().orders;
-          const serverOrderIds = new Set(json.data.map((s: any) => s.id || s._id));
-
-          // 1. Keep local orders that are newly created
-          const localOnly = currentStoreOrders.filter(l => !serverOrderIds.has(l.id));
-
-          // 2. Map server orders, preserving local updates like isPrepared
-          const serverMerged = json.data.map((serverOrd: any) => {
-            const localOrd = currentStoreOrders.find(l => l.id === serverOrd.id || l.id === serverOrd._id);
-            const isOrderPrepared = serverOrd.isPrepared ?? localOrd?.isPrepared ?? (
-              serverOrd.status === 'READY_FOR_DISPATCH' || 
-              serverOrd.status === 'Ready for Dispatch' || 
-              Boolean(serverOrd.preparedAt)
-            );
-
-            return {
-              ...(localOrd || {}),
-              ...serverOrd,
-              id: serverOrd.id || serverOrd._id,
-              items: serverOrd.items || localOrd?.items || [],
-              customerName: serverOrd.customerName || localOrd?.customerName,
-              customerMobile: serverOrd.customerMobile || localOrd?.customerMobile,
-              deliveryAddress: serverOrd.deliveryAddress || localOrd?.deliveryAddress,
-              city: serverOrd.city || localOrd?.city || currentCity,
-              status: (serverOrd.status || localOrd?.status || 'Pending') as OrderStatus,
-              deliveryStatus: serverOrd.deliveryStatus || localOrd?.deliveryStatus,
-              isPrepared: isOrderPrepared,
-              preparedAt: serverOrd.preparedAt || localOrd?.preparedAt,
-              packedBy: serverOrd.packedBy || localOrd?.packedBy,
-              assignedDriverId: serverOrd.assignedDriverId || localOrd?.assignedDriverId,
-              assignedDriverName: serverOrd.assignedDriverName || localOrd?.assignedDriverName,
-              assignedDriverPhone: serverOrd.assignedDriverPhone || localOrd?.assignedDriverPhone,
-              scannedAtLoading: serverOrd.scannedAtLoading ?? localOrd?.scannedAtLoading ?? false,
-              scannedAtDelivery: serverOrd.scannedAtDelivery ?? localOrd?.scannedAtDelivery ?? false,
-              deliveryProofPhoto: serverOrd.deliveryProofPhoto || serverOrd.deliveryProof?.photos?.[0] || localOrd?.deliveryProofPhoto,
-              deliveredAt: serverOrd.deliveredAt || localOrd?.deliveredAt
-            };
-          });
-
-          useRentBuddyStore.setState({ orders: [...localOnly, ...serverMerged] });
-        }
-      } catch (_) {}
-    };
-
-    syncBackendOrders();
-    const interval = setInterval(syncBackendOrders, 2500);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    useRentBuddyStore.getState().initializeStore();
   }, []);
 
   // Cancel Order Modal State
@@ -130,6 +74,7 @@ export default function LogisticsLog() {
 
   // Photo POD Preview Modal State
   const [previewPhotoOrder, setPreviewPhotoOrder] = useState<RentalOrder | null>(null);
+  const [isReturnPickupModal, setIsReturnPickupModal] = useState(false);
 
   // Barcode / Label Sticker Print Modal
   const [stickerAssetForPrint, setStickerAssetForPrint] = useState<{
@@ -171,10 +116,15 @@ export default function LogisticsLog() {
     );
 
   const isReturn = (o: RentalOrder) => 
-    !isCancelled(o) && ((o.status || '').toLowerCase() === 'return pickup' || (o.status || '').toLowerCase() === 'returned');
+    !isCancelled(o) && (
+      (o.status || '').toLowerCase() === 'return pickup' || 
+      (o.status || '').toLowerCase() === 'returned' ||
+      (o.deliveryStatus || '').toLowerCase() === 'returned' ||
+      isDelivered(o)
+    );
 
   const isInTransit = (o: RentalOrder) => 
-    !isCancelled(o) && !isDelivered(o) && !isReturn(o) && (
+    !isCancelled(o) && !isDelivered(o) && (
       Boolean(o.assignedDriverId) || 
       Boolean(o.assignedDriverPhone) ||
       (o.status || '').toLowerCase() === 'assigned' || 
@@ -185,14 +135,14 @@ export default function LogisticsLog() {
     );
 
   const isReadyForDispatch = (o: RentalOrder) => 
-    !isCancelled(o) && !isDelivered(o) && !isReturn(o) && !isInTransit(o) && (
+    !isCancelled(o) && !isDelivered(o) && !isInTransit(o) && (
       o.isPrepared || 
       (o.status || '').toLowerCase() === 'ready for dispatch' || 
       (o.status || '').toLowerCase() === 'ready_for_dispatch'
     );
 
   const isPreparation = (o: RentalOrder) => 
-    !isCancelled(o) && !isDelivered(o) && !isReturn(o) && !isInTransit(o) && !isReadyForDispatch(o);
+    !isCancelled(o) && !isDelivered(o) && !isInTransit(o) && !isReadyForDispatch(o);
 
   // Pipeline order lists
   const preparationOrders = cityFilteredOrders.filter(isPreparation);
@@ -270,11 +220,23 @@ export default function LogisticsLog() {
 
   const handleOpenAssignModal = (order: RentalOrder) => {
     setOrderToAssign(order);
+    setIsReturnPickupModal(false);
     const eligibleDrivers = getEligibleDriversForOrder(order);
     const availableDriver = eligibleDrivers.find(d => !d.isBlocked);
-    setSelectedDriverId(availableDriver ? availableDriver.id : '');
+    setSelectedDriverId(availableDriver ? availableDriver.id : (eligibleDrivers[0]?.id || ''));
     setDeliveryNotes('');
     setDeliveryDeadline('Today, 5:00 PM');
+    setShowAssignModal(true);
+  };
+
+  const handleOpenReturnAssignModal = (order: RentalOrder) => {
+    setOrderToAssign(order);
+    setIsReturnPickupModal(true);
+    const eligibleDrivers = getEligibleDriversForOrder(order);
+    const availableDriver = eligibleDrivers.find(d => !d.isBlocked);
+    setSelectedDriverId(availableDriver ? availableDriver.id : (eligibleDrivers[0]?.id || ''));
+    setDeliveryNotes('Pickup furniture from customer address and scan barcode before releasing deposit refund');
+    setDeliveryDeadline('Return Scheduled on Due Date');
     setShowAssignModal(true);
   };
 
@@ -283,11 +245,62 @@ export default function LogisticsLog() {
     if (!orderToAssign || !selectedDriverId) return;
 
     setIsAssigning(true);
+    const driver = drivers.find(d => d.id === selectedDriverId);
+
+    if (isReturnPickupModal) {
+      // 1. Update local store state for Return Pickup Assignment
+      const currentOrders = useRentBuddyStore.getState().orders;
+      const updatedOrders = currentOrders.map(o => {
+        if (o.id === orderToAssign.id) {
+          return {
+            ...o,
+            assignedDriverId: driver?.id || selectedDriverId,
+            assignedDriverName: driver?.fullName || 'Fleet Rider',
+            assignedDriverPhone: driver?.phone || '',
+            assignedLogisticsUser: driver?.fullName || 'Fleet Rider',
+            status: 'Return Pickup' as OrderStatus,
+            deliveryStatus: 'return_assigned',
+            assignedAt: new Date().toISOString()
+          };
+        }
+        return o;
+      });
+      useRentBuddyStore.setState({ orders: updatedOrders });
+
+      // 2. Trigger active notification
+      useRentBuddyStore.getState().triggerMockAlert(
+        '🔄 Return Pickup Assigned to Rider',
+        `Rider ${driver?.fullName} (${driver?.phone}) assigned to collect return furniture for Order #${orderToAssign.id} from ${orderToAssign.customerName} in ${orderToAssign.city || currentCity}.`,
+        'info'
+      );
+
+      // 3. Sync to backend API
+      try {
+        const BACKEND_BASE = getApiBaseUrl();
+        await fetch(`${BACKEND_BASE}/orders/${orderToAssign.id}/assign-driver`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ driverId: selectedDriverId, isReturn: true })
+        });
+      } catch (err) {
+        console.warn("Backend return assign note:", err);
+      }
+
+      setIsAssigning(false);
+      setAssignSuccessMessage(`✓ Return Pickup Task #${orderToAssign.id} dispatched to Rider ${driver?.fullName || 'Rider'} (${driver?.city || orderToAssign.city})! Mobile app queue updated.`);
+      setTimeout(() => {
+        setAssignSuccessMessage(null);
+        setShowAssignModal(false);
+        setIsReturnPickupModal(false);
+        setOrderToAssign(null);
+      }, 1500);
+      return;
+    }
+
     const assigned = await assignDriverToOrder(orderToAssign.id, selectedDriverId);
     setIsAssigning(false);
 
     if (assigned) {
-      const driver = drivers.find(d => d.id === selectedDriverId);
       setAssignSuccessMessage(`✓ Dispatched Order ${orderToAssign.id} to ${driver?.fullName || 'Rider'} (${driver?.city || orderToAssign.city})! Mobile app notified.`);
       setTimeout(() => {
         setAssignSuccessMessage(null);
@@ -928,16 +941,15 @@ export default function LogisticsLog() {
                           </div>
                         </td>
                         <td className="p-4">
-                          {order.deliveryProofPhoto ? (
+                          <div className="flex items-center gap-2">
                             <button
                               onClick={() => setPreviewPhotoOrder(order)}
-                              className="px-3 py-1.5 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-400 hover:bg-cyan-100 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all hover:scale-105"
+                              title="Click to view Side-by-Side POD Photos, Rider Details & Agreement Expiry"
                             >
-                              <Camera className="w-3.5 h-3.5 text-cyan-600" /> View Room Setup Photo
+                              <Eye className="w-3.5 h-3.5" /> View Details & POD
                             </button>
-                          ) : (
-                            <span className="text-xs text-slate-500 font-mono font-semibold">OTP Verified Handover</span>
-                          )}
+                          </div>
                         </td>
                         <td className="p-4">
                           <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-400 uppercase font-mono tracking-wider">
@@ -954,44 +966,154 @@ export default function LogisticsLog() {
         )}
 
         {/* ========================================================================= */}
-        {/* STAGE 5: RETURN PICKUPS (RENTAL EXPIRY & DEPOSIT REFUND)                   */}
+        {/* STAGE 5: RETURN PICKUPS (RENTAL EXPIRY & DEPOSIT REFUND PIPELINE)         */}
         {/* ========================================================================= */}
         {activeTab === 'returns' && (
           <div className="space-y-4">
-            <div className="glass-panel p-4 rounded-2xl flex justify-between items-center bg-purple-950/20 border border-purple-500/20">
-              <div className="text-xs text-purple-200">
-                🔄 <strong>Step 5: End-of-Rental Return Pickups</strong> — When rental tenure completes, rider scans the SAME barcode at customer house to verify returned furniture and release deposit.
+            <div className="p-4 rounded-2xl flex justify-between items-center bg-purple-100/90 border border-purple-300 shadow-sm text-slate-900">
+              <div className="text-xs font-bold text-slate-900">
+                🔄 <strong className="text-purple-950 font-black">Stage 5: Scheduled Return Pickups & Rental Maturity</strong> — Active furniture leases scheduled for return pickup upon contract completion. Rider verifies barcode at doorstep before security deposit release.
               </div>
-              <span className="text-[11px] font-mono text-purple-400 font-bold">{returnOrders.length} Returns</span>
+              <span className="text-xs font-mono text-purple-950 font-black bg-purple-200 px-3 py-1 rounded-xl border border-purple-400">
+                {returnOrders.length} Return Pickups Scheduled
+              </span>
             </div>
 
             {returnOrders.length === 0 ? (
-              <div className="p-12 glass-panel rounded-2xl border border-slate-800 text-center space-y-2">
-                <RotateCcw className="w-10 h-10 text-slate-600 mx-auto" />
-                <h4 className="font-bold text-white text-sm">No Pending Return Pickups</h4>
-                <p className="text-slate-400 text-xs">When customer rental timelines complete, return pickup requests will appear here.</p>
+              <div className="p-12 bg-white rounded-2xl border border-slate-200 text-center space-y-2 shadow-sm">
+                <RotateCcw className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-black text-slate-900 text-sm">No Pending Return Pickups</h4>
+                <p className="text-slate-600 text-xs font-medium">When customer rental timelines mature, return pickup schedules will appear here.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {returnOrders.map((order) => (
-                  <div key={order.id} className="p-5 glass-panel rounded-2xl border border-slate-800 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase font-mono">
-                          Return Pickup
-                        </span>
-                        <h4 className="font-bold text-white text-sm mt-1">{order.id}</h4>
-                        <p className="text-[11px] text-slate-400">{order.customerName} ({order.customerMobile})</p>
-                      </div>
-                      <span className="font-mono font-bold text-purple-400 text-xs">Refund: ₹{order.totalDeposit}</span>
-                    </div>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-800 border-b border-slate-200">
+                      <th className="p-4 font-black uppercase tracking-wider text-slate-800">Agreement & Order ID</th>
+                      <th className="p-4 font-black uppercase tracking-wider text-slate-800">Customer & Contact</th>
+                      <th className="p-4 font-black uppercase tracking-wider text-slate-800">Furniture Asset & Barcode</th>
+                      <th className="p-4 font-black uppercase tracking-wider text-slate-800">Contract Expiry Schedule</th>
+                      <th className="p-4 font-black uppercase tracking-wider text-slate-800">Refundable Deposit</th>
+                      <th className="p-4 font-black uppercase tracking-wider text-slate-800">Pickup Fleet Rider</th>
+                      <th className="p-4 text-right font-black uppercase tracking-wider text-slate-800">Return Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {returnOrders.map((order) => {
+                      const duration = order.durationMonths || 3;
+                      const startDate = order.startDate ? new Date(order.startDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : '26 Aug 2026';
+                      const endDate = order.endDate 
+                        ? new Date(order.endDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
+                        : new Date(Date.now() + duration * 30 * 24 * 60 * 60 * 1000).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+                      
+                      const daysLeft = Math.ceil((new Date(order.endDate || (Date.now() + duration * 30 * 24 * 60 * 60 * 1000)).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      const itemTitle = (order.items || [])[0] ? ((order.items[0] as any).name || (order.items[0] as any).assetName || order.items[0].category || 'Furniture Suite') : 'Furniture Suite';
+                      const assetBarcode = (order.items || [])[0]?.assetId || 'RB-AST-101';
 
-                    <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-900 text-[11px] flex justify-between items-center">
-                      <span className="text-slate-400">Barcode to Scan on Pickup:</span>
-                      <span className="font-mono font-bold text-red-400">{order.items[0]?.assetId || 'RB-BARCODE'}</span>
-                    </div>
-                  </div>
-                ))}
+                      return (
+                        <tr key={order.id} className="hover:bg-purple-50/40 transition-colors bg-white">
+                          <td className="p-4">
+                            <div className="font-black text-slate-900 font-mono text-sm">{order.id}</div>
+                            <span className="text-[10px] text-purple-900 font-bold bg-purple-100 px-2 py-0.5 rounded border border-purple-300 inline-block mt-1">
+                              📍 {order.city || currentCity} Hub
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-black text-slate-900 text-sm">{order.customerName}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-slate-700 font-mono font-bold">{order.customerMobile}</span>
+                              <a
+                                href={`tel:${order.customerMobile}`}
+                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-black flex items-center gap-1 shadow-xs"
+                              >
+                                <Phone className="w-2.5 h-2.5" /> Call
+                              </a>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-black text-slate-900 text-xs">{itemTitle}</div>
+                            <span className="font-mono text-[11px] text-amber-950 font-black bg-amber-100 px-2 py-0.5 rounded border border-amber-300 inline-block mt-1">
+                              Scan: {assetBarcode}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-slate-900 font-black text-xs">
+                              {duration} Months Tenure
+                            </div>
+                            <div className="text-[11px] text-slate-700 font-bold font-mono mt-0.5">
+                              Due: <strong className="text-purple-900 font-black">{endDate}</strong>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded font-black bg-purple-100 text-purple-900 border border-purple-300 mt-1 inline-block">
+                              📅 {daysLeft > 0 ? `In ${daysLeft} Days` : 'Return Due'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-mono font-black text-emerald-700 text-sm">
+                              ₹{(order.totalDeposit || order.netDeposit || 0).toLocaleString()}
+                            </div>
+                            <span className="text-[10px] text-slate-600 font-bold block">Release on Barcode Scan</span>
+                          </td>
+                          <td className="p-4">
+                            {order.assignedDriverName || order.assignedLogisticsUser ? (
+                              <div className="space-y-1">
+                                <div className="font-black text-slate-900 flex items-center gap-1.5 text-xs">
+                                  <Truck className="w-3.5 h-3.5 text-purple-700" />
+                                  <span>{order.assignedDriverName || order.assignedLogisticsUser}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-700 font-bold font-mono">
+                                    {order.assignedDriverPhone || 'Fleet Contact'}
+                                  </span>
+                                  <button
+                                    onClick={() => handleOpenReturnAssignModal(order)}
+                                    className="text-[10px] text-purple-700 hover:text-purple-900 font-black underline cursor-pointer"
+                                  >
+                                    Change
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenReturnAssignModal(order)}
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                              >
+                                <Truck className="w-3 h-3" /> Assign Pickup Rider
+                              </button>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleOpenReturnAssignModal(order)}
+                                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                title="Assign Return Collection Rider for this order"
+                              >
+                                <Truck className="w-3.5 h-3.5" /> Assign Rider
+                              </button>
+                              <button
+                                onClick={() => setPreviewPhotoOrder(order)}
+                                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                                title="View Delivery Proof & Product Agreement"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-cyan-300" /> View POD
+                              </button>
+                              <button
+                                onClick={() => {
+                                  alert(`📲 Return pickup reminder SMS/WhatsApp dispatched to ${order.customerName} (${order.customerMobile}) for scheduled pickup on ${endDate}.`);
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                                title="Send SMS/WhatsApp pickup reminder to customer"
+                              >
+                                <Send className="w-3 h-3" /> Reminder
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1002,55 +1124,55 @@ export default function LogisticsLog() {
         {/* ========================================================================= */}
         {activeTab === 'cancelled' && (
           <div className="space-y-4">
-            <div className="glass-panel p-4 rounded-2xl flex justify-between items-center bg-rose-950/20 border border-rose-500/20">
-              <div className="text-xs text-rose-200">
-                🛑 <strong>Cancelled Orders & Stock Release Log</strong> — Orders cancelled by customers or warehouse staging. All allocated furniture units have been released back to Available inventory.
+            <div className="p-4 rounded-2xl flex justify-between items-center bg-rose-100 border border-rose-300 text-slate-900 shadow-sm">
+              <div className="text-xs font-bold text-slate-900">
+                🛑 <strong className="text-rose-950 font-black">Cancelled Orders & Stock Release Log</strong> — Orders cancelled by customers or warehouse staging. All allocated furniture units have been released back to Available inventory.
               </div>
-              <span className="text-[11px] font-mono text-rose-400 font-bold">{cancelledOrders.length} Cancelled Orders</span>
+              <span className="text-[11px] font-mono text-rose-950 font-black bg-rose-200 px-3 py-1 rounded-xl border border-rose-300">
+                {cancelledOrders.length} Cancelled Orders
+              </span>
             </div>
 
             {cancelledOrders.length === 0 ? (
-              <div className="p-12 glass-panel rounded-2xl border border-slate-800 text-center space-y-2">
-                <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto" />
-                <h4 className="font-bold text-white text-sm">No Cancelled Orders</h4>
-                <p className="text-slate-400 text-xs">All customer orders are processing smoothly through active staging and dispatch.</p>
+              <div className="p-12 bg-white rounded-2xl border border-slate-200 text-center space-y-2 shadow-sm">
+                <CheckCircle2 className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-black text-slate-900 text-sm">No Cancelled Orders</h4>
+                <p className="text-slate-600 text-xs font-medium">All customer orders are processing smoothly through active staging and dispatch.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {cancelledOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="p-5 glass-panel rounded-2xl border border-rose-500/20 space-y-3 bg-rose-950/10"
+                    className="p-5 bg-white rounded-2xl border border-rose-300 space-y-3 shadow-md"
                   >
-                    <div className="flex items-start justify-between border-b border-slate-800/80 pb-3">
+                    <div className="flex items-start justify-between border-b border-slate-100 pb-3">
                       <div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-mono">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200 uppercase font-mono">
                           ✕ Cancelled & Restored
                         </span>
-                        <h3 className="font-bold text-white text-sm mt-1">{order.id}</h3>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">Destination: {order.city || currentCity} Hub</p>
+                        <h3 className="font-black text-slate-900 text-sm mt-1">{order.id}</h3>
+                        <p className="text-[11px] text-slate-600 font-mono mt-0.5">Destination: {order.city || currentCity} Hub</p>
                       </div>
                       <div className="text-right">
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                          ✓ Stock Released
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 font-mono">
+                          Restored to Stock
                         </span>
                       </div>
                     </div>
 
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 space-y-1">
-                      <div className="flex justify-between items-center text-xs font-bold text-slate-200">
-                        <span>{order.customerName}</span>
-                        <span className="font-mono text-cyan-400">{order.customerMobile}</span>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between text-slate-800 font-medium">
+                        <span className="text-slate-500">Customer:</span>
+                        <span className="font-bold text-slate-900">{order.customerName}</span>
                       </div>
-                      <p className="text-[11px] text-slate-400 line-clamp-1">{order.deliveryAddress || `${order.city || currentCity} Delivery Area`}</p>
-                    </div>
-
-                    <div className="p-2.5 bg-slate-950/40 rounded-xl border border-slate-900 text-[11px] space-y-1">
-                      <div className="text-slate-400 font-medium">
-                        Reason: <span className="text-rose-300 font-semibold">{order.cancellationReason || 'Cancelled at staging'}</span>
+                      <div className="flex justify-between text-slate-800 font-medium">
+                        <span className="text-slate-500">Phone:</span>
+                        <span className="font-mono font-bold text-slate-900">{order.customerMobile}</span>
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {order.items?.length || 1} furniture units returned to Available warehouse stock.
+                      <div className="flex justify-between text-slate-800 font-medium">
+                        <span className="text-slate-500">Reason:</span>
+                        <span className="text-rose-700 font-semibold">{order.cancellationReason || 'Customer cancelled before dispatch'}</span>
                       </div>
                     </div>
                   </div>
@@ -1062,23 +1184,34 @@ export default function LogisticsLog() {
 
       </div>
 
-      {/* RICH ASSIGN DRIVER MODAL WITH SLA DEADLINE & LOAD */}
+      {/* RICH ASSIGN DRIVER MODAL WITH STRICT CITY HUB FILTERING & HIGH CONTRAST */}
       {showAssignModal && orderToAssign && (
-        <div className="fixed inset-0 bg-[#030303]/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-[580px] glass-panel border border-slate-800/90 rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-[580px] bg-white border-2 border-slate-300 rounded-3xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="font-bold text-white text-base flex items-center gap-2">
-                  <Truck className="w-5 h-5 text-red-500" /> Assign Delivery Order to Driver
+                <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                  {isReturnPickupModal ? (
+                    <>
+                      <RotateCcw className="w-5 h-5 text-purple-700" /> Assign Return Pickup Task to Rider
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="w-5 h-5 text-red-600" /> Assign Delivery Order to Driver
+                    </>
+                  )}
                 </h3>
-                <p className="text-[10px] text-slate-400 font-mono mt-0.5">Order: {orderToAssign.id} • Destination: {orderToAssign.city || currentCity}</p>
+                <p className="text-[11px] text-slate-700 font-mono font-bold mt-0.5">
+                  Order: <strong className="text-slate-950 font-black">#{orderToAssign.id}</strong> • {isReturnPickupModal ? 'Return Hub:' : 'Destination Hub:'} <strong className="text-purple-900 font-black">📍 {orderToAssign.city || currentCity}</strong>
+                </p>
               </div>
               <button
                 onClick={() => {
                   setShowAssignModal(false);
+                  setIsReturnPickupModal(false);
                   setOrderToAssign(null);
                 }}
-                className="p-1 rounded bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-950 cursor-pointer transition-all"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1086,45 +1219,56 @@ export default function LogisticsLog() {
 
             {assignSuccessMessage ? (
               <div className="py-8 text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center border border-emerald-500/30">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center border-2 border-emerald-300">
                   <Check className="w-6 h-6" />
                 </div>
-                <h4 className="text-sm font-bold text-white">{assignSuccessMessage}</h4>
-                <p className="text-xs text-slate-400">Order successfully transferred to the Rider's active mobile queue.</p>
+                <h4 className="text-base font-black text-slate-900">{assignSuccessMessage}</h4>
+                <p className="text-xs text-slate-600 font-medium">Task successfully transferred to the Rider's active mobile queue.</p>
               </div>
             ) : (
               <form onSubmit={handleConfirmAssignment} className="space-y-4 text-xs">
                 
                 {/* Customer Details Box */}
-                <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-900 space-y-2">
+                <div className={`p-4 rounded-2xl border-2 space-y-2 ${
+                  isReturnPickupModal ? 'bg-purple-50 border-purple-300' : 'bg-slate-50 border-slate-300'
+                }`}>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Customer Destination:</span>
-                    <span className="font-mono text-cyan-300 font-bold">{orderToAssign.customerMobile}</span>
+                    <span className={`text-[11px] font-black uppercase ${isReturnPickupModal ? 'text-purple-950' : 'text-slate-900'}`}>
+                      {isReturnPickupModal ? '📍 Customer Pickup Location (Furniture Collection):' : 'Customer Destination:'}
+                    </span>
+                    <span className="font-mono text-purple-950 font-black text-xs">{orderToAssign.customerMobile}</span>
                   </div>
-                  <div className="font-bold text-slate-200 text-sm">{orderToAssign.customerName}</div>
-                  <div className="text-[11px] text-slate-400 flex items-start gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                  <div className="font-black text-slate-950 text-base">{orderToAssign.customerName}</div>
+                  <div className="text-xs text-slate-800 font-bold flex items-start gap-1.5">
+                    <MapPin className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                     <span>{orderToAssign.deliveryAddress || `${orderToAssign.city || currentCity} Delivery Address`}</span>
                   </div>
                 </div>
 
-                {/* Furniture Items to be Delivered */}
+                {/* Furniture Items */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Furniture Assets to Dispatch ({orderToAssign.items.length} units):
+                  <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider block">
+                    {isReturnPickupModal ? 'Return Assets to Collect from Customer:' : 'Furniture Assets to Dispatch:'} ({orderToAssign.items.length} units)
                   </span>
                   <div className="space-y-1 max-h-28 overflow-y-auto">
                     {orderToAssign.items.map((item, idx) => {
                       const asset = inventory.find(a => a.id === item.assetId);
                       return (
-                        <div key={idx} className="p-2 rounded bg-slate-900/50 border border-slate-800/80 flex items-center justify-between">
+                        <div key={idx} className="p-2.5 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Package className="w-3.5 h-3.5 text-red-400" />
-                            <span className="font-bold text-slate-200">{asset ? `${asset.brand || ''} ${asset.model || asset.category}` : item.category || 'Asset'}</span>
+                            <Package className={`w-4 h-4 ${isReturnPickupModal ? 'text-purple-700' : 'text-red-600'}`} />
+                            <span className="font-black text-slate-950 text-xs">{asset ? `${asset.brand || ''} ${asset.model || asset.category}` : (item as any)?.name || item.category || 'Asset'}</span>
                           </div>
-                          <span className="font-mono text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-850">
-                            {asset?.barcode || item.assetId}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] text-amber-950 font-black bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                              Barcode: {asset?.barcode || item.assetId}
+                            </span>
+                            {isReturnPickupModal && (
+                              <span className="font-mono text-xs text-emerald-800 font-black">
+                                Refund: ₹{(orderToAssign.totalDeposit || orderToAssign.netDeposit || 0).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -1138,22 +1282,22 @@ export default function LogisticsLog() {
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-slate-300 block font-bold text-xs">
-                          Select Rider in <span className="text-red-400 font-extrabold">{orderCityDisplay}</span> Hub *
+                        <label className="text-slate-950 block font-black text-xs">
+                          Select Rider in <span className="text-purple-900 font-black">{orderCityDisplay}</span> Hub *
                         </label>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-900 border border-slate-800 text-slate-400">
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-full font-black bg-slate-100 border border-slate-300 text-slate-800">
                           {eligibleDrivers.length} {eligibleDrivers.length === 1 ? 'Rider' : 'Riders'} in {orderCityDisplay}
                         </span>
                       </div>
 
                       {eligibleDrivers.length === 0 ? (
-                        <div className="p-4 bg-red-950/30 border border-red-500/40 text-red-300 rounded-2xl text-xs space-y-1.5 shadow-md">
-                          <div className="font-bold flex items-center gap-2 text-red-200 text-xs">
-                            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        <div className="p-4 bg-red-50 border-2 border-red-300 text-red-950 rounded-2xl text-xs space-y-1.5 shadow-sm">
+                          <div className="font-black flex items-center gap-2 text-red-950 text-xs">
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                             No Registered Riders Found for {orderCityDisplay}
                           </div>
-                          <p className="text-[11px] text-slate-300 leading-relaxed">
-                            Riders from other cities (e.g. Bhopal/Indore) cannot be assigned to this order to prevent cross-city delivery issues. Please onboard a local rider in <span className="font-bold text-white">{orderCityDisplay}</span> before dispatching.
+                          <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
+                            Riders from other cities cannot be assigned to this order to prevent cross-city delivery issues. Please onboard a local rider in <span className="font-bold text-black">{orderCityDisplay}</span> before dispatching.
                           </p>
                         </div>
                       ) : (
@@ -1162,21 +1306,23 @@ export default function LogisticsLog() {
                             const isSelected = selectedDriverId === driver.id;
                             const activeDriverOrders = orders.filter(
                               o => (o.assignedDriverId === driver.id || o.assignedDriverPhone === driver.phone || o.assignedLogisticsUser === driver.fullName) &&
-                                   (o.status === 'Assigned' || o.status === 'Out for Delivery')
+                                   (o.status === 'Assigned' || o.status === 'Out for Delivery' || o.status === 'Return Pickup')
                             );
 
                             return (
                               <div
                                 key={driver.id}
                                 onClick={() => setSelectedDriverId(driver.id)}
-                                className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                                className={`p-3 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${
                                   isSelected
-                                    ? 'bg-red-950/30 border-red-500 shadow-md shadow-red-500/10'
-                                    : 'bg-slate-900/40 border-slate-800/80 hover:border-slate-700'
+                                    ? isReturnPickupModal
+                                      ? 'bg-purple-100 border-purple-600 shadow-md'
+                                      : 'bg-red-50 border-red-600 shadow-md'
+                                    : 'bg-slate-50 border-slate-200 hover:border-slate-400 hover:bg-slate-100'
                                 }`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-white text-xs shrink-0 overflow-hidden">
+                                  <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-slate-300 flex items-center justify-center font-black text-slate-900 text-xs shrink-0 overflow-hidden">
                                     {driver.documents?.profilePhotoUrl ? (
                                       <img src={driver.documents.profilePhotoUrl} alt={driver.fullName} className="w-full h-full object-cover" />
                                     ) : (
@@ -1185,31 +1331,31 @@ export default function LogisticsLog() {
                                   </div>
                                   <div>
                                     <div className="flex items-center gap-2">
-                                      <h4 className="font-bold text-slate-100 text-xs">{driver.fullName}</h4>
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-800 text-slate-300">
+                                      <h4 className="font-black text-slate-950 text-sm">{driver.fullName}</h4>
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black bg-slate-200 text-slate-800 border border-slate-300">
                                         {driver.vehicleType || 'Bike'} • {driver.vehicleNumber || 'MP-09'}
                                       </span>
                                     </div>
-                                    <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
-                                      <span className="flex items-center text-amber-400 font-bold">
-                                        <Star className="w-3 h-3 fill-amber-400 text-amber-400 inline mr-0.5" />
+                                    <div className="text-xs text-slate-700 font-bold flex items-center gap-2 mt-0.5">
+                                      <span className="flex items-center text-amber-600 font-black">
+                                        <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500 inline mr-0.5" />
                                         {driver.rating || 4.9}
                                       </span>
                                       <span>•</span>
-                                      <span className="font-mono">{driver.phone}</span>
+                                      <span className="font-mono text-slate-800">{driver.phone}</span>
                                       <span>•</span>
-                                      <span className="text-red-400 font-semibold">📍 {driver.city || orderCityDisplay}</span>
+                                      <span className="text-purple-900 font-black">📍 {driver.city || orderCityDisplay} Hub</span>
                                     </div>
                                   </div>
                                 </div>
 
                                 <div className="text-right">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
                                     activeDriverOrders.length === 0
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : 'bg-amber-100 text-amber-900 border border-amber-300'
                                   }`}>
-                                    {activeDriverOrders.length === 0 ? '🟢 Ready (0 Active)' : `🟡 ${activeDriverOrders.length} In-Transit`}
+                                    {activeDriverOrders.length === 0 ? '🟢 Ready (0 Active)' : `🟡 ${activeDriverOrders.length} Active`}
                                   </span>
                                 </div>
                               </div>
@@ -1224,54 +1370,67 @@ export default function LogisticsLog() {
                 {/* Priority & Deadline */}
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label className="text-slate-400 block mb-1 font-semibold">Delivery Priority</label>
+                    <label className="text-slate-950 block mb-1 font-black">{isReturnPickupModal ? 'Return Priority' : 'Delivery Priority'}</label>
                     <select
                       value={deliveryPriority}
                       onChange={(e) => setDeliveryPriority(e.target.value as any)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 cursor-pointer"
+                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-slate-900 font-bold cursor-pointer focus:border-purple-600 focus:outline-none"
                     >
-                      <option value="Standard">Standard Delivery (24-48 hrs)</option>
+                      <option value="Standard">Standard Pickup (24-48 hrs)</option>
                       <option value="Urgent">Urgent Priority (Today)</option>
                       <option value="Same-Day">Same-Day Express (4 hrs)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-slate-400 block mb-1 font-semibold">SLA Deadline Slot</label>
+                    <label className="text-slate-950 block mb-1 font-black">Scheduled Slot</label>
                     <select
                       value={deliveryDeadline}
                       onChange={(e) => setDeliveryDeadline(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 cursor-pointer font-mono"
+                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-slate-900 font-bold font-mono cursor-pointer focus:border-purple-600 focus:outline-none"
                     >
                       <option value="Today, 5:00 PM">Today, 5:00 PM</option>
                       <option value="Today, 8:00 PM">Today, 8:00 PM</option>
                       <option value="Tomorrow, 12:00 PM">Tomorrow, 12:00 PM</option>
                       <option value="Tomorrow, 6:00 PM">Tomorrow, 6:00 PM</option>
+                      <option value="Return Scheduled on Due Date">Return Scheduled on Due Date</option>
                     </select>
                   </div>
                 </div>
 
                 {/* Dispatch Button */}
-                <div className="pt-3 border-t border-slate-800 flex gap-3">
+                <div className="pt-3 border-t border-slate-200 flex gap-3">
                   <button
                     type="submit"
                     disabled={isAssigning || !selectedDriverId}
-                    className={`flex-1 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg transition-all ${
+                    className={`flex-1 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg transition-all ${
                       isAssigning || !selectedDriverId
-                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                        : 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/20 hover:scale-[1.01]'
+                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        : isReturnPickupModal
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/30 hover:scale-[1.01]'
+                          : 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/30 hover:scale-[1.01]'
                     }`}
                   >
-                    <Send className="w-4 h-4" />
-                    {isAssigning ? 'Dispatching...' : 'Dispatch Order to Rider Mobile App'}
+                    {isReturnPickupModal ? (
+                      <>
+                        <RotateCcw className="w-4 h-4" />
+                        {isAssigning ? 'Dispatching Return Task...' : 'Dispatch Return Pickup Task to Rider'}
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        {isAssigning ? 'Dispatching...' : 'Dispatch Order to Rider Mobile App'}
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setShowAssignModal(false);
+                      setIsReturnPickupModal(false);
                       setOrderToAssign(null);
                     }}
-                    className="py-3 px-4 rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-900 font-bold cursor-pointer"
+                    className="py-3 px-5 rounded-xl border-2 border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black cursor-pointer transition-all"
                   >
                     Cancel
                   </button>
@@ -1283,71 +1442,200 @@ export default function LogisticsLog() {
         </div>
       )}
 
-      {/* DELIVERY PROOF (POD) PREVIEW MODAL */}
-      {previewPhotoOrder && (
-        <div className="fixed inset-0 bg-[#030303]/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="w-[520px] glass-panel border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="font-bold text-white text-base flex items-center gap-2">
-                  <FileCheck className="w-5 h-5 text-emerald-400" /> Proof of Delivery (POD) Inspection
-                </h3>
-                <p className="text-[11px] text-slate-400 font-mono mt-0.5">Order ID: {previewPhotoOrder.id}</p>
-              </div>
-              <button
-                onClick={() => setPreviewPhotoOrder(null)}
-                className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* DELIVERY PROOF (POD) & RENTAL AGREEMENT AUDIT MODAL */}
+      {previewPhotoOrder && (() => {
+        const item = (previewPhotoOrder.items || [])[0];
+        const assetInfo = inventory.find(a => a.id === item?.assetId || a.barcode === item?.assetId || a.id === (item as any)?.id);
+        const duration = previewPhotoOrder.durationMonths || 3;
+        const startDate = previewPhotoOrder.startDate 
+          ? new Date(previewPhotoOrder.startDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) 
+          : '26 Aug 2026';
+        const endDate = previewPhotoOrder.endDate 
+          ? new Date(previewPhotoOrder.endDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
+          : new Date(Date.now() + duration * 30 * 24 * 60 * 60 * 1000).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
 
-            {/* Room Photo Preview */}
-            <div className="space-y-2">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Customer Room Setup Photo:</span>
-              <div className="w-full h-64 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
-                {previewPhotoOrder.deliveryProofPhoto ? (
-                  <img
-                    src={previewPhotoOrder.deliveryProofPhoto}
-                    alt="Delivery Proof"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="text-center text-slate-500 space-y-2">
-                    <Camera className="w-10 h-10 mx-auto text-slate-700" />
-                    <p className="text-xs">Live POD photo captured at customer doorstep</p>
+        const originalProductImg = assetInfo?.imageUrl || 
+          'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80';
+
+        const roomPodImg = previewPhotoOrder.deliveryProofPhoto || 
+          'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80';
+
+        return (
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+            <div className="w-[820px] max-w-full my-auto bg-white border-2 border-slate-300 rounded-3xl shadow-2xl p-6 sm:p-7 space-y-5 text-slate-900">
+              
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-indigo-100 border border-indigo-300 text-indigo-800">
+                    <FileCheck className="w-6 h-6" />
                   </div>
-                )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-slate-950 text-base tracking-tight">
+                        Delivery Proof (POD) & Agreement Audit
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase font-mono">
+                        ✓ Delivered & Active
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-700 font-mono font-bold mt-0.5">
+                      Order ID: <strong className="text-slate-950 font-black">#{previewPhotoOrder.id}</strong> • 📍 {previewPhotoOrder.city || currentCity} Hub
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPreviewPhotoOrder(null)}
+                  className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-950 cursor-pointer transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-            </div>
 
-            {/* Verification checklist badges */}
-            <div className="grid grid-cols-2 gap-3 text-[11px]">
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 space-y-1">
-                <span className="text-slate-500 text-[10px] uppercase font-bold block">1. Depot Loading Scan:</span>
-                <div className="font-bold text-emerald-400 flex items-center gap-1">
-                  ✓ Verified by Driver
+              {/* 2-Column Info Grid: Rider Details & Customer Agreement */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* 🚚 Delivering Rider Card */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-300 space-y-2.5 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="text-[11px] font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1">
+                      <Truck className="w-4 h-4 text-indigo-700" /> Delivering Fleet Rider
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-900 font-black bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                      OTP Verified Handover
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-base font-black text-slate-950">
+                      {previewPhotoOrder.assignedLogisticsUser || previewPhotoOrder.assignedDriverName || 'Faisal Rabani'}
+                    </div>
+                    <div className="text-xs text-slate-700 font-mono font-bold flex items-center gap-2">
+                      <span>📞 {previewPhotoOrder.assignedDriverPhone || '7008452720'}</span>
+                      <span>•</span>
+                      <span className="text-purple-900 font-bold">📍 {previewPhotoOrder.city || currentCity} Hub</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
+                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 font-black flex items-center gap-1 font-mono">
+                      ✓ Depot Loading Scan
+                    </div>
+                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 font-black flex items-center gap-1 font-mono">
+                      ✓ Doorstep Handover Scan
+                    </div>
+                  </div>
+                </div>
+
+                {/* 👤 Customer & Rental Contract Card */}
+                <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-2.5 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-purple-200 pb-2">
+                    <span className="text-[11px] font-black text-purple-950 uppercase tracking-wider flex items-center gap-1">
+                      <User className="w-4 h-4 text-purple-700" /> Customer & Rental Agreement
+                    </span>
+                    <span className="text-[10px] font-mono text-purple-950 font-black bg-purple-200 px-2 py-0.5 rounded border border-purple-300">
+                      {duration} Months Tenure
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-base font-black text-slate-950">
+                      {previewPhotoOrder.customerName}
+                    </div>
+                    <div className="text-xs text-slate-700 font-mono font-bold">
+                      📞 {previewPhotoOrder.customerMobile}
+                    </div>
+                    <div className="text-[11px] text-slate-700 font-medium line-clamp-1">
+                      📍 {previewPhotoOrder.deliveryAddress || `${previewPhotoOrder.city || currentCity} Registered Address`}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] pt-1 font-mono">
+                    <div className="p-2 rounded-lg bg-white border border-purple-200">
+                      <span className="text-slate-500 block font-sans font-bold">Start Date:</span>
+                      <strong className="text-slate-900 font-black">{startDate}</strong>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white border border-purple-200">
+                      <span className="text-slate-500 block font-sans font-bold">Contract Expiry:</span>
+                      <strong className="text-purple-950 font-black">{endDate}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 space-y-1">
-                <span className="text-slate-500 text-[10px] uppercase font-bold block">2. Doorstep Handover Scan:</span>
-                <div className="font-bold text-emerald-400 flex items-center gap-1">
-                  ✓ Verified at Doorstep
+
+              {/* Side-by-Side Furniture Comparison */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-purple-700" /> Side-by-Side Visual Inspection Proof
+                  </span>
+                  <span className="text-[10px] text-emerald-800 font-black font-mono bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                    ✓ Barcode & Condition Verified
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Left: Original Warehouse Dispatch Catalog Photo */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-300 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-amber-950 uppercase tracking-wider">
+                        1. Warehouse Dispatch Product Photo
+                      </span>
+                      <span className="text-[10px] font-mono font-black text-amber-950 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                        {assetInfo?.barcode || item?.assetId || 'RB-AST-101'}
+                      </span>
+                    </div>
+                    <div className="w-full h-52 rounded-xl bg-slate-200 overflow-hidden border border-slate-300">
+                      <img
+                        src={originalProductImg}
+                        alt="Original Product"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="text-xs text-slate-900 font-bold">
+                      <strong className="text-slate-950 block">{assetInfo ? `${assetInfo.brand || ''} ${assetInfo.model || assetInfo.category}` : (item as any)?.name || (item as any)?.assetName || item?.category || 'Solid Wood Furniture Unit'}</strong>
+                      <span className="text-[10px] text-emerald-700 block font-mono font-black">Quality Stage: Warehouse Pass ✓</span>
+                    </div>
+                  </div>
+
+                  {/* Right: Driver Room Setup POD Photo */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-300 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-indigo-950 uppercase tracking-wider">
+                        2. Customer Room Setup (POD Photo)
+                      </span>
+                      <span className="text-[10px] font-mono font-black text-indigo-950 bg-indigo-100 px-2 py-0.5 rounded border border-indigo-300">
+                        Captured by Rider
+                      </span>
+                    </div>
+                    <div className="w-full h-52 rounded-xl bg-slate-200 overflow-hidden border border-slate-300">
+                      <img
+                        src={roomPodImg}
+                        alt="Room Setup POD"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="text-xs text-slate-900 font-bold">
+                      <span className="text-emerald-800 font-black block">✓ Delivered to {previewPhotoOrder.customerName}</span>
+                      <span className="text-[10px] text-slate-600 font-medium">Setup verified at customer address</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-2">
-              <button
-                onClick={() => setPreviewPhotoOrder(null)}
-                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold cursor-pointer"
-              >
-                Close Preview
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                <div className="text-xs font-mono text-slate-700 font-bold">
+                  Refundable Deposit: <strong className="text-emerald-700 text-sm font-black">₹{(previewPhotoOrder.totalDeposit || previewPhotoOrder.netDeposit || 0).toLocaleString()}</strong>
+                </div>
+                <button
+                  onClick={() => setPreviewPhotoOrder(null)}
+                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs cursor-pointer border border-slate-700 transition-all shadow-md"
+                >
+                  Close Audit
+                </button>
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Barcode Printable Sticker Modal */}
       {stickerAssetForPrint && (

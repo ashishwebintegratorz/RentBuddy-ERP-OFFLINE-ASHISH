@@ -10,22 +10,28 @@ import {
   AlertCircle,
   Sun,
   Moon,
-  Menu
+  Menu,
+  Truck,
+  Package,
+  Wrench,
+  CheckCheck
 } from 'lucide-react';
 
 interface NavbarProps {
   currentView: string;
+  setView?: (view: string) => void;
   onOpenSearch: () => void;
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
 }
 
-export default function Navbar({ currentView, onOpenSearch, onToggleSidebar, isSidebarCollapsed }: NavbarProps) {
+export default function Navbar({ currentView, setView, onOpenSearch, onToggleSidebar, isSidebarCollapsed }: NavbarProps) {
   const {
     currentCity,
     currentUserRole,
-    notifications,
+    notifications = [],
     markNotificationRead,
+    markAllNotificationsRead,
     clearNotifications,
     theme,
     toggleTheme,
@@ -33,23 +39,49 @@ export default function Navbar({ currentView, onOpenSearch, onToggleSidebar, isS
   } = useRentBuddyStore();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'logistics' | 'damage' | 'order'>('all');
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = (notifications || []).filter((n) => !n.read).length;
 
-  const handleNotificationClick = (id: string) => {
-    markNotificationRead(id);
+  const handleNotificationClick = (notif: any) => {
+    // Instantly mark as read in store and MongoDB Atlas without navigating away
+    markNotificationRead(notif.id);
   };
 
-  const getNotifIcon = (type: string) => {
+  const handleMarkAllRead = () => {
+    markAllNotificationsRead();
+  };
+
+  const filteredNotifications = (notifications || []).filter(n => {
+    if (!n) return false;
+    if (activeFilter === 'all') return true;
+    const cat = ((n as any).category || '').toLowerCase();
+    const title = (n.title || '').toLowerCase();
+    if (activeFilter === 'logistics') {
+      return cat === 'logistics' || title.includes('rider') || title.includes('loading') || title.includes('delivery') || title.includes('otp') || title.includes('handover');
+    }
+    if (activeFilter === 'damage') {
+      return cat === 'damage' || title.includes('damage') || title.includes('quality') || title.includes('defect') || title.includes('repair');
+    }
+    if (activeFilter === 'order') {
+      return cat === 'order' || title.includes('order') || title.includes('placed') || title.includes('booked');
+    }
+    return true;
+  });
+
+  const getNotifIcon = (type: string, category?: string) => {
+    if (category === 'logistics' || type === 'logistics') {
+      return <Truck className="w-4 h-4 text-indigo-400" />;
+    }
     switch (type) {
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
+        return <AlertCircle className="w-4 h-4 text-rose-500" />;
       case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-amber-600" />;
+        return <AlertTriangle className="w-4 h-4 text-amber-500" />;
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-emerald-600" />;
+        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
       default:
-        return <Info className="w-4 h-4 text-red-600" />;
+        return <Info className="w-4 h-4 text-cyan-400" />;
     }
   };
 
@@ -79,7 +111,7 @@ export default function Navbar({ currentView, onOpenSearch, onToggleSidebar, isS
   const isDark = theme === 'dark';
 
   return (
-    <header className={`h-16 ${isDark ? 'bg-[#0d131f] text-slate-100 border-slate-800 shadow-md' : 'bg-white text-slate-800 border-slate-200/90 shadow-xs'} border-b flex items-center justify-between px-6 z-20 select-none transition-colors duration-300`}>
+    <header className={`h-16 ${isDark ? 'bg-[#0d131f] text-slate-100 border-slate-800 shadow-md' : 'bg-white text-slate-800 border-slate-200/90 shadow-xs'} border-b flex items-center justify-between px-6 relative z-50 select-none transition-colors duration-300`}>
       {/* Left: Sidebar Hamburger Toggle + Breadcrumb */}
       <div className="flex items-center gap-3">
         {/* 3-line Hamburger Menu Toggle Icon */}
@@ -98,45 +130,41 @@ export default function Navbar({ currentView, onOpenSearch, onToggleSidebar, isS
         {/* Breadcrumb Hierarchy */}
         <div className="flex items-center gap-2">
           <span className="text-red-600 font-black text-sm tracking-wider uppercase">RentBuddy</span>
-          <span className={`${isDark ? 'text-slate-600' : 'text-slate-300'} text-xs font-bold`}>/</span>
-          <span className={`${isDark ? 'text-white' : 'text-slate-900'} text-sm font-bold tracking-wide`}>
+          <span className={`${isDark ? 'text-slate-600' : 'text-slate-300'} font-bold`}>/</span>
+          <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
             {getBreadcrumbTitle()}
           </span>
-          <span className={`ml-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold border shadow-2xs ${
-            isDark
-              ? 'bg-red-950/50 text-red-400 border-red-900/80'
-              : 'bg-red-50 text-red-700 border-red-200'
-          }`}>
-            📍 {currentCity} Hub
-          </span>
+          {currentCity && (
+            <span className={`ml-2 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+              isDark
+                ? 'bg-red-950/40 text-red-400 border-red-800/50'
+                : 'bg-red-50 text-red-700 border-red-200'
+            }`}>
+              📍 {currentCity.replace(' (Head Office)', ' Hub')}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Center/Right controls */}
+      {/* Right controls */}
       <div className="flex items-center gap-3">
-        {/* Global Search button */}
+        {/* Global Search trigger button */}
         <button
           onClick={onOpenSearch}
-          className={`w-64 border rounded-xl px-3.5 py-2 flex items-center justify-between text-xs transition-all cursor-pointer shadow-2xs ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs transition-all cursor-pointer shadow-2xs ${
             isDark
-              ? 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
-              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300'
+              ? 'bg-slate-850 hover:bg-slate-800 border-slate-700/80 text-slate-400 hover:text-slate-200'
+              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-700'
           }`}
         >
-          <span className="flex items-center gap-2">
-            <Search className={`w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-400'}`} />
-            <span className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Search inventory, orders...</span>
-          </span>
-          <kbd className={`text-[10px] px-1.5 py-0.5 rounded font-mono border shadow-2xs ${
-            isDark
-              ? 'bg-slate-900 text-slate-400 border-slate-700'
-              : 'bg-white text-slate-500 border-slate-200'
-          }`}>
-            ⌘K
-          </kbd>
+          <Search className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Search inventory, orders...</span>
+          <kbd className={`hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono border ${
+            isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-200 border-slate-300 text-slate-600'
+          }`}>⌘K</kbd>
         </button>
 
-        {/* Theme Toggle Button (Full dark/light mode toggle functioning) */}
+        {/* Theme toggle */}
         <button
           onClick={toggleTheme}
           className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105 ${
@@ -144,7 +172,7 @@ export default function Navbar({ currentView, onOpenSearch, onToggleSidebar, isS
               ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200'
               : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
           }`}
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={isDark ? "Switch to Light Theme" : "Switch to Dark Theme"}
         >
           {isDark ? (
             <Sun className="w-4 h-4 text-amber-400" />
@@ -171,65 +199,166 @@ export default function Navbar({ currentView, onOpenSearch, onToggleSidebar, isS
             )}
           </button>
 
-          {/* Notifications Dropdown Card */}
+          {/* Notifications Dropdown Card (z-[100] to completely cover cards without bleed-through) */}
           {showNotifications && (
-            <div className={`absolute right-0 mt-2 w-80 border rounded-2xl shadow-2xl p-4 space-y-3 z-50 ${
+            <div className={`absolute right-0 mt-2 w-[390px] sm:w-[440px] border rounded-2xl shadow-2xl p-4 space-y-3 z-[100] animate-fade-in ${
               isDark
-                ? 'bg-slate-900 border-slate-700 text-slate-100'
-                : 'bg-white border-slate-200 text-slate-800'
+                ? 'bg-slate-900 border-slate-700 text-slate-100 shadow-black/80'
+                : 'bg-white border-slate-200 text-slate-800 shadow-slate-400/30'
             }`}>
-              <div className={`flex items-center justify-between border-b pb-2 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                <span className={`font-bold text-xs uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>Notifications ({unreadCount})</span>
-                {notifications.length > 0 && (
-                  <button
-                    onClick={() => {
-                      clearNotifications();
-                      setShowNotifications(false);
-                    }}
-                    className="text-slate-400 hover:text-red-600 p-1 transition-all cursor-pointer"
-                    title="Clear All"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+              {/* Header */}
+              <div className={`flex items-center justify-between border-b pb-2.5 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500">
+                    <Bell className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className={`font-black text-xs uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      Live Notifications
+                    </h4>
+                    <span className="text-[10px] text-red-500 font-bold">
+                      {unreadCount} unread alert{unreadCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors cursor-pointer px-2 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20"
+                    >
+                      <CheckCheck className="w-3 h-3" /> Mark all read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={() => {
+                        clearNotifications();
+                        setShowNotifications(false);
+                      }}
+                      className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all cursor-pointer"
+                      title="Clear All"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-                {notifications.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-slate-500 font-medium">
-                    No active system alerts. All systems nominal.
+              {/* Clickable Notification Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeFilter === 'all'
+                      ? isDark ? 'bg-red-600 text-white font-black shadow-sm' : 'bg-red-600 text-white font-black'
+                      : isDark ? 'bg-slate-800 hover:bg-slate-750 text-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  All ({notifications.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter('logistics')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeFilter === 'logistics'
+                      ? isDark ? 'bg-red-600 text-white font-black shadow-sm' : 'bg-red-600 text-white font-black'
+                      : isDark ? 'bg-slate-800 hover:bg-slate-750 text-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  🚚 Logistics & Riders
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter('damage')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeFilter === 'damage'
+                      ? isDark ? 'bg-red-600 text-white font-black shadow-sm' : 'bg-red-600 text-white font-black'
+                      : isDark ? 'bg-slate-800 hover:bg-slate-750 text-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  ⚠️ Quality & Damage
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter('order')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeFilter === 'order'
+                      ? isDark ? 'bg-red-600 text-white font-black shadow-sm' : 'bg-red-600 text-white font-black'
+                      : isDark ? 'bg-slate-800 hover:bg-slate-750 text-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  📦 Orders
+                </button>
+              </div>
+
+              {/* Notifications List */}
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-800/40">
+                {filteredNotifications.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-500 font-medium">
+                    <CheckCircle className="w-8 h-8 text-emerald-500/40 mx-auto mb-1.5" />
+                    No notifications matching this filter.
                   </div>
                 ) : (
-                  notifications.map((notif) => (
+                  filteredNotifications.map((notif) => (
                     <div
                       key={notif.id}
-                      onClick={() => handleNotificationClick(notif.id)}
-                      className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-2.5 ${
+                      onClick={() => handleNotificationClick(notif)}
+                      className={`pt-2.5 pb-2.5 px-3 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-3 hover:scale-[1.01] ${
                         notif.read
-                          ? isDark ? 'bg-slate-800/40 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-500'
-                          : isDark ? 'bg-red-950/40 hover:bg-red-950/60 border-red-800 text-slate-200' : 'bg-red-50/70 hover:bg-red-50 border-red-200 text-slate-800'
+                          ? isDark ? 'bg-slate-800/30 border-slate-800 text-slate-400 hover:bg-slate-800/50' : 'bg-slate-50/80 border-slate-200 text-slate-500 hover:bg-slate-100'
+                          : isDark ? 'bg-red-950/40 hover:bg-red-950/60 border-red-800/80 text-slate-100 shadow-sm' : 'bg-red-50/90 hover:bg-red-100/80 border-red-200 text-slate-900'
                       }`}
                     >
-                      <div className="mt-0.5">{getNotifIcon(notif.type)}</div>
+                      <div className="mt-0.5 shrink-0">{getNotifIcon(notif.type, (notif as any).category)}</div>
                       <div className="flex-1 space-y-1">
                         <div className="flex justify-between items-center">
-                          <span className={`font-bold text-[11px] ${
+                          <span className={`font-black text-xs ${
                             notif.read
                               ? isDark ? 'text-slate-400' : 'text-slate-600'
-                              : isDark ? 'text-red-400' : 'text-red-700'
+                              : isDark ? 'text-white' : 'text-slate-900'
                           }`}>
                             {notif.title}
                           </span>
                           {!notif.read && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                            <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
                           )}
                         </div>
-                        <p className={`text-[11px] leading-normal ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <p className={`text-xs leading-relaxed font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                           {notif.message}
                         </p>
-                        <span className="text-[9px] text-slate-400 block font-mono">
-                          {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+
+                        {/* Rider, City & Order Badges */}
+                        {((notif as any).riderName || (notif as any).orderId || notif.city) && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            {(notif as any).riderName && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/25">
+                                🚚 Rider: {(notif as any).riderName} {(notif as any).riderPhone ? `(${(notif as any).riderPhone})` : ''}
+                              </span>
+                            )}
+                            {notif.city && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                                📍 {notif.city}
+                              </span>
+                            )}
+                            {(notif as any).orderId && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-mono">
+                                #{(notif as any).orderId}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1">
+                          <span>
+                            {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(notif.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </span>
+                          <span className={`font-bold ${notif.read ? 'text-emerald-500/70' : 'text-red-400 hover:text-red-300'}`}>
+                            {notif.read ? '✓ Read' : '● Mark as read'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))

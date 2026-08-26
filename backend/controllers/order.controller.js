@@ -1,4 +1,5 @@
 import { Order, Customer, Driver, Asset, Zone, Log } from '../models/index.js';
+import { addNotification } from '../utils/notification.helper.js';
 
 export const getOrders = async (req, res) => {
   try {
@@ -125,6 +126,15 @@ export const createOrder = async (req, res) => {
       details: `Order ${orderId} created for ${finalCustName} in ${finalCity}. Assets reserved: ${(items || []).map(i => i.assetId || i.id).join(', ')}`
     });
 
+    await addNotification({
+      title: '📦 New Order Placed',
+      message: `Order #${orderId} booked for ${finalCustName} (${finalCity}). Deposit: ₹${order.netDeposit || 0}, Rent: ₹${order.netMonthlyRent || 0}/mo.`,
+      type: 'info',
+      city: finalCity,
+      orderId: orderId,
+      category: 'order'
+    });
+
     return res.status(201).json({ success: true, message: 'Order created and inventory reserved successfully', data: order });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -176,6 +186,17 @@ export const assignDriverToOrder = async (req, res) => {
       userRole: 'Logistics Manager',
       action: 'DRIVER_ASSIGNED',
       details: `Order ${order.id} assigned to driver ${driver.fullName} (${driver.id})`
+    });
+
+    await addNotification({
+      title: '🚚 Rider Assigned to Order',
+      message: `Rider ${driver.fullName} (${driver.phone}) assigned to Order #${order.id} for delivery in ${order.city || 'Hub'}.`,
+      type: 'info',
+      city: order.city || 'Indore (Head Office)',
+      riderName: driver.fullName,
+      riderPhone: driver.phone,
+      orderId: order.id,
+      category: 'logistics'
     });
 
     return res.json({
@@ -288,6 +309,18 @@ export const scanAssetBarcode = async (req, res) => {
       details: `Asset ${barcode} (${assetName}) verified for Order ${order.id} [${scanType}]`
     });
 
+    const scanLabel = scanType === 'CHECKOUT' ? '📦 Warehouse Loading Scan' : (scanType === 'DELIVERY' ? '📍 Delivery Location Scan' : '🔄 Return Pickup Scan');
+    await addNotification({
+      title: scanLabel,
+      message: `Asset [${barcode}] (${assetName}) scanned and verified by Rider ${order.assignedDriverName || ''} for Order #${order.id}.`,
+      type: 'info',
+      city: order.city || 'Indore (Head Office)',
+      riderName: order.assignedDriverName || '',
+      riderPhone: order.assignedDriverPhone || '',
+      orderId: order.id,
+      category: 'logistics'
+    });
+
     return res.json({
       success: true,
       verified: true,
@@ -324,6 +357,17 @@ export const acceptOrder = async (req, res) => {
       userRole: 'Rider',
       action: 'ORDER_ACCEPTED',
       details: `Rider accepted Order ${order.id}`
+    });
+
+    await addNotification({
+      title: '🚚 Order Accepted by Rider',
+      message: `Rider ${order.assignedDriverName || 'Driver'} accepted delivery dispatch for Order #${order.id}.`,
+      type: 'info',
+      city: order.city || 'Indore (Head Office)',
+      riderName: order.assignedDriverName || '',
+      riderPhone: order.assignedDriverPhone || '',
+      orderId: order.id,
+      category: 'logistics'
     });
 
     return res.json({ success: true, message: 'Order accepted successfully', data: order });
@@ -429,11 +473,22 @@ export const getDriverActiveOrders = async (req, res) => {
       if (driver.phone) {
         const dp = driver.phone.replace(/[^0-9]/g, '').slice(-10);
         idFilters.push({ assignedDriverPhone: dp });
+        idFilters.push({ assignedDriverPhone: `+91${dp}` });
+        idFilters.push({ assignedDriverPhone: `+91-${dp}` });
       }
-      if (driver.fullName || driver.name) {
-        const dName = driver.fullName || driver.name;
-        idFilters.push({ assignedDriverName: dName });
-        idFilters.push({ assignedLogisticsUser: dName });
+      if (driver.fullName) {
+        const dCity = (driver.city || '').replace(/\(.*?\)/g, '').trim();
+        if (dCity) {
+          idFilters.push({
+            city: new RegExp(dCity, 'i'),
+            $or: [
+              { assignedDriverName: driver.fullName },
+              { assignedLogisticsUser: driver.fullName },
+              { assignedDriverId: driver.id }
+            ],
+            ...(cleanPhone ? { assignedDriverPhone: { $in: [null, '', cleanPhone, `+91${cleanPhone}`, `+91-${cleanPhone}`] } } : {})
+          });
+        }
       }
     }
 
@@ -550,11 +605,22 @@ export const getDriverOrderHistory = async (req, res) => {
       if (driver.phone) {
         const dp = driver.phone.replace(/[^0-9]/g, '').slice(-10);
         idFilters.push({ assignedDriverPhone: dp });
+        idFilters.push({ assignedDriverPhone: `+91${dp}` });
+        idFilters.push({ assignedDriverPhone: `+91-${dp}` });
       }
-      if (driver.fullName || driver.name) {
-        const dName = driver.fullName || driver.name;
-        idFilters.push({ assignedDriverName: dName });
-        idFilters.push({ assignedLogisticsUser: dName });
+      if (driver.fullName) {
+        const dCity = (driver.city || '').replace(/\(.*?\)/g, '').trim();
+        if (dCity) {
+          idFilters.push({
+            city: new RegExp(dCity, 'i'),
+            $or: [
+              { assignedDriverName: driver.fullName },
+              { assignedLogisticsUser: driver.fullName },
+              { assignedDriverId: driver.id }
+            ],
+            ...(cleanPhone ? { assignedDriverPhone: { $in: [null, '', cleanPhone, `+91${cleanPhone}`, `+91-${cleanPhone}`] } } : {})
+          });
+        }
       }
     }
 

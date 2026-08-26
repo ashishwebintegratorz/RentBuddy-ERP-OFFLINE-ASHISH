@@ -1,4 +1,5 @@
 import { DamageReport, Asset, Log } from '../models/index.js';
+import { addNotification } from '../utils/notification.helper.js';
 
 export const reportDamage = async (req, res) => {
   try {
@@ -53,6 +54,15 @@ export const reportDamage = async (req, res) => {
       details: `Damage reported for asset ${assetId} (${severity}). Damage ID: ${reportId}`
     });
 
+    await addNotification({
+      title: '⚠️ Asset Damage Reported',
+      message: `Damage reported on Asset ${assetBarcode || assetId} (${severity || 'Medium'}). Issue: ${damageType || 'Defect'}. Reported by: ${reportedByDriverName || 'Inspector'}`,
+      type: 'warning',
+      city: 'Indore (Head Office)',
+      orderId: orderId || '',
+      category: 'damage'
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Damage report submitted to Admin for repair review.',
@@ -96,6 +106,15 @@ export const resolveDamageReport = async (req, res) => {
         { status: newStatus, currentStatus: newStatus }
       );
     }
+
+    await addNotification({
+      title: '🛠️ Damage Ticket Resolved',
+      message: `Damage report #${report.id} on Asset ${report.assetBarcode || report.assetId} marked as ${report.status}.`,
+      type: 'success',
+      city: 'Indore (Head Office)',
+      orderId: report.orderId || '',
+      category: 'damage'
+    });
 
     return res.json({
       success: true,

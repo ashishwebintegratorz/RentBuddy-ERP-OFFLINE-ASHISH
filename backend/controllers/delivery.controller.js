@@ -1,4 +1,5 @@
 import { Order, Asset, Driver, Log } from '../models/index.js';
+import { addNotification } from '../utils/notification.helper.js';
 
 // Record Delivery Proof & Property / Security Details
 export const uploadDeliveryProof = async (req, res) => {
@@ -20,6 +21,17 @@ export const uploadDeliveryProof = async (req, res) => {
     };
 
     await order.save();
+
+    await addNotification({
+      title: '📸 Proof of Delivery Captured',
+      message: `POD Photo verified for Order #${order.id}. Customer: ${order.customerName} (${order.city || 'Hub'}).`,
+      type: 'success',
+      city: order.city || 'Indore',
+      riderName: order.assignedDriverName || '',
+      riderPhone: order.assignedDriverPhone || '',
+      orderId: order.id,
+      category: 'logistics'
+    });
 
     return res.json({
       success: true,
@@ -118,6 +130,17 @@ export const sendDeliveryOtp = async (req, res) => {
     }
     console.log(`🔢 4-Digit OTP    : >>> [ ${deliveryOtp} ] <<<`);
     console.log(`======================================================\n`);
+
+    await addNotification({
+      title: '🔑 Handover OTP Dispatched',
+      message: `OTP [${deliveryOtp}] sent for Order #${ordId}. Customer: ${customerName}. Rider: ${driverName || 'Faisal Rabani'}.`,
+      type: 'info',
+      city: order?.city || 'Surat',
+      riderName: driverName || 'Faisal Rabani',
+      riderPhone: driverPhone || '',
+      orderId: ordId,
+      category: 'logistics'
+    });
 
     return res.json({
       success: true,
@@ -248,6 +271,17 @@ export const completeDelivery = async (req, res) => {
     console.log(` 👤 Customer: ${order?.customerName || 'Customer'}`);
     console.log(` 🚚 Delivered by: ${order?.assignedDriverName || 'Driver'}`);
     console.log('\x1b[42m\x1b[30m%s\x1b[0m\n', ' ====================================================== ');
+
+    await addNotification({
+      title: '✅ Order Handover & Delivery Completed',
+      message: `Order #${order?.id || orderId} delivered to ${order?.customerName || 'Customer'} by Rider ${order?.assignedDriverName || 'Faisal Rabani'} with OTP verification.`,
+      type: 'success',
+      city: order?.city || 'Indore',
+      riderName: order?.assignedDriverName || 'Faisal Rabani',
+      riderPhone: order?.assignedDriverPhone || '',
+      orderId: order?.id || orderId,
+      category: 'logistics'
+    });
 
     return res.json({
       success: true,

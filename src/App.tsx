@@ -135,6 +135,7 @@ function App() {
         {/* Top Navbar */}
         <Navbar
           currentView={currentView}
+          setView={setView}
           onOpenSearch={() => setIsSearchOpen(true)}
           onToggleSidebar={() => setIsSidebarCollapsed(prev => !prev)}
           isSidebarCollapsed={isSidebarCollapsed}

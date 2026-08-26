@@ -155,6 +155,7 @@ interface RentBuddyState {
 
   // Notification Actions
   markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
   clearNotifications: () => void;
 
   // System Simulators
@@ -1582,10 +1583,19 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           set((state) => ({
             notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
           }));
+          syncToDatabase(get());
+        },
+
+        markAllNotificationsRead: () => {
+          set((state) => ({
+            notifications: state.notifications.map(n => ({ ...n, read: true }))
+          }));
+          syncToDatabase(get());
         },
 
         clearNotifications: () => {
           set({ notifications: [] });
+          syncToDatabase(get());
         },
 
         // System Audits
@@ -1848,15 +1858,44 @@ export const useRentBuddyStore = create<RentBuddyState>()(
 
               const activeCity = localStorage.getItem('rentbuddy_active_city') || get().currentCity || db.currentCity || 'Indore (Head Office)';
 
+              const currentLocalOrders = get().orders || [];
+              const serverOrders = (db.orders || []).map((s: any) => {
+                const local = currentLocalOrders.find((l: any) => l.id === s.id || l.id === s._id);
+                const isPrepared = s.isPrepared ?? local?.isPrepared ?? (
+                  s.status === 'READY_FOR_DISPATCH' || 
+                  s.status === 'Ready for Dispatch' || 
+                  Boolean(s.preparedAt)
+                );
+                const proof = s.deliveryProofPhoto || s.deliveryProof?.photos?.[0] || s.deliveryProof?.photoUrl || local?.deliveryProofPhoto || '';
+
+                return {
+                  ...(local || {}),
+                  ...s,
+                  id: s.id || s._id,
+                  isPrepared: Boolean(isPrepared),
+                  deliveryProofPhoto: proof,
+                  city: s.city || local?.city || 'Indore (Head Office)'
+                };
+              });
+
+              const currentLocalNotifs = get().notifications || [];
+              const mergedNotifications = (db.notifications || []).map((srvNotif: any) => {
+                const local = currentLocalNotifs.find((l: any) => l.id === srvNotif.id);
+                return {
+                  ...srvNotif,
+                  read: local ? (local.read === true || srvNotif.read === true) : Boolean(srvNotif.read)
+                };
+              });
+
               // Overwrite local memory state with synced real MongoDB collections
               set({
                 inventory: db.assets || [],
                 customers: db.customers || [],
-                orders: db.orders || [],
+                orders: serverOrders,
                 invoices: db.invoices || [],
                 repairs: db.repairs || [],
                 auditLogs: db.auditLogs || [],
-                notifications: db.notifications || [],
+                notifications: mergedNotifications,
                 drivers: db.drivers || [],
                 cities: db.cities && db.cities.length > 0 ? db.cities : get().cities,
                 currentCity: activeCity,

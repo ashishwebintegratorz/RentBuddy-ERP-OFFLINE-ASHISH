@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
+import { matchCityContext } from '../utils/cityUtils';
 import {
   CreditCard,
   RefreshCw,
@@ -7,17 +8,18 @@ import {
   Printer,
   Send,
   X,
-  Info
+  Info,
+  MapPin
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function FinancePortal() {
   const {
-    invoices,
+    invoices = [],
     payInvoice,
     generateMonthlyInvoices,
     currentCity,
-    orders
+    orders = []
   } = useRentBuddyStore();
 
   const [search, setSearch] = useState('');
@@ -28,15 +30,27 @@ export default function FinancePortal() {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState('UPI');
 
-  const selectedInvoice = invoices.find(i => i.id === selectedInvoiceId);
+  const selectedInvoice = (invoices || []).find(i => i && i.id === selectedInvoiceId);
 
-  // Filter list
-  const filteredInvoices = invoices.filter(i => {
-    const matchesSearch = i.id.toLowerCase().includes(search.toLowerCase()) ||
-                          i.customerName.toLowerCase().includes(search.toLowerCase()) ||
-                          i.orderId.toLowerCase().includes(search.toLowerCase());
+  // Filter list with safe null checks and city matching
+  const filteredInvoices = (invoices || []).filter(i => {
+    if (!i) return false;
+    const invId = (i.id || '').toLowerCase();
+    const custName = (i.customerName || '').toLowerCase();
+    const ordId = (i.orderId || '').toLowerCase();
+    const query = search.toLowerCase();
+
+    const matchesSearch = invId.includes(query) || custName.includes(query) || ordId.includes(query);
     const matchesStatus = statusFilter === 'All' || i.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    // Match linked order city if present
+    const linkedOrder = orders.find(o => o.id === i.orderId);
+    const invoiceCity = linkedOrder?.city;
+    const matchesCity = (!currentCity || currentCity === 'All Cities (Global View)' || currentCity === 'All') 
+      ? true 
+      : (invoiceCity ? matchCityContext(invoiceCity, currentCity) : true);
+
+    return matchesSearch && matchesStatus && matchesCity;
   });
 
   const handlePayInvoice = () => {
@@ -140,8 +154,8 @@ export default function FinancePortal() {
                     </td>
                     <td className="p-4 font-mono text-slate-300">{inv.billingPeriod}</td>
                     <td className="p-4 font-mono text-slate-200">
-                      <div>₹{inv.totalAmount.toLocaleString()}</div>
-                      {inv.lateFee > 0 && <span className="text-[9px] text-rose-400 font-semibold">+₹{inv.lateFee} Late fee</span>}
+                      <div>₹{(inv.totalAmount || 0).toLocaleString()}</div>
+                      {(inv.lateFee || 0) > 0 && <span className="text-[9px] text-rose-400 font-semibold">+₹{inv.lateFee} Late fee</span>}
                     </td>
                     <td className="p-4">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(inv.status)}`}>
@@ -235,7 +249,7 @@ export default function FinancePortal() {
             )}
             <div className="flex justify-between text-slate-100 font-bold border-t border-slate-900 pt-1.5 text-sm">
               <span>Total Bill:</span>
-              <span className="font-mono text-red-400">₹{selectedInvoice.totalAmount.toLocaleString()}</span>
+              <span className="font-mono text-red-400">₹{(selectedInvoice.totalAmount || 0).toLocaleString()}</span>
             </div>
           </div>
 
@@ -302,7 +316,7 @@ export default function FinancePortal() {
               </div>
               <div className="flex justify-between text-slate-400 text-sm border-t border-slate-900 pt-2">
                 <span>Charge Amount:</span>
-                <strong className="text-white font-mono text-base">₹{selectedInvoice.totalAmount.toLocaleString()}</strong>
+                <strong className="text-white font-mono text-base">₹{(selectedInvoice.totalAmount || 0).toLocaleString()}</strong>
               </div>
             </div>
 

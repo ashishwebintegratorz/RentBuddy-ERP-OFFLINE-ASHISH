@@ -1,20 +1,21 @@
 import { useState } from 'react';
 import { useRentBuddyStore } from '../store/rentBuddyStore';
+import { matchCityContext } from '../utils/cityUtils';
 import { FileSpreadsheet, Download, FileText, BarChart, FileCheck } from 'lucide-react';
 
 export default function ReportsCenter() {
-  const { customers, inventory, invoices, currentCity } = useRentBuddyStore();
+  const { customers = [], inventory = [], invoices = [], currentCity } = useRentBuddyStore();
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
   // CSV Generator Helper
   const triggerCSVDownload = (filename: string, headers: string[], rows: string[][]) => {
     const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(','))].join('\n');
+      + [headers.join(','), ...rows.map(e => e.map(val => `"${(val || '').replace(/"/g, '""')}"`).join(','))].join('\n');
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${filename}_${currentCity}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `${filename}_${currentCity || 'All'}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -26,16 +27,16 @@ export default function ReportsCenter() {
   // Export 1: Revenue & Collections Report
   const handleExportRevenue = () => {
     const headers = ['Invoice ID', 'Order ID', 'Customer Name', 'Billing Period', 'DueDate', 'Charges', 'Late Fee', 'Total Paid Amount', 'Status'];
-    const rows = invoices.map(i => [
-      i.id,
-      i.orderId,
-      i.customerName,
-      i.billingPeriod,
-      i.dueDate,
-      i.rentalCharges.toString(),
-      i.lateFee.toString(),
-      i.totalAmount.toString(),
-      i.status
+    const rows = (invoices || []).map(i => [
+      i?.id || '',
+      i?.orderId || '',
+      i?.customerName || '',
+      i?.billingPeriod || '',
+      i?.dueDate || '',
+      (i?.rentalCharges ?? 0).toString(),
+      (i?.lateFee ?? 0).toString(),
+      (i?.totalAmount ?? 0).toString(),
+      i?.status || 'Pending'
     ]);
     triggerCSVDownload('RentBuddy_Revenue_Collections', headers, rows);
   };
@@ -43,19 +44,26 @@ export default function ReportsCenter() {
   // Export 2: Inventory Ledger Report
   const handleExportInventory = () => {
     const headers = ['Asset ID', 'Barcode', 'Category', 'Brand', 'Model', 'Warehouse', 'City', 'Rack Number', 'Deposit', 'Rent Price', 'Status', 'Condition'];
-    const rows = inventory.filter(a => a.city === currentCity).map(a => [
-      a.id,
-      a.barcode,
-      a.category,
-      a.brand,
-      a.model,
-      a.warehouse,
-      a.city,
-      a.rackNumber,
-      a.securityDeposit.toString(),
-      a.monthlyRentalPrice.toString(),
-      a.status,
-      a.lifecycle.currentCondition
+    const filteredAssets = (inventory || []).filter(a => {
+      if (!a) return false;
+      return (!currentCity || currentCity === 'All Cities (Global View)' || currentCity === 'All') 
+        ? true 
+        : matchCityContext(a.city, currentCity);
+    });
+
+    const rows = filteredAssets.map(a => [
+      a?.id || '',
+      a?.barcode || '',
+      a?.category || '',
+      a?.brand || '',
+      a?.model || '',
+      a?.warehouse || '',
+      a?.city || '',
+      a?.rackNumber || '',
+      (a?.securityDeposit ?? 0).toString(),
+      (a?.monthlyRentalPrice ?? (a as any)?.monthlyRent ?? 0).toString(),
+      a?.status || 'Available',
+      a?.lifecycle?.currentCondition || (a as any)?.condition || 'Excellent'
     ]);
     triggerCSVDownload('RentBuddy_Inventory_Ledger', headers, rows);
   };
@@ -63,18 +71,18 @@ export default function ReportsCenter() {
   // Export 3: Customer Demographic Report
   const handleExportCustomers = () => {
     const headers = ['Customer ID', 'Full Name', 'Mobile', 'Email', 'PAN', 'Aadhaar', 'Occupation', 'Employer', 'Current Address', 'Landlord Mobile', 'Compliance Status'];
-    const rows = customers.map(c => [
-      c.id,
-      c.fullName,
-      c.mobileNumber,
-      c.email,
-      c.panNumber,
-      c.aadhaarNumber,
-      c.occupation,
-      c.employer,
-      c.currentAddress,
-      c.landlordMobile,
-      c.status
+    const rows = (customers || []).map(c => [
+      c?.id || '',
+      c?.fullName || '',
+      c?.mobileNumber || '',
+      c?.email || '',
+      c?.panNumber || '',
+      c?.aadhaarNumber || '',
+      c?.occupation || '',
+      c?.employer || '',
+      c?.currentAddress || c?.deliveryAddress || '',
+      c?.landlordMobile || '',
+      c?.status || c?.verificationStatus || 'Verified'
     ]);
     triggerCSVDownload('RentBuddy_Customer_Ledger', headers, rows);
   };
@@ -82,17 +90,26 @@ export default function ReportsCenter() {
   // Export 4: Asset ROI Metrics
   const handleExportROI = () => {
     const headers = ['Asset ID', 'Barcode', 'Category', 'Model', 'Purchase Cost', 'Revenue Earned', 'Repairs Cost', 'Rentals Count', 'Calculated ROI %'];
-    const rows = inventory.filter(a => a.city === currentCity).map(a => {
-      const roi = a.purchaseCost > 0 ? Math.round((a.lifecycle.revenueEarned / a.purchaseCost) * 100) : 0;
+    const filteredAssets = (inventory || []).filter(a => {
+      if (!a) return false;
+      return (!currentCity || currentCity === 'All Cities (Global View)' || currentCity === 'All') 
+        ? true 
+        : matchCityContext(a.city, currentCity);
+    });
+
+    const rows = filteredAssets.map(a => {
+      const pCost = a?.purchaseCost || 0;
+      const rev = a?.lifecycle?.revenueEarned || 0;
+      const roi = pCost > 0 ? Math.round((rev / pCost) * 100) : 0;
       return [
-        a.id,
-        a.barcode,
-        a.category,
-        `${a.brand} ${a.model}`,
-        a.purchaseCost.toString(),
-        a.lifecycle.revenueEarned.toString(),
-        a.lifecycle.repairCost.toString(),
-        a.lifecycle.totalRentalsCount.toString(),
+        a?.id || '',
+        a?.barcode || '',
+        a?.category || '',
+        `${a?.brand || ''} ${a?.model || ''}`.trim(),
+        pCost.toString(),
+        rev.toString(),
+        (a?.lifecycle?.repairCost || 0).toString(),
+        (a?.lifecycle?.totalRentalsCount || (a?.lifecycle as any)?.totalRents || 0).toString(),
         `${roi}%`
       ];
     });

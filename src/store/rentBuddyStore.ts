@@ -179,12 +179,10 @@ const genId = (prefix: string) => `${prefix}-${Math.floor(100000 + Math.random()
 
 const BACKEND_URL = getApiBaseUrl();
 
-// Debounced synchronization engine to prevent database flooding
+// Debounced & immediate synchronization engine to prevent database flooding and data loss
 let syncTimeout: any = null;
-const syncToDatabase = (state: any) => {
-  if (syncTimeout) clearTimeout(syncTimeout);
-  
-  syncTimeout = setTimeout(async () => {
+const syncToDatabase = (state: any, immediate: boolean = false) => {
+  const performSync = async () => {
     try {
       const payload = {
         assets: state.inventory,
@@ -201,9 +199,14 @@ const syncToDatabase = (state: any) => {
         expectedVsActualAudit: state.expectedVsActualAudit
       };
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (state.token) {
+        headers['Authorization'] = `Bearer ${state.token}`;
+      }
+
       const res = await fetch(`${BACKEND_URL}/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -212,7 +215,16 @@ const syncToDatabase = (state: any) => {
     } catch (err: any) {
       console.warn('⚠️ [RentBuddy Store] Offline cache active. Sync deferred:', err.message);
     }
-  }, 1000); // 1s debounce
+  };
+
+  if (immediate) {
+    if (syncTimeout) clearTimeout(syncTimeout);
+    performSync();
+    return;
+  }
+
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(performSync, 1000);
 };
 
 export const useRentBuddyStore = create<RentBuddyState>()(
@@ -311,9 +323,11 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         // Customer Actions
         addCustomer: (custData, checkoutCart) => {
           const custId = genId('RB-CUST');
+          const targetCity = custData.city || get().currentCity || 'Ahmedabad';
           const newCustomer: Customer = {
             ...custData,
             id: custId,
+            city: targetCity,
             status: 'Verified',
             verificationStatus: 'Verified',
             createdAt: new Date().toISOString(),
@@ -325,17 +339,20 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
               userName: `User (${state.currentUserRole})`,
-              city: state.currentCity,
+              city: targetCity,
               action: 'Customer Onboarding',
               category: 'COMPLIANCE',
               severity: 'INFO',
-              details: `Onboarded new customer ${newCustomer.fullName} with Mobile ${newCustomer.mobileNumber}.`,
+              details: `Onboarded new customer ${newCustomer.fullName} with Mobile ${newCustomer.mobileNumber} in ${targetCity}.`,
             };
             return {
               customers: list,
               auditLogs: [log, ...state.auditLogs],
             };
           });
+
+          // Immediate persistence to MongoDB Atlas to prevent 5-second polling rollback
+          syncToDatabase(get(), true);
 
           if (checkoutCart) {
             get().checkoutOrder({
@@ -1887,10 +1904,23 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 };
               });
 
+              const currentLocalCustomers = get().customers || [];
+              const serverCustomers = (db.customers || []).map((sc: any) => ({
+                ...sc,
+                id: sc.id || sc._id,
+                city: sc.city || 'Indore (Head Office)'
+              }));
+              const mergedCustomers = [...serverCustomers];
+              for (const loc of currentLocalCustomers) {
+                if (loc && loc.id && !mergedCustomers.some(s => s.id === loc.id || (loc.mobileNumber && s.mobileNumber === loc.mobileNumber))) {
+                  mergedCustomers.unshift(loc);
+                }
+              }
+
               // Overwrite local memory state with synced real MongoDB collections
               set({
                 inventory: db.assets || [],
-                customers: db.customers || [],
+                customers: mergedCustomers,
                 orders: serverOrders,
                 invoices: db.invoices || [],
                 repairs: db.repairs || [],

@@ -411,6 +411,16 @@ export const deleteDriverAccount = async (req, res) => {
       return errorResponse(res, 'A valid 10-digit mobile number is required to delete account', 400);
     }
 
+    // Authorization check: User must be Super Admin or deleting their own verified account
+    if (req.user) {
+      const userPhone = (req.user.phone || '').replace(/[^0-9]/g, '').slice(-10);
+      const isSuperAdmin = req.user.role === 'Super Admin';
+      const isOwner = userPhone && userPhone === cleanPhone;
+      if (!isSuperAdmin && !isOwner) {
+        return errorResponse(res, 'Access denied: You are not authorized to delete another rider account.', 403);
+      }
+    }
+
     if (getDbStatus()) {
       // 1. Remove from Driver collection
       await Driver.deleteMany({

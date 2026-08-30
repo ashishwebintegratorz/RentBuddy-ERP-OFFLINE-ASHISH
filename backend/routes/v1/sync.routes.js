@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { loadState, syncState } from '../../controllers/sync.controller.js';
-import { authenticateToken } from '../../middlewares/auth.middleware.js';
+import { optionalAuth } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -9,6 +9,6 @@ const router = Router();
 router.get('/load', loadState);
 
 // POST /api/v1/sync
-router.post('/', authenticateToken, syncState);
+router.post('/', optionalAuth, syncState);
 
 export default router;

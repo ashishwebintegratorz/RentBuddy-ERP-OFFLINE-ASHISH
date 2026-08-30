@@ -257,25 +257,73 @@ export const scanAssetBarcode = async (req, res) => {
 
     const cleanBarcode = barcode.trim().toLowerCase();
 
-    // Check if barcode matches any expected asset in order or items list
+    // Strict Rider Assignment Verification
+    const { driverId, driverPhone, driverName } = req.body;
+    if (driverId || driverPhone || driverName) {
+      const cleanDp = (driverPhone || '').replace(/[^0-9]/g, '').slice(-10);
+      const ordDp = (order.assignedDriverPhone || '').replace(/[^0-9]/g, '').slice(-10);
+      const isAssigned = (
+        (!order.assignedDriverId && !order.assignedDriverPhone) ||
+        (driverId && order.assignedDriverId && (order.assignedDriverId === driverId || order.assignedDriverId === driverId.toString())) ||
+        (cleanDp && ordDp && cleanDp === ordDp) ||
+        (driverName && order.assignedDriverName && driverName.trim().toLowerCase() === order.assignedDriverName.trim().toLowerCase())
+      );
+      if (!isAssigned) {
+        const assignedRider = order.assignedDriverName || order.assignedDriverPhone || order.assignedDriverId || 'Another Driver';
+        return res.status(403).json({
+          success: false,
+          verified: false,
+          code: 'UNAUTHORIZED_RIDER',
+          message: `Access Denied: Order #${order.id} is assigned to Rider "${assignedRider}". You are not authorized to scan or dispatch this order.`
+        });
+      }
+    }
+
+    // Check if barcode matches any expected asset, items, or consignment tag
+    const orderNum = (order.id || '').replace(/[^0-9]/g, '');
+    const custClean = (order.customerName || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const validTags = [
+      (order.id || '').toLowerCase(),
+      (order.orderBarcode || '').toLowerCase(),
+      (order.trackingNumber || '').toLowerCase(),
+      `rb-${custClean}-${orderNum}`,
+      `rb-ord-${orderNum}`,
+      `ord-${orderNum}`,
+      `ship-${orderNum}`
+    ].filter(Boolean);
+
+    const matchesConsignmentTag = validTags.some(tag => 
+      tag === cleanBarcode || cleanBarcode.includes(tag) || (tag.length > 5 && tag.includes(cleanBarcode))
+    );
+
     let matchedItem = (order.expectedAssets || []).find(
       it => (it.barcode && it.barcode.toLowerCase() === cleanBarcode) ||
-            (it.assetId && it.assetId.toLowerCase() === cleanBarcode)
+            (it.assetId && it.assetId.toLowerCase() === cleanBarcode) ||
+            (it.assetId && cleanBarcode.includes(it.assetId.toLowerCase()))
     );
 
     if (!matchedItem) {
       matchedItem = (order.items || []).find(
         it => (it.barcode && it.barcode.toLowerCase() === cleanBarcode) ||
               (it.assetId && it.assetId.toLowerCase() === cleanBarcode) ||
-              (it.id && it.id.toLowerCase() === cleanBarcode)
+              (it.id && it.id.toLowerCase() === cleanBarcode) ||
+              (it.assetId && cleanBarcode.includes(it.assetId.toLowerCase()))
       );
+    }
+
+    if (!matchedItem && matchesConsignmentTag) {
+      matchedItem = (order.expectedAssets && order.expectedAssets[0]) || (order.items && order.items[0]) || {
+        assetName: 'Solid Wood Furniture Unit',
+        assetId: `RB-AST-${orderNum || '101'}`
+      };
     }
 
     if (!matchedItem) {
       return res.status(400).json({
         success: false,
         verified: false,
-        message: `Barcode ${barcode} does not match any furniture item assigned to Order ${order.id}`
+        code: 'INVALID_PRODUCT_BARCODE',
+        message: `Wrong Product: Barcode "${barcode}" does NOT match any furniture item assigned to Order #${order.id}`
       });
     }
 
@@ -287,11 +335,11 @@ export const scanAssetBarcode = async (req, res) => {
       order.status = 'OUT_FOR_DELIVERY';
       order.deliveryStatus = 'out_for_delivery';
       order.dispatchedAt = new Date().toISOString();
-    } else if (scanType === 'DELIVERY') {
+    } else if (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') {
+      // Step 2 Doorstep Handover Barcode Scan -> Confirms physical item presence, unlocks Step 3 Customer OTP
       order.scannedAtDelivery = true;
-      order.status = 'DELIVERED';
-      order.deliveryStatus = 'delivered';
-      order.deliveredAt = new Date().toISOString();
+      order.doorstepScanned = true;
+      order.deliveryStatus = 'out_for_delivery'; // Remains active until Customer Handover OTP is confirmed
     } else if (scanType === 'RETURN_PICKUP') {
       order.scannedAtReturn = true;
       order.status = 'RETURNED';

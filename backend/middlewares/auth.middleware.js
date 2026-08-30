@@ -10,19 +10,19 @@ export const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) {
+    if (!token || typeof token !== 'string') {
       return errorResponse(res, 'Authentication required. Missing Bearer token.', 401);
     }
 
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }, (err, decoded) => {
       if (err) {
-        return errorResponse(res, 'Session expired or invalid token.', 403);
+        return errorResponse(res, 'Session expired or invalid authentication token.', 403);
       }
       req.user = decoded;
       next();
     });
   } catch (err) {
-    return errorResponse(res, `Authentication error: ${err.message}`, 500);
+    return errorResponse(res, 'Authentication processing failed.', 500);
   }
 };
 

@@ -118,18 +118,18 @@ export const sendDeliveryOtp = async (req, res) => {
       console.warn('DB OTP update note:', dbErr.message);
     }
 
-    // Clean, professional, uncolored Terminal log
-    console.log(`\n======================================================`);
-    console.log(`🔐 [RentBuddy Delivery OTP]`);
-    console.log(`📦 Order ID       : #${ordId}`);
-    if (customerName || customerMobile) {
-      console.log(`👤 Customer       : ${customerName}${customerMobile ? ` (${customerMobile})` : ''}`);
-    }
-    if (driverName || driverPhone) {
-      console.log(`🚚 Assigned Rider : ${driverName}${driverPhone ? ` (${driverPhone})` : ''}`);
-    }
-    console.log(`🔢 4-Digit OTP    : >>> [ ${deliveryOtp} ] <<<`);
-    console.log(`======================================================\n`);
+    // Clean, high-visibility Terminal log for developer/dispatcher
+    const logBox = `
+======================================================
+🔐 [RentBuddy Delivery OTP Generated]
+📦 Order ID       : #${ordId}
+👤 Customer       : ${customerName}${customerMobile ? ` (${customerMobile})` : ''}
+🚚 Assigned Rider : ${driverName || 'Rider'}${driverPhone ? ` (${driverPhone})` : ''}
+🔢 4-Digit OTP    : >>> [ ${deliveryOtp} ] <<<
+======================================================
+`;
+    console.log(logBox);
+    process.stdout.write(logBox);
 
     await addNotification({
       title: '🔑 Handover OTP Dispatched',
@@ -203,33 +203,37 @@ export const completeDelivery = async (req, res) => {
     console.log(`✅ [RentBuddy Delivery OTP] OTP Verified (${cleanOtp}) for Order #${orderId}`);
 
     // 3. Transition Order to DELIVERED
+    const deliveredTime = new Date().toISOString();
     if (order) {
       order.status = 'DELIVERED';
       order.deliveryStatus = 'delivered';
-      order.deliveredAt = new Date().toISOString();
+      order.deliveredAt = deliveredTime;
       order.scannedAtDelivery = true;
+      order.doorstepScanned = true;
       if (proofImage) order.deliveryProofPhoto = proofImage;
       if (photoUrls && photoUrls.length > 0) order.deliveryProofPhoto = photoUrls[0];
       await order.save();
-    } else {
-      await Order.updateMany(
-        {
-          $or: [
-            { id: orderId },
-            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
-          ]
-        },
-        {
-          $set: {
-            status: 'DELIVERED',
-            deliveryStatus: 'delivered',
-            deliveredAt: new Date().toISOString(),
-            scannedAtDelivery: true,
-            ...(proofImage ? { deliveryProofPhoto: proofImage } : {})
-          }
-        }
-      );
     }
+    
+    await Order.updateMany(
+      {
+        $or: [
+          { id: orderId },
+          { id: order?.id },
+          ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+        ]
+      },
+      {
+        $set: {
+          status: 'DELIVERED',
+          deliveryStatus: 'delivered',
+          deliveredAt: deliveredTime,
+          scannedAtDelivery: true,
+          doorstepScanned: true,
+          ...(proofImage ? { deliveryProofPhoto: proofImage } : {})
+        }
+      }
+    );
 
     // Clear cache entry
     if (orderId) globalDeliveryOtpCache.delete(orderId.toString());

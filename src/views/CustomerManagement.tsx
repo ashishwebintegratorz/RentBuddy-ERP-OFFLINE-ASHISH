@@ -32,6 +32,7 @@ export default function CustomerManagement() {
     complaints,
     inventory,
     currentCity,
+    cities,
   } = useRentBuddyStore();
 
   const [search, setSearch] = useState('');
@@ -63,6 +64,7 @@ export default function CustomerManagement() {
     email: '',
     aadhaarNumber: '',
     panNumber: '',
+    city: currentCity !== 'All Cities' && currentCity !== 'All' ? currentCity : 'Ahmedabad',
     occupation: '',
     employer: '',
     monthlyIncome: 0,
@@ -95,8 +97,9 @@ export default function CustomerManagement() {
   const [coupon, setCoupon] = useState('');
 
   // Calculations for onboarding checkout preview
+  const activeFormCity = newCust.city || (currentCity !== 'All Cities' && currentCity !== 'All' ? currentCity : 'Ahmedabad');
   const availableInventory = inventory.filter(
-    a => a.city === currentCity && a.status === 'Available' && !selectedAssets.includes(a.id)
+    a => a.city === activeFormCity && a.status === 'Available' && !selectedAssets.includes(a.id)
   );
 
   const selectedInventoryItems = inventory.filter(a => selectedAssets.includes(a.id));
@@ -124,6 +127,8 @@ export default function CustomerManagement() {
       return;
     }
 
+    const targetCity = newCust.city || (currentCity === 'All Cities' || currentCity === 'All' ? 'Ahmedabad' : currentCity);
+
     const checkoutCart = rentImmediately && selectedAssets.length > 0 ? {
       items: selectedAssets.map(id => ({ assetId: id })),
       durationMonths: duration,
@@ -136,9 +141,9 @@ export default function CustomerManagement() {
 
     addCustomer({
       ...newCust,
-      city: currentCity === 'All Cities' || currentCity === 'All' ? 'Indore (Head Office)' : currentCity,
-      deliveryAddress: newCust.deliveryAddress || newCust.currentAddress || `${currentCity} Area`,
-      billingAddress: newCust.billingAddress || newCust.currentAddress || `${currentCity} Area`,
+      city: targetCity,
+      deliveryAddress: newCust.deliveryAddress || newCust.currentAddress || `${targetCity} Delivery Area`,
+      billingAddress: newCust.billingAddress || newCust.currentAddress || `${targetCity} Billing Area`,
       documents: {
         aadhaarFront: aadhaarFront || SVG_DOCUMENT_PLACEHOLDER,
         aadhaarBack: aadhaarBack || SVG_DOCUMENT_PLACEHOLDER,
@@ -156,6 +161,7 @@ export default function CustomerManagement() {
       email: '',
       aadhaarNumber: '',
       panNumber: '',
+      city: currentCity !== 'All Cities' && currentCity !== 'All' ? currentCity : 'Ahmedabad',
       occupation: '',
       employer: '',
       monthlyIncome: 0,
@@ -264,10 +270,16 @@ export default function CustomerManagement() {
               <option value="Blacklisted">Blacklisted</option>
             </select>
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                setNewCust(prev => ({
+                  ...prev,
+                  city: currentCity !== 'All Cities' && currentCity !== 'All' ? currentCity : prev.city || 'Ahmedabad'
+                }));
+                setShowAddForm(true);
+              }}
               className="bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold px-4 py-2 flex items-center gap-2 cursor-pointer shadow-lg shadow-red-600/10"
             >
-              <Plus className="w-4 h-4" /> Add Customer
+              <Plus className="w-4 h-4" /> Onboard Customer
             </button>
           </div>
         </div>
@@ -522,121 +534,154 @@ export default function CustomerManagement() {
 
       {/* Add Customer Dialog Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-[#030303]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-[550px] glass-panel border border-slate-800/90 rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-[#030303]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="w-[580px] bg-slate-950 border-2 border-slate-800 rounded-3xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-white text-base">Onboard New Customer (Wizard)</h3>
+              <div>
+                <h3 className="font-black text-white text-lg flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-red-500" /> Onboard New Customer (Wizard)
+                </h3>
+                <p className="text-xs text-slate-400 font-medium">Add verified KYC customer with dedicated City Hub routing</p>
+              </div>
               <button
                 onClick={() => setShowAddForm(false)}
-                className="p-1 rounded bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateCustomer} className="space-y-4 text-xs">
+              {/* Row 1: Full Name & Mobile Number */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">Full Name *</label>
+                  <label className="text-slate-300 block font-bold text-[11px]">Full Name *</label>
                   <input
                     type="text"
                     required
                     value={newCust.fullName}
                     onChange={(e) => setNewCust({ ...newCust, fullName: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
-                    placeholder="Enter full name"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
+                    placeholder="e.g. Rahul Sharma"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">Mobile Number *</label>
+                  <label className="text-slate-300 block font-bold text-[11px]">Mobile Number *</label>
                   <input
                     type="text"
                     required
                     value={newCust.mobileNumber}
                     onChange={(e) => setNewCust({ ...newCust, mobileNumber: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
-                    placeholder="Primary mobile"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
+                    placeholder="10-digit mobile"
                   />
                 </div>
               </div>
 
+              {/* Row 2: Select City Hub & Email Address */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">Email Address</label>
+                  <label className="text-amber-400 block font-black text-[11px] flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" /> Select City Hub *
+                  </label>
+                  <select
+                    required
+                    value={newCust.city}
+                    onChange={(e) => setNewCust({ ...newCust, city: e.target.value })}
+                    className="w-full bg-slate-900 border-2 border-amber-500/50 focus:border-amber-400 rounded-xl px-3 py-2 text-amber-300 font-black outline-none transition-colors cursor-pointer"
+                  >
+                    {cities.filter(c => c !== 'All Cities' && c !== 'All').map((c) => (
+                      <option key={c} value={c} className="bg-slate-900 text-white font-semibold">
+                        📍 {c}
+                      </option>
+                    ))}
+                    {!cities.some(c => c.includes('Ahmedabad')) && <option value="Ahmedabad" className="bg-slate-900 text-white font-semibold">📍 Ahmedabad</option>}
+                    {!cities.some(c => c.includes('Surat')) && <option value="Surat" className="bg-slate-900 text-white font-semibold">📍 Surat</option>}
+                    {!cities.some(c => c.includes('Indore')) && <option value="Indore (Head Office)" className="bg-slate-900 text-white font-semibold">📍 Indore (Head Office)</option>}
+                    {!cities.some(c => c.includes('Bhopal')) && <option value="Bhopal" className="bg-slate-900 text-white font-semibold">📍 Bhopal</option>}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-300 block font-bold text-[11px]">Email Address</label>
                   <input
                     type="email"
                     value={newCust.email}
                     onChange={(e) => setNewCust({ ...newCust, email: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
-                    placeholder="name@gmail.com"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
+                    placeholder="name@example.com"
                   />
                 </div>
+              </div>
+
+              {/* Row 3: Alternate Phone & Aadhaar */}
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">Alternate Number</label>
+                  <label className="text-slate-300 block font-bold text-[11px]">Alternate Phone</label>
                   <input
                     type="text"
                     value={newCust.alternateNumber}
                     onChange={(e) => setNewCust({ ...newCust, alternateNumber: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
                     placeholder="Optional backup"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">Aadhaar Number (12 Digit)</label>
+                  <label className="text-slate-300 block font-bold text-[11px]">Aadhaar Number (12-Digit)</label>
                   <input
                     type="text"
                     value={newCust.aadhaarNumber}
                     onChange={(e) => setNewCust({ ...newCust, aadhaarNumber: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
                     placeholder="xxxx xxxx xxxx"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">PAN Number</label>
-                  <input
-                    type="text"
-                    value={newCust.panNumber}
-                    onChange={(e) => setNewCust({ ...newCust, panNumber: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
-                    placeholder="ABCDE1234F"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2 space-y-1">
-                  <label className="text-slate-400 block font-medium">Employer / Office</label>
+              {/* Row 4: PAN Card & Monthly Income */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-300 block font-bold text-[11px]">PAN Number</label>
                   <input
                     type="text"
-                    value={newCust.employer}
-                    onChange={(e) => setNewCust({ ...newCust, employer: e.target.value })}
-                    className="w-full rounded-lg px-2.5 py-2"
-                    placeholder="Company Name"
+                    value={newCust.panNumber}
+                    onChange={(e) => setNewCust({ ...newCust, panNumber: e.target.value.toUpperCase() })}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold uppercase outline-none transition-colors placeholder:text-slate-600"
+                    placeholder="ABCDE1234F"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-slate-400 block font-medium">Monthly Income</label>
+                  <label className="text-slate-300 block font-bold text-[11px]">Monthly Income (₹)</label>
                   <input
                     type="number"
                     value={newCust.monthlyIncome || ''}
                     onChange={(e) => setNewCust({ ...newCust, monthlyIncome: Number(e.target.value) })}
-                    className="w-full rounded-lg px-2.5 py-2"
-                    placeholder="INR"
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
+                    placeholder="e.g. 45000"
                   />
                 </div>
               </div>
 
+              {/* Row 5: Employer / Office */}
               <div className="space-y-1">
-                <label className="text-slate-400 block font-medium">Delivery Address</label>
+                <label className="text-slate-300 block font-bold text-[11px]">Employer / Organization</label>
+                <input
+                  type="text"
+                  value={newCust.employer}
+                  onChange={(e) => setNewCust({ ...newCust, employer: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
+                  placeholder="e.g. Tata Consultancy Services / Freelancer"
+                />
+              </div>
+
+              {/* Row 6: Delivery Address */}
+              <div className="space-y-1">
+                <label className="text-slate-300 block font-bold text-[11px]">Delivery & Rental Address</label>
                 <textarea
                   value={newCust.deliveryAddress}
                   onChange={(e) => setNewCust({ ...newCust, deliveryAddress: e.target.value })}
-                  className="w-full rounded-lg px-2.5 py-2"
+                  className="w-full bg-slate-900 border border-slate-700 focus:border-red-500 rounded-xl px-3 py-2 text-white font-semibold outline-none transition-colors placeholder:text-slate-600"
                   rows={2}
-                  placeholder="Address where furniture will be delivered"
+                  placeholder={`Flat/House No, Street, Landmark in ${newCust.city || 'Hub'}`}
                 />
               </div>
 

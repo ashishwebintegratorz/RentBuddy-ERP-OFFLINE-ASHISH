@@ -3,25 +3,31 @@ import { Asset, Order, AssetScanLog, DamageReport, Log } from '../models/index.j
 // Two-Way Barcode/QR Asset Verification (Supports Universal Scanner & Order-Linked Scanning)
 export const verifyAssetBarcode = async (req, res) => {
   try {
-    const { orderId, barcode, scanType = 'CHECKOUT', driverId, driverName, latitude, longitude, deviceId } = req.body;
+    const { orderId, barcode, scanType = 'CHECKOUT', driverId, driverPhone, driverName, latitude, longitude, deviceId } = req.body;
 
-    if (!barcode) {
-      return res.status(400).json({ success: false, message: 'Barcode is required for verification.' });
+    if (!barcode || !barcode.trim()) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        code: 'MISSING_BARCODE',
+        message: 'Barcode or asset serial code is required for scanning.'
+      });
     }
 
     const cleanBarcode = barcode.trim().toUpperCase();
 
-    // 1. Fetch physical asset from ERP Inventory
+    // 1. Fetch physical asset from ERP Inventory (if present)
     const physicalAsset = await Asset.findOne({
       $or: [
         { barcode: cleanBarcode },
+        { barcode: `BAR-${cleanBarcode}` },
         { id: cleanBarcode },
-        { barcode: cleanBarcode.replace('BAR-', '') },
-        { barcode: cleanBarcode.replace('RB-AST-', '') }
+        { barcode: cleanBarcode.replace(/^BAR-/, '') },
+        { id: cleanBarcode.replace(/^BAR-/, '') }
       ]
     });
 
-    // 2. Flexible Order Lookup
+    // 2. Order Resolution
     let order = null;
     if (orderId) {
       order = await Order.findOne({ id: orderId });
@@ -34,81 +40,169 @@ export const verifyAssetBarcode = async (req, res) => {
       if (!order && cleanNum) {
         order = await Order.findOne({ id: new RegExp(cleanNum, 'i') });
       }
-    }
-
-    // Universal Auto-Resolution: Find active order matching the scanned barcode if orderId not specified or matched
-    if (!order) {
-      const activeOrders = await Order.find({
-        status: { $in: ['ASSIGNED', 'OUT_FOR_DELIVERY', 'IN_TRANSIT', 'PICKUP_PENDING', 'PENDING'] }
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          verified: false,
+          code: 'ORDER_NOT_FOUND',
+          message: `Order #${orderId} was not found in the database.`
+        });
+      }
+    } else {
+      // Universal Scanner mode: Find the active order that specifically contains this barcode
+      const candidateOrders = await Order.find({
+        status: { $in: ['ASSIGNED', 'READY_FOR_DISPATCH', 'OUT_FOR_DELIVERY', 'IN_TRANSIT', 'PICKUP_PENDING', 'PENDING'] }
       });
 
-      for (const ord of activeOrders) {
-        const matchesTag = cleanBarcode.includes((ord.id || '').replace(/[^0-9]/g, '')) ||
-                           cleanBarcode.includes(ord.id) ||
-                           (ord.customerMobile && cleanBarcode.includes(ord.customerMobile.slice(-4)));
-
-        const matchesItem = (ord.items || []).some(it => 
-          (it.barcode && it.barcode.toUpperCase() === cleanBarcode) ||
-          (it.id && it.id.toUpperCase() === cleanBarcode) ||
-          (it.assetId && it.assetId.toUpperCase() === cleanBarcode)
-        );
-
-        const matchesExpected = (ord.expectedAssets || []).some(a => 
+      for (const ord of candidateOrders) {
+        const matchesExpected = (ord.expectedAssets || []).some(a =>
           (a.barcode && a.barcode.toUpperCase() === cleanBarcode) ||
-          (a.assetId && a.assetId.toUpperCase() === cleanBarcode)
+          (a.assetId && a.assetId.toUpperCase() === cleanBarcode) ||
+          (physicalAsset && a.assetId === physicalAsset.id)
         );
-
-        if (matchesTag || matchesItem || matchesExpected) {
+        const matchesItem = (ord.items || []).some(it =>
+          (it.barcode && it.barcode.toUpperCase() === cleanBarcode) ||
+          (it.assetId && it.assetId.toUpperCase() === cleanBarcode) ||
+          (it.id && it.id.toUpperCase() === cleanBarcode) ||
+          (physicalAsset && it.assetId === physicalAsset.id)
+        );
+        if (matchesExpected || matchesItem) {
           order = ord;
           break;
         }
       }
 
-      // Fallback: If still not matched, bind to latest active order
-      if (!order && activeOrders.length > 0) {
-        order = activeOrders[0];
+      // DO NOT fallback to random orders! If barcode doesn't match any active order, reject immediately.
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          verified: false,
+          code: 'BARCODE_NOT_FOUND',
+          message: `Wrong Product / Invalid Barcode: Barcode "${cleanBarcode}" is not assigned to any active delivery order.`
+        });
       }
     }
 
-    if (!order) {
-      return res.status(404).json({ success: false, message: `No active delivery found matching barcode "${cleanBarcode}".` });
+    // 3. Strict Rider Authorization Check: Only assigned rider can scan the order
+    if (driverId || driverPhone || driverName) {
+      const cleanDriverPhone = (driverPhone || '').replace(/[^0-9]/g, '').slice(-10);
+      const orderDriverPhone = (order.assignedDriverPhone || '').replace(/[^0-9]/g, '').slice(-10);
+
+      const isDriverAuthorized = (
+        (!order.assignedDriverId && !order.assignedDriverPhone) || // Order not assigned yet, rider is claiming it
+        (driverId && order.assignedDriverId && (order.assignedDriverId === driverId || order.assignedDriverId === driverId.toString())) ||
+        (cleanDriverPhone && orderDriverPhone && cleanDriverPhone === orderDriverPhone) ||
+        (driverName && order.assignedDriverName && driverName.trim().toLowerCase() === order.assignedDriverName.trim().toLowerCase())
+      );
+
+      if (!isDriverAuthorized) {
+        const assignedRider = order.assignedDriverName || order.assignedDriverPhone || order.assignedDriverId || 'Another Driver';
+        return res.status(403).json({
+          success: false,
+          verified: false,
+          code: 'UNAUTHORIZED_RIDER',
+          message: `Access Denied: Order #${order.id} is assigned to Rider "${assignedRider}". You are not authorized to scan or dispatch this order.`
+        });
+      }
     }
 
-    const ordId = order.id || orderId || '647641';
-    const cleanNum = ordId.toString().replace(/[^0-9]/g, '');
+    // 4. Strict Barcode Verification against Order's Expected Assets, Items, and Consignment Tag
+    const orderNum = (order.id || '').replace(/[^0-9]/g, '');
+    const custClean = (order.customerName || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const validConsignmentTags = [
+      (order.id || '').toUpperCase(),
+      (order.orderBarcode || '').toUpperCase(),
+      (order.trackingNumber || '').toUpperCase(),
+      `RB-${custClean}-${orderNum}`,
+      `RB-ORD-${orderNum}`,
+      `ORD-${orderNum}`,
+      `SHIP-${orderNum}`
+    ].filter(Boolean);
 
-    // 3. Side 1: Does the order expect this asset or dispatch tag?
+    const matchesConsignmentTag = validConsignmentTags.some(tag => 
+      tag === cleanBarcode || cleanBarcode.includes(tag) || (tag.length > 5 && tag.includes(cleanBarcode))
+    );
+
     let matchedExpectedAsset = null;
     if (order.expectedAssets && order.expectedAssets.length > 0) {
-      matchedExpectedAsset = order.expectedAssets.find(a => 
+      matchedExpectedAsset = order.expectedAssets.find(a =>
         (a.barcode && a.barcode.toUpperCase() === cleanBarcode) ||
         (a.assetId && a.assetId.toUpperCase() === cleanBarcode) ||
+        (a.assetId && cleanBarcode.includes(a.assetId.toUpperCase())) ||
         (physicalAsset && a.assetId === physicalAsset.id)
-      );
-    } else if (order.items && order.items.length > 0) {
-      matchedExpectedAsset = order.items.find(it => 
-        (it.barcode && it.barcode.toUpperCase() === cleanBarcode) ||
-        (it.id && it.id.toUpperCase() === cleanBarcode) ||
-        (it.assetId && it.assetId.toUpperCase() === cleanBarcode)
       );
     }
 
-    const logId = `SCAN-${Date.now()}`;
-    const verifiedAssetName = matchedExpectedAsset?.assetName || (physicalAsset?.model && physicalAsset.model !== 'fgh' ? physicalAsset.model : 'Solid Wood Furniture Unit');
-    const verifiedAssetId = matchedExpectedAsset?.assetId || physicalAsset?.id || `AST-${cleanBarcode.replace(/[^0-9]/g, '') || '101'}`;
+    if (!matchedExpectedAsset && order.items && order.items.length > 0) {
+      matchedExpectedAsset = order.items.find(it =>
+        (it.barcode && it.barcode.toUpperCase() === cleanBarcode) ||
+        (it.assetId && it.assetId.toUpperCase() === cleanBarcode) ||
+        (it.id && it.id.toUpperCase() === cleanBarcode) ||
+        (it.assetId && cleanBarcode.includes(it.assetId.toUpperCase())) ||
+        (physicalAsset && it.assetId === physicalAsset.id)
+      );
+    }
 
+    if (!matchedExpectedAsset && matchesConsignmentTag) {
+      matchedExpectedAsset = (order.expectedAssets && order.expectedAssets[0]) || (order.items && order.items[0]) || {
+        assetName: 'Solid Wood Furniture Unit',
+        assetId: `RB-AST-${orderNum || '101'}`
+      };
+    }
+
+    // If barcode is neither in expectedAssets, items, consignment tag nor physical asset, reject as wrong product!
+    if (!matchedExpectedAsset && !physicalAsset && !matchesConsignmentTag) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        code: 'INVALID_PRODUCT_BARCODE',
+        message: `Wrong Product: Barcode "${cleanBarcode}" does NOT match any furniture item for Order #${order.id} (${order.customerName || 'Customer'}). Please scan the correct product barcode.`
+      });
+    }
+
+    const ordId = order.id || order._id.toString();
+    const verifiedAssetName = matchedExpectedAsset?.assetName || matchedExpectedAsset?.name || matchedExpectedAsset?.category || physicalAsset?.model || physicalAsset?.category || 'Furniture Asset';
+    const verifiedAssetId = matchedExpectedAsset?.assetId || matchedExpectedAsset?.id || physicalAsset?.id || `AST-${cleanBarcode.replace(/[^0-9]/g, '') || '101'}`;
+
+    // Mark asset scanned in order.expectedAssets
     if (order.expectedAssets && order.expectedAssets.length > 0) {
-      order.expectedAssets = order.expectedAssets.map(a => ({
-        ...a,
-        scannedAtCheckout: true,
-        scannedAt: new Date().toISOString()
-      }));
+      let foundInExpected = false;
+      order.expectedAssets = order.expectedAssets.map(a => {
+        const isMatch = (a.barcode && a.barcode.toUpperCase() === cleanBarcode) ||
+                        (a.assetId && a.assetId.toUpperCase() === cleanBarcode) ||
+                        (physicalAsset && a.assetId === physicalAsset.id);
+        if (isMatch) {
+          foundInExpected = true;
+          return {
+            ...a,
+            scannedAtCheckout: scanType === 'CHECKOUT' ? true : a.scannedAtCheckout,
+            scannedAtDelivery: scanType === 'DELIVERY' ? true : a.scannedAtDelivery,
+            scannedAtReturn: scanType === 'RETURN_PICKUP' ? true : a.scannedAtReturn,
+            scannedAt: new Date().toISOString()
+          };
+        }
+        return a;
+      });
+
+      if (!foundInExpected) {
+        order.expectedAssets.push({
+          assetId: verifiedAssetId,
+          assetName: verifiedAssetName,
+          barcode: cleanBarcode,
+          scannedAtCheckout: scanType === 'CHECKOUT',
+          scannedAtDelivery: scanType === 'DELIVERY',
+          scannedAtReturn: scanType === 'RETURN_PICKUP',
+          scannedAt: new Date().toISOString()
+        });
+      }
     } else {
       order.expectedAssets = [{
         assetId: verifiedAssetId,
         assetName: verifiedAssetName,
         barcode: cleanBarcode,
-        scannedAtCheckout: true,
+        scannedAtCheckout: scanType === 'CHECKOUT',
+        scannedAtDelivery: scanType === 'DELIVERY',
+        scannedAtReturn: scanType === 'RETURN_PICKUP',
         scannedAt: new Date().toISOString()
       }];
     }
@@ -118,15 +212,23 @@ export const verifyAssetBarcode = async (req, res) => {
       order.scannedAtCheckout = true;
       order.deliveryStatus = 'out_for_delivery';
       order.status = 'OUT_FOR_DELIVERY';
-    }
-    if (scanType === 'DELIVERY') {
+      order.dispatchedAt = new Date().toISOString();
+    } else if (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') {
+      // Step 2 Doorstep Handover Barcode Scan -> Confirms physical item presence, unlocks Step 3 Customer OTP
       order.scannedAtDelivery = true;
-      order.deliveryStatus = 'out_for_delivery';
+      order.doorstepScanned = true;
+      order.deliveryStatus = 'out_for_delivery'; // Remains active until Customer Handover OTP is confirmed
+    } else if (scanType === 'RETURN_PICKUP' || scanType === 'PICKUP') {
+      order.scannedAtReturn = true;
+      order.deliveryStatus = 'returned';
+      order.status = 'RETURNED';
+      order.returnedAt = new Date().toISOString();
     }
-    if (scanType === 'PICKUP') order.scannedAtPickup = true;
-    if (scanType === 'CHECKIN') order.scannedAtWarehouseEntry = true;
 
     await order.save();
+
+    const cleanNum = (orderId || order.id || '').toString().replace(/[^0-9]/g, '');
+    const logId = `LOG-SCAN-${Date.now()}`;
 
     // Sync database across all query variations
     try {
@@ -142,7 +244,8 @@ export const verifyAssetBarcode = async (req, res) => {
           $set: {
             scannedAtLoading: scanType === 'CHECKOUT' ? true : order.scannedAtLoading,
             scannedAtCheckout: scanType === 'CHECKOUT' ? true : order.scannedAtCheckout,
-            scannedAtDelivery: scanType === 'DELIVERY' ? true : order.scannedAtDelivery,
+            scannedAtDelivery: (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') ? true : order.scannedAtDelivery,
+            doorstepScanned: (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') ? true : order.doorstepScanned,
             deliveryStatus: 'out_for_delivery',
             ...(scanType === 'CHECKOUT' ? { status: 'OUT_FOR_DELIVERY' } : {})
           }

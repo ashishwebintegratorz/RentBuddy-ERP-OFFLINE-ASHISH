@@ -9,6 +9,7 @@ import orderRoutes from './order.routes.js';
 import assetRoutes from './asset.routes.js';
 import deliveryRoutes from './delivery.routes.js';
 import damageRoutes from './damage.routes.js';
+import configRoutes from './config.routes.js';
 
 const router = Router();
 
@@ -35,5 +36,6 @@ router.use('/orders', orderRoutes);
 router.use('/assets', assetRoutes);
 router.use('/delivery', deliveryRoutes);
 router.use('/damage', damageRoutes);
+router.use('/config', configRoutes);
 
 export default router;

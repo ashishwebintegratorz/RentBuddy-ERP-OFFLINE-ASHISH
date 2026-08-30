@@ -19,6 +19,9 @@ export const IMAGEKIT_PUBLIC_KEY = process.env.IMAGEKIT_PUBLIC_KEY || '';
 export const IMAGEKIT_PRIVATE_KEY = process.env.IMAGEKIT_PRIVATE_KEY || '';
 export const IMAGEKIT_URL_ENDPOINT = process.env.IMAGEKIT_URL_ENDPOINT || '';
 
+// Google Maps Platform Configuration (Mobile Rider App & Live Tracking)
+export const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCN7XqyxOj5lgr2uaMNrTOg6PzHTOGa0xU';
+
 // System User Roles
 export const USER_ROLES = [
   'Super Admin',

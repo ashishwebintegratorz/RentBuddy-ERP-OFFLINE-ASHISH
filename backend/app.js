@@ -1,33 +1,48 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
 import routes from './routes/index.js';
 import { CORS_ORIGIN } from './config/constants.js';
+import { sanitizeInputs } from './middlewares/sanitize.middleware.js';
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 import { notFoundHandler, errorHandler } from './middlewares/error.middleware.js';
 
 const app = express();
 
-// Global Middlewares
+// 1. HTTP Security Headers (Helmet)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false // Allows dynamic ImageKit & Map tile assets in dev/webview
+}));
+
+// 2. CORS Allowed Origins
 app.use(cors({
   origin: CORS_ORIGIN === '*' ? '*' : CORS_ORIGIN.split(',').map(s => s.trim()),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-client-platform']
 }));
 
-// Body Parsers (Support up to 50mb payloads for large JSON sync blobs)
+// 3. Body Parsers with limits
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Live Terminal Request Logger
+// 4. HTTP Parameter Pollution Protection
+app.use(hpp());
+
+// 5. NoSQL Injection & Input Sanitization
+app.use(sanitizeInputs);
+
+// 6. Live Terminal Request Logger (Excludes sensitive credentials)
 app.use((req, res, next) => {
   console.log(`📡 [RentBuddy Gateway] ${req.method} ${req.originalUrl}`);
   next();
 });
 
-// Apply rate limiting across general API endpoints
+// 7. Apply rate limiting across general API endpoints
 app.use('/api', apiLimiter);
 
-// Mount Modular API Routes
+// 8. Mount Modular API Routes
 app.use('/api', routes);
 
 // Global 404 Not Found Handler

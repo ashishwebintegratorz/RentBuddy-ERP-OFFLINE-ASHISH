@@ -45,6 +45,7 @@ export default function LogisticsLog() {
     cities,
     assignDriverToOrder,
     updateOrderStatus,
+    prepareOrder,
     cancelOrder
   } = useRentBuddyStore();
 
@@ -106,8 +107,15 @@ export default function LogisticsLog() {
   const isCancelled = (o: RentalOrder) => 
     (o.status || '').toLowerCase() === 'cancelled' || (o.deliveryStatus || '').toLowerCase() === 'cancelled';
 
-  const isDelivered = (o: RentalOrder) => 
+  const isReturned = (o: RentalOrder) => 
     !isCancelled(o) && (
+      (o.status || '').toLowerCase() === 'returned' || 
+      (o.deliveryStatus || '').toLowerCase() === 'returned' ||
+      o.scannedAtReturn === true
+    );
+
+  const isDelivered = (o: RentalOrder) => 
+    !isCancelled(o) && !isReturned(o) && (
       (o.status || '').toLowerCase() === 'delivered' || 
       (o.status || '').toLowerCase() === 'completed' || 
       (o.deliveryStatus || '').toLowerCase() === 'delivered' || 
@@ -116,15 +124,17 @@ export default function LogisticsLog() {
     );
 
   const isReturn = (o: RentalOrder) => 
-    !isCancelled(o) && (
+    !isCancelled(o) && !isReturned(o) && (
       (o.status || '').toLowerCase() === 'return pickup' || 
-      (o.status || '').toLowerCase() === 'returned' ||
-      (o.deliveryStatus || '').toLowerCase() === 'returned' ||
+      (o.status || '').toLowerCase() === 'return_pickup' || 
+      (o.status || '').toLowerCase() === 'return scheduled' || 
+      (o.deliveryStatus || '').toLowerCase() === 'return_assigned' ||
+      (o.deliveryStatus || '').toLowerCase() === 'return_pickup' ||
       isDelivered(o)
     );
 
   const isInTransit = (o: RentalOrder) => 
-    !isCancelled(o) && !isDelivered(o) && (
+    !isCancelled(o) && !isDelivered(o) && !isReturned(o) && (
       Boolean(o.assignedDriverId) || 
       Boolean(o.assignedDriverPhone) ||
       (o.status || '').toLowerCase() === 'assigned' || 
@@ -135,20 +145,20 @@ export default function LogisticsLog() {
     );
 
   const isReadyForDispatch = (o: RentalOrder) => 
-    !isCancelled(o) && !isDelivered(o) && !isInTransit(o) && (
+    !isCancelled(o) && !isDelivered(o) && !isReturned(o) && !isInTransit(o) && (
       o.isPrepared || 
       (o.status || '').toLowerCase() === 'ready for dispatch' || 
       (o.status || '').toLowerCase() === 'ready_for_dispatch'
     );
 
   const isPreparation = (o: RentalOrder) => 
-    !isCancelled(o) && !isDelivered(o) && !isInTransit(o) && !isReadyForDispatch(o);
+    !isCancelled(o) && !isDelivered(o) && !isReturned(o) && !isInTransit(o) && !isReadyForDispatch(o);
 
   // Pipeline order lists
   const preparationOrders = cityFilteredOrders.filter(isPreparation);
   const readyForDispatchOrders = cityFilteredOrders.filter(isReadyForDispatch);
   const inTransitOrders = cityFilteredOrders.filter(isInTransit);
-  const completedOrders = cityFilteredOrders.filter(isDelivered);
+  const completedOrders = cityFilteredOrders.filter(o => isDelivered(o) || isReturned(o));
   const returnOrders = cityFilteredOrders.filter(isReturn);
   const cancelledOrders = cityFilteredOrders.filter(isCancelled);
 
@@ -180,35 +190,8 @@ export default function LogisticsLog() {
   const handleMarkAsPrepared = async (order: RentalOrder) => {
     const storeState = useRentBuddyStore.getState() as any;
     
-    // 1. Update locally in store immediately
-    const currentOrders = useRentBuddyStore.getState().orders;
-    const updatedOrders = currentOrders.map(o => {
-      if (o.id === order.id || o.id === (order as any)._id) {
-        return {
-          ...o,
-          isPrepared: true,
-          status: 'Ready for Dispatch' as OrderStatus,
-          deliveryStatus: 'ready_for_dispatch',
-          preparedAt: new Date().toISOString(),
-          packedBy: 'Warehouse Staging Team'
-        };
-      }
-      return o;
-    });
-
-    useRentBuddyStore.setState({ orders: updatedOrders });
-
-    // 2. Call backend API on port 5001
-    try {
-      const BACKEND_BASE = getApiBaseUrl();
-      await fetch(`${BACKEND_BASE}/orders/${order.id}/prepare`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packedBy: 'Warehouse Staging Team' })
-      });
-    } catch (err) {
-      console.warn("Backend prepare order sync deferred:", err);
-    }
+    // Call store prepareOrder which updates store & syncs to MongoDB atomically
+    await prepareOrder(order.id, 'Warehouse Staging Team');
 
     // Automatically transition to Stage 2: Rider Assignment & Dispatch
     setActiveTab('dispatch');
@@ -308,6 +291,79 @@ export default function LogisticsLog() {
         setOrderToAssign(null);
         setActiveTab('transit');
       }, 1500);
+    }
+  };
+
+  const handleAcceptReturnDeposit = async (order: RentalOrder) => {
+    try {
+      const isConfirmed = window.confirm(`Accept return deposit and restock all furniture for Order #${order.id} into ${order.city || currentCity} warehouse inventory?`);
+      if (!isConfirmed) return;
+
+      // 1. Call Backend API
+      const apiBase = getApiBaseUrl();
+      const urls = [
+        `${apiBase}/orders/${order.id}/accept-return-deposit`,
+        `http://localhost:5001/api/v1/orders/${order.id}/accept-return-deposit`,
+        `http://127.0.0.1:5001/api/v1/orders/${order.id}/accept-return-deposit`
+      ];
+
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: order.id })
+          });
+          if (res.ok) {
+            console.log(`[RentBuddy Return] Successfully accepted return deposit via ${url}`);
+            break;
+          }
+        } catch (err) {
+          console.warn("Backend accept-return-deposit retry on:", url, err);
+        }
+      }
+
+      // 2. Update local orders
+      const currentOrders = useRentBuddyStore.getState().orders;
+      const updatedOrders = currentOrders.map(o => {
+        if (o.id === order.id) {
+          return {
+            ...o,
+            status: 'Returned' as OrderStatus,
+            deliveryStatus: 'returned',
+            returnedAt: new Date().toISOString(),
+            scannedAtReturn: true
+          };
+        }
+        return o;
+      });
+
+      // 3. Mark all assets on that order as Available
+      const orderAssetIds = new Set((order.items || []).map((it: any) => it.assetId || it.id));
+      const currentInventory = useRentBuddyStore.getState().inventory;
+      const updatedInventory = currentInventory.map(a => {
+        if (orderAssetIds.has(a.id)) {
+          return { ...a, status: 'Available' as any, currentCustomer: undefined, currentOrderId: undefined };
+        }
+        return a;
+      });
+
+      useRentBuddyStore.setState({
+        orders: updatedOrders,
+        inventory: updatedInventory
+      });
+
+      // 4. Play alert and notification
+      useRentBuddyStore.getState().triggerMockAlert(
+        '✅ Return Accepted & Inventory Restocked',
+        `Order #${order.id} return completed. All furniture units are now Available in ${order.city || currentCity} Warehouse.`,
+        'success'
+      );
+
+      // 5. Reload store
+      await useRentBuddyStore.getState().initializeStore();
+    } catch (e: any) {
+      alert(`Error accepting return deposit: ${e.message}`);
     }
   };
 
@@ -1011,13 +1067,20 @@ export default function LogisticsLog() {
                       const itemTitle = (order.items || [])[0] ? ((order.items[0] as any).name || (order.items[0] as any).assetName || order.items[0].category || 'Furniture Suite') : 'Furniture Suite';
                       const assetBarcode = (order.items || [])[0]?.assetId || 'RB-AST-101';
 
-                      return (
-                        <tr key={order.id} className="hover:bg-purple-50/40 transition-colors bg-white">
+                        const isDepositPending = (order.status as string) === 'RETURN_DEPOSIT_PENDING' || (order.status as string) === 'Return Deposit Pending' || order.deliveryStatus === 'return_deposit_requested';
+
+                        return (
+                        <tr key={order.id} className={`hover:bg-purple-50/40 transition-colors ${isDepositPending ? 'bg-purple-50/60 border-l-4 border-l-purple-600' : 'bg-white'}`}>
                           <td className="p-4">
                             <div className="font-black text-slate-900 font-mono text-sm">{order.id}</div>
                             <span className="text-[10px] text-purple-900 font-bold bg-purple-100 px-2 py-0.5 rounded border border-purple-300 inline-block mt-1">
                               📍 {order.city || currentCity} Hub
                             </span>
+                            {isDepositPending && (
+                              <span className="text-[10px] text-amber-950 font-black bg-amber-200 px-2 py-0.5 rounded border border-amber-400 block mt-1 animate-pulse">
+                                📥 Deposit Requested
+                              </span>
+                            )}
                           </td>
                           <td className="p-4">
                             <div className="font-black text-slate-900 text-sm">{order.customerName}</div>
@@ -1052,7 +1115,7 @@ export default function LogisticsLog() {
                             <div className="font-mono font-black text-emerald-700 text-sm">
                               ₹{(order.totalDeposit || order.netDeposit || 0).toLocaleString()}
                             </div>
-                            <span className="text-[10px] text-slate-600 font-bold block">Release on Barcode Scan</span>
+                            <span className="text-[10px] text-slate-600 font-bold block">Release on Depot Restock</span>
                           </td>
                           <td className="p-4">
                             {order.assignedDriverName || order.assignedLogisticsUser ? (
@@ -1084,29 +1147,41 @@ export default function LogisticsLog() {
                           </td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleOpenReturnAssignModal(order)}
-                                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
-                                title="Assign Return Collection Rider for this order"
-                              >
-                                <Truck className="w-3.5 h-3.5" /> Assign Rider
-                              </button>
-                              <button
-                                onClick={() => setPreviewPhotoOrder(order)}
-                                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-all shadow-sm"
-                                title="View Delivery Proof & Product Agreement"
-                              >
-                                <Eye className="w-3.5 h-3.5 text-cyan-300" /> View POD
-                              </button>
-                              <button
-                                onClick={() => {
-                                  alert(`📲 Return pickup reminder SMS/WhatsApp dispatched to ${order.customerName} (${order.customerMobile}) for scheduled pickup on ${endDate}.`);
-                                }}
-                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-all shadow-sm"
-                                title="Send SMS/WhatsApp pickup reminder to customer"
-                              >
-                                <Send className="w-3 h-3" /> Reminder
-                              </button>
+                              {isDepositPending ? (
+                                <button
+                                  onClick={() => handleAcceptReturnDeposit(order)}
+                                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md animate-pulse"
+                                  title="Accept Return & Restore Inventory to Available"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" /> Accept Deposit & Restock
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenReturnAssignModal(order)}
+                                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                    title="Assign Return Collection Rider for this order"
+                                  >
+                                    <Truck className="w-3.5 h-3.5" /> Assign Rider
+                                  </button>
+                                  <button
+                                    onClick={() => setPreviewPhotoOrder(order)}
+                                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                                    title="View Delivery Proof & Product Agreement"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-cyan-300" /> View POD
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      alert(`📲 Return pickup reminder SMS/WhatsApp dispatched to ${order.customerName} (${order.customerMobile}) for scheduled pickup on ${endDate}.`);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                                    title="Send SMS/WhatsApp pickup reminder to customer"
+                                  >
+                                    <Send className="w-3 h-3" /> Reminder
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>

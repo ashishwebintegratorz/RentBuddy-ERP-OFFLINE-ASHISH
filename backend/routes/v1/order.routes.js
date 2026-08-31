@@ -10,7 +10,9 @@ import {
   updateOrderStatus,
   getDriverActiveOrders,
   getDriverOrderHistory,
-  cancelOrder
+  cancelOrder,
+  requestReturnDeposit,
+  acceptReturnDeposit
 } from '../../controllers/order.controller.js';
 
 const router = express.Router();
@@ -28,5 +30,7 @@ router.put('/:id/cancel', cancelOrder);
 router.put('/:id/accept', acceptOrder);
 router.post('/:id/accept', acceptOrder);
 router.put('/:id/status', updateOrderStatus);
+router.post('/:id/request-return-deposit', requestReturnDeposit);
+router.post('/:id/accept-return-deposit', acceptReturnDeposit);
 
 export default router;

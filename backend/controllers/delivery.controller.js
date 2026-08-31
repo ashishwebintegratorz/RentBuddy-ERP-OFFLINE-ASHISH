@@ -202,14 +202,23 @@ export const completeDelivery = async (req, res) => {
 
     console.log(`✅ [RentBuddy Delivery OTP] OTP Verified (${cleanOtp}) for Order #${orderId}`);
 
-    // 3. Transition Order to DELIVERED
+    // 3. Transition Order to DELIVERED or RETURNED
     const deliveredTime = new Date().toISOString();
+    const isReturn = Boolean(order?.isReturnPickup || order?.status === 'RETURN_PICKUP' || order?.status === 'Return Pickup' || order?.deliveryStatus === 'return_assigned' || req.body.isReturn);
+    const targetStatus = isReturn ? 'RETURNED' : 'DELIVERED';
+    const targetDeliveryStatus = isReturn ? 'returned' : 'delivered';
+
     if (order) {
-      order.status = 'DELIVERED';
-      order.deliveryStatus = 'delivered';
-      order.deliveredAt = deliveredTime;
-      order.scannedAtDelivery = true;
-      order.doorstepScanned = true;
+      order.status = targetStatus;
+      order.deliveryStatus = targetDeliveryStatus;
+      if (isReturn) {
+        order.returnedAt = deliveredTime;
+        order.scannedAtReturn = true;
+      } else {
+        order.deliveredAt = deliveredTime;
+        order.scannedAtDelivery = true;
+        order.doorstepScanned = true;
+      }
       if (proofImage) order.deliveryProofPhoto = proofImage;
       if (photoUrls && photoUrls.length > 0) order.deliveryProofPhoto = photoUrls[0];
       await order.save();
@@ -225,11 +234,16 @@ export const completeDelivery = async (req, res) => {
       },
       {
         $set: {
-          status: 'DELIVERED',
-          deliveryStatus: 'delivered',
-          deliveredAt: deliveredTime,
-          scannedAtDelivery: true,
-          doorstepScanned: true,
+          status: targetStatus,
+          deliveryStatus: targetDeliveryStatus,
+          ...(isReturn ? {
+            returnedAt: deliveredTime,
+            scannedAtReturn: true
+          } : {
+            deliveredAt: deliveredTime,
+            scannedAtDelivery: true,
+            doorstepScanned: true
+          }),
           ...(proofImage ? { deliveryProofPhoto: proofImage } : {})
         }
       }
@@ -239,15 +253,48 @@ export const completeDelivery = async (req, res) => {
     if (orderId) globalDeliveryOtpCache.delete(orderId.toString());
     if (cleanNum) globalDeliveryOtpCache.delete(cleanNum);
 
-    // 4. Update physical assets to ON_RENT / DELIVERED
-    if (order && order.expectedAssets) {
-      for (const item of order.expectedAssets) {
-        if (item.assetId) {
-          await Asset.findOneAndUpdate(
-            { id: item.assetId },
-            { status: 'DELIVERED', currentStatus: 'ON_RENT' }
-          );
-        }
+    // 4. Update physical assets
+    const assetIds = [
+      ...(order?.items || []).map(it => it.assetId || it.id),
+      ...(order?.expectedAssets || []).map(it => it.assetId || it.id)
+    ].filter(Boolean);
+
+    if (assetIds.length > 0) {
+      if (isReturn) {
+        // Return completed -> Make assets AVAILABLE again in Inventory
+        await Asset.updateMany(
+          {
+            $or: [
+              { id: { $in: assetIds } },
+              { _id: { $in: assetIds.filter(id => id.length === 24) } }
+            ]
+          },
+          {
+            $set: {
+              status: 'Available',
+              currentStatus: 'AVAILABLE',
+              currentCustomer: null,
+              currentOrderId: null
+            }
+          }
+        );
+        console.log(`\n\x1b[32m♻️ [RentBuddy Asset Return] All assets for Order #${orderId} marked AVAILABLE in Inventory.\x1b[0m`);
+      } else {
+        // Delivery completed -> Mark assets ON_RENT
+        await Asset.updateMany(
+          {
+            $or: [
+              { id: { $in: assetIds } },
+              { _id: { $in: assetIds.filter(id => id.length === 24) } }
+            ]
+          },
+          {
+            $set: {
+              status: 'DELIVERED',
+              currentStatus: 'ON_RENT'
+            }
+          }
+        );
       }
     }
 

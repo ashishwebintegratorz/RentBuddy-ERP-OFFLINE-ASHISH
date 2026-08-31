@@ -110,6 +110,7 @@ interface RentBuddyState {
     couponCode?: string;
   }) => RentalOrder;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  prepareOrder: (orderId: string, packedBy?: string) => Promise<boolean>;
   cancelOrder: (orderId: string, reason?: string) => Promise<boolean>;
   assignDriverToOrder: (orderId: string, driverId: string) => Promise<boolean>;
   scanAssetBarcode: (orderId: string, assetId: string, scanType: 'loading' | 'delivery' | 'pickup' | 'warehouse') => boolean;
@@ -747,6 +748,58 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
           });
           get().runSystemAudit();
+        },
+
+        prepareOrder: async (orderId: string, packedBy: string = 'Warehouse Staging Team') => {
+          const now = new Date().toISOString();
+          set((state) => {
+            const updatedOrders = state.orders.map((o) => {
+              if (o.id === orderId || (o as any)._id === orderId) {
+                return {
+                  ...o,
+                  isPrepared: true,
+                  status: 'Ready for Dispatch' as OrderStatus,
+                  deliveryStatus: 'ready_for_dispatch',
+                  preparedAt: now,
+                  packedBy,
+                };
+              }
+              return o;
+            });
+
+            const log: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: now,
+              userRole: state.currentUserRole,
+              userName: `User (${state.currentUserRole})`,
+              city: state.currentCity,
+              action: 'Order Staged & Prepared',
+              category: 'ORDER_STATUS',
+              severity: 'INFO',
+              details: `Order ${orderId} staged, packed, barcode label printed by ${packedBy}. Ready for driver dispatch.`,
+            };
+
+            return {
+              orders: updatedOrders,
+              auditLogs: [log, ...state.auditLogs],
+            };
+          });
+
+          // Sync to backend DB immediately
+          syncToDatabase(get(), true);
+
+          try {
+            await fetch(`${BACKEND_URL}/orders/${encodeURIComponent(orderId)}/prepare`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ packedBy }),
+            });
+          } catch (e) {
+            console.warn("Backend prepare order sync deferred:", e);
+          }
+
+          get().runSystemAudit();
+          return true;
         },
 
         cancelOrder: async (orderId: string, reason?: string) => {
@@ -1600,19 +1653,28 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           set((state) => ({
             notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
           }));
-          syncToDatabase(get());
+          try {
+            const apiBase = getApiBaseUrl();
+            fetch(`${apiBase}/notifications/${id}/read`, { method: 'PUT' }).catch(() => {});
+          } catch (_) {}
         },
 
         markAllNotificationsRead: () => {
           set((state) => ({
             notifications: state.notifications.map(n => ({ ...n, read: true }))
           }));
-          syncToDatabase(get());
+          try {
+            const apiBase = getApiBaseUrl();
+            fetch(`${apiBase}/notifications/mark-all-read`, { method: 'PUT' }).catch(() => {});
+          } catch (_) {}
         },
 
         clearNotifications: () => {
           set({ notifications: [] });
-          syncToDatabase(get());
+          try {
+            const apiBase = getApiBaseUrl();
+            fetch(`${apiBase}/notifications`, { method: 'DELETE' }).catch(() => {});
+          } catch (_) {}
         },
 
         // System Audits
@@ -1865,7 +1927,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               headers['Authorization'] = `Bearer ${token}`;
             }
 
-            const res = await fetch(`${BACKEND_URL}/sync/load`, { headers });
+            const apiBase = getApiBaseUrl();
+            const res = await fetch(`${apiBase}/sync/load`, { headers });
             const data = await res.json();
             
             if (data.success) {
@@ -1878,18 +1941,26 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               const currentLocalOrders = get().orders || [];
               const serverOrders = (db.orders || []).map((s: any) => {
                 const local = currentLocalOrders.find((l: any) => l.id === s.id || l.id === s._id);
-                const isPrepared = s.isPrepared ?? local?.isPrepared ?? (
+                const isPrepared = Boolean(
+                  s.isPrepared === true || 
                   s.status === 'READY_FOR_DISPATCH' || 
                   s.status === 'Ready for Dispatch' || 
-                  Boolean(s.preparedAt)
+                  Boolean(s.preparedAt) || 
+                  (local && (local.isPrepared === true || local.status === 'Ready for Dispatch'))
                 );
                 const proof = s.deliveryProofPhoto || s.deliveryProof?.photos?.[0] || s.deliveryProof?.photoUrl || local?.deliveryProofPhoto || '';
+
+                let status = s.status || local?.status || 'Confirmed';
+                if (isPrepared && (status === 'CONFIRMED' || status === 'Confirmed' || !status)) {
+                  status = 'Ready for Dispatch';
+                }
 
                 return {
                   ...(local || {}),
                   ...s,
                   id: s.id || s._id,
-                  isPrepared: Boolean(isPrepared),
+                  status,
+                  isPrepared,
                   deliveryProofPhoto: proof,
                   city: s.city || local?.city || 'Indore (Head Office)'
                 };
@@ -1917,9 +1988,52 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 }
               }
 
+              // Reconcile active and terminated order assets with inventory
+              const activeOrderAssetMap = new Map<string, { status: AssetStatus; customerName?: string; orderId: string }>();
+              const returnedOrderAssetIds = new Set<string>();
+
+              (serverOrders || []).forEach((ord: any) => {
+                const rawStatus = (ord.status || ord.deliveryStatus || '').toString();
+                const st = rawStatus.toLowerCase();
+                const isTerminated = st === 'returned' || st === 'cancelled' || rawStatus === 'RETURNED' || rawStatus === 'Cancelled';
+
+                (ord.items || []).forEach((it: any) => {
+                  const aId = it.assetId || it.id;
+                  if (aId) {
+                    if (isTerminated) {
+                      returnedOrderAssetIds.add(aId);
+                    } else {
+                      const isDelivered = st === 'delivered' || rawStatus === 'DELIVERED';
+                      activeOrderAssetMap.set(aId, {
+                        status: (isDelivered ? 'Rented' : 'Reserved') as AssetStatus,
+                        customerName: ord.customerName,
+                        orderId: ord.id || ord._id
+                      });
+                    }
+                  }
+                });
+              });
+
+              const syncedAssets = (db.assets || []).map((a: any) => {
+                if (activeOrderAssetMap.has(a.id) || activeOrderAssetMap.has(a._id)) {
+                  const activeInfo = activeOrderAssetMap.get(a.id) || activeOrderAssetMap.get(a._id)!;
+                  return {
+                    ...a,
+                    status: activeInfo.status,
+                    currentCustomer: activeInfo.customerName || a.currentCustomer,
+                    currentOrderId: activeInfo.orderId || a.currentOrderId
+                  };
+                } else if (returnedOrderAssetIds.has(a.id) || returnedOrderAssetIds.has(a._id)) {
+                  if (a.status === 'Rented' || a.status === 'ON_RENT' || a.status === 'Reserved') {
+                    return { ...a, status: 'Available' as AssetStatus, currentCustomer: undefined, currentOrderId: undefined };
+                  }
+                }
+                return a;
+              });
+
               // Overwrite local memory state with synced real MongoDB collections
               set({
-                inventory: db.assets || [],
+                inventory: syncedAssets,
                 customers: mergedCustomers,
                 orders: serverOrders,
                 invoices: db.invoices || [],
@@ -1931,8 +2045,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 currentCity: activeCity,
                 currentUserRole: db.currentUserRole || get().currentUserRole,
                 expectedVsActualAudit: db.expectedVsActualAudit || {
-                  expectedCount: (db.assets || []).length,
-                  actualCount: (db.assets || []).length,
+                  expectedCount: syncedAssets.length,
+                  actualCount: syncedAssets.length,
                   missingCount: 0,
                   duplicateBarcodes: [],
                   fraudAlertCount: 0,

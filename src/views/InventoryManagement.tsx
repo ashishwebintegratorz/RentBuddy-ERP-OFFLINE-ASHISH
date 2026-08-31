@@ -338,6 +338,19 @@ export default function InventoryManagement() {
                           <QrCode className="w-3 h-3 text-red-400" /> QR Label
                         </button>
 
+                        {asset.status !== 'Available' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateAssetStatus(asset.id, 'Available');
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer border border-emerald-500/40 shadow-sm"
+                            title="Mark asset returned & available for renting"
+                          >
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Available
+                          </button>
+                        )}
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -436,27 +449,37 @@ export default function InventoryManagement() {
             </div>
           </div>
 
-          {/* Action Buttons: Edit & Close Asset */}
-          <div className="pt-1 flex gap-2">
-            <button
-              onClick={() => openEditModal(selectedAsset)}
-              className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow text-xs"
-            >
-              <Edit3 className="w-3.5 h-3.5" /> Edit Furniture
-            </button>
-            <button
-              onClick={() => handleToggleCloseAsset(selectedAsset)}
-              className={`flex-1 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow text-xs ${selectedAsset.status === 'Scrapped'
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  : 'bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300'
-                }`}
-            >
-              {selectedAsset.status === 'Scrapped' ? (
-                <><Power className="w-3.5 h-3.5" /> Reactivate</>
-              ) : (
-                <><Ban className="w-3.5 h-3.5" /> Close / Off-Rent</>
-              )}
-            </button>
+          {/* Action Buttons: Edit, Make Available & Close Asset */}
+          <div className="space-y-2 pt-1">
+            {selectedAsset.status !== 'Available' && (
+              <button
+                onClick={() => updateAssetStatus(selectedAsset.id, 'Available')}
+                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20 text-xs transition-all hover:scale-[1.02]"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Mark Returned / Set Available
+              </button>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => openEditModal(selectedAsset)}
+                className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow text-xs"
+              >
+                <Edit3 className="w-3.5 h-3.5" /> Edit Furniture
+              </button>
+              <button
+                onClick={() => handleToggleCloseAsset(selectedAsset)}
+                className={`flex-1 py-2 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow text-xs ${selectedAsset.status === 'Scrapped'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300'
+                  }`}
+              >
+                {selectedAsset.status === 'Scrapped' ? (
+                  <><Power className="w-3.5 h-3.5" /> Reactivate</>
+                ) : (
+                  <><Ban className="w-3.5 h-3.5" /> Close / Off-Rent</>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* ROI Telemetry (Calculated dynamically) */}

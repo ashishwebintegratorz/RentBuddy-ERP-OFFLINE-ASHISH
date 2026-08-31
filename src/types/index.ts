@@ -143,6 +143,9 @@ export interface RentalOrder {
   cancellationReason?: string;
   cancelledAt?: string;
   deliveredAt?: string;
+  returnedAt?: string;
+  scannedAtReturn?: boolean;
+  isReturnPickup?: boolean;
   depositRefundStatus: 'Held' | 'Pending Inspection' | 'Approved' | 'Refunded';
   depositDeductions: number;
   createdAt: string;

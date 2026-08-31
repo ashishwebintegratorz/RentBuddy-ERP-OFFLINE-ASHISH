@@ -376,13 +376,13 @@ export default function PointOfSale() {
               ) : (
                 cityCatalog.map(asset => {
                   const isInCart = cart.some(item => item.id === asset.id);
-                  const isReservedOrRented = asset.status === 'Reserved' || asset.status === 'Rented' || asset.status === 'Under Repair';
+                  const isUnavailable = asset.status !== 'Available';
 
                   return (
                     <div
                       key={asset.id}
                       className={`p-4 rounded-2xl flex items-center gap-3.5 text-xs transition-all shadow-md relative ${
-                        isReservedOrRented
+                        isUnavailable
                           ? 'bg-slate-950/40 border border-slate-800/80 opacity-75'
                           : isInCart
                           ? 'bg-slate-950 border border-emerald-500/50 shadow-emerald-500/5'
@@ -395,7 +395,7 @@ export default function PointOfSale() {
                         ) : (
                           <Package className="w-6 h-6 text-red-400" />
                         )}
-                        {isReservedOrRented && (
+                        {isUnavailable && (
                           <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center">
                             <Lock className="w-4 h-4 text-rose-400" />
                           </div>
@@ -410,7 +410,7 @@ export default function PointOfSale() {
                               🔒 Reserved
                             </span>
                           )}
-                          {asset.status === 'Rented' && (
+                          {(asset.status === 'Rented' || (asset.status as any) === 'ON_RENT' || (asset.status as any) === 'DELIVERED') && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
                               🔒 Rented Out
                             </span>
@@ -418,6 +418,16 @@ export default function PointOfSale() {
                           {asset.status === 'Under Repair' && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
                               🔧 In Repair
+                            </span>
+                          )}
+                          {(asset.status === 'Scrapped' || (asset.status as any) === 'Sold') && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-500/15 text-red-300 border border-red-500/30">
+                              ❌ Sold / Closed
+                            </span>
+                          )}
+                          {asset.status === 'Lost' && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-500/15 text-slate-300 border border-slate-500/30">
+                              ❓ Lost
                             </span>
                           )}
                         </div>
@@ -433,9 +443,9 @@ export default function PointOfSale() {
                         <span className="px-3.5 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold rounded-xl text-xs flex items-center gap-1 shrink-0">
                           <Check className="w-3.5 h-3.5" /> In Basket
                         </span>
-                      ) : isReservedOrRented ? (
+                      ) : isUnavailable ? (
                         <span className="px-3 py-2 bg-slate-900 border border-slate-800 text-slate-400 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-not-allowed select-none shrink-0">
-                          <Lock className="w-3.5 h-3.5 text-slate-500" /> Rented
+                          <Lock className="w-3.5 h-3.5 text-slate-500" /> {asset.status === 'Rented' || (asset.status as any) === 'ON_RENT' ? 'Rented' : 'Unavailable'}
                         </span>
                       ) : (
                         <button

@@ -33,11 +33,7 @@ app.use(hpp());
 // 5. NoSQL Injection & Input Sanitization
 app.use(sanitizeInputs);
 
-// 6. Live Terminal Request Logger (Excludes sensitive credentials)
-app.use((req, res, next) => {
-  console.log(`📡 [RentBuddy Gateway] ${req.method} ${req.originalUrl}`);
-  next();
-});
+// 6. Quiet logger (Keeps terminal clean for critical events & OTP banners)
 
 // 7. Apply rate limiting across general API endpoints
 app.use('/api', apiLimiter);

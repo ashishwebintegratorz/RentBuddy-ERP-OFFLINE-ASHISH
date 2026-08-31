@@ -215,9 +215,12 @@ export const verifyAssetBarcode = async (req, res) => {
       order.dispatchedAt = new Date().toISOString();
     } else if (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') {
       // Step 2 Doorstep Handover Barcode Scan -> Confirms physical item presence, unlocks Step 3 Customer OTP
+      order.scannedAtLoading = true;
+      order.scannedAtCheckout = true;
       order.scannedAtDelivery = true;
       order.doorstepScanned = true;
-      order.deliveryStatus = 'out_for_delivery'; // Remains active until Customer Handover OTP is confirmed
+      order.deliveryStatus = 'out_for_delivery';
+      order.status = 'OUT_FOR_DELIVERY';
     } else if (scanType === 'RETURN_PICKUP' || scanType === 'PICKUP') {
       order.scannedAtReturn = true;
       order.deliveryStatus = 'returned';
@@ -242,15 +245,56 @@ export const verifyAssetBarcode = async (req, res) => {
         },
         {
           $set: {
-            scannedAtLoading: scanType === 'CHECKOUT' ? true : order.scannedAtLoading,
-            scannedAtCheckout: scanType === 'CHECKOUT' ? true : order.scannedAtCheckout,
-            scannedAtDelivery: (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') ? true : order.scannedAtDelivery,
-            doorstepScanned: (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') ? true : order.doorstepScanned,
-            deliveryStatus: 'out_for_delivery',
-            ...(scanType === 'CHECKOUT' ? { status: 'OUT_FOR_DELIVERY' } : {})
+            ...( (scanType === 'RETURN_PICKUP' || scanType === 'PICKUP') ? {
+              scannedAtReturn: true,
+              deliveryStatus: 'returned',
+              status: 'RETURNED',
+              returnedAt: order.returnedAt
+            } : (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') ? {
+              scannedAtLoading: true,
+              scannedAtCheckout: true,
+              scannedAtDelivery: true,
+              doorstepScanned: true,
+              deliveryStatus: 'out_for_delivery',
+              status: 'OUT_FOR_DELIVERY'
+            } : {
+              scannedAtLoading: true,
+              scannedAtCheckout: true,
+              deliveryStatus: 'out_for_delivery',
+              status: 'OUT_FOR_DELIVERY'
+            })
           }
         }
       );
+
+      // Auto-restore physical assets back to Available warehouse stock
+      if (scanType === 'RETURN_PICKUP' || scanType === 'PICKUP') {
+        const assetIds = [
+          verifiedAssetId,
+          ...(order.items || []).map(it => it.assetId || it.id),
+          ...(order.expectedAssets || []).map(it => it.assetId || it.id)
+        ].filter(Boolean);
+
+        if (assetIds.length > 0) {
+          await Asset.updateMany(
+            {
+              $or: [
+                { id: { $in: assetIds } },
+                { barcode: { $in: [cleanBarcode, ...assetIds] } }
+              ]
+            },
+            {
+              $set: {
+                status: 'Available',
+                currentStatus: 'AVAILABLE',
+                currentCustomer: null,
+                currentOrderId: null
+              }
+            }
+          );
+          console.log(`\n\x1b[32m♻️ [RentBuddy Asset Return] Asset(s) ${assetIds.join(', ')} marked AVAILABLE in Warehouse Inventory.\x1b[0m`);
+        }
+      }
     } catch (_) {}
 
     // Create immutable audit log
@@ -431,7 +475,7 @@ export const createAsset = async (req, res) => {
     const created = await Asset.findOneAndUpdate(
       { id: assetData.id },
       { $set: assetData },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
     return res.status(201).json({ success: true, message: 'Asset created successfully', data: created });
   } catch (error) {
@@ -448,7 +492,7 @@ export const updateAssetById = async (req, res) => {
     const updated = await Asset.findOneAndUpdate(
       { $or: [{ id }, { barcode: id }, ...(id.match(/^[0-9a-fA-F]{24}$/) ? [{ _id: id }] : [])] },
       { $set: updates },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     console.log(`🍃 [Asset Controller] Updated asset [${id}] in MongoDB Atlas:`, updates);

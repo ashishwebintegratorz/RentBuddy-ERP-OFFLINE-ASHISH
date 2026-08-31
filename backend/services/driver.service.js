@@ -43,7 +43,7 @@ class DriverService {
     return await Driver.findOneAndUpdate(
       filter,
       { $set: driverData },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
   }
 
@@ -52,7 +52,7 @@ class DriverService {
     return await Driver.findOneAndUpdate(
       this._buildDriverFilter(id),
       { $set: updates },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
   }
 
@@ -70,7 +70,7 @@ class DriverService {
     return await Driver.findOneAndUpdate(
       this._buildDriverFilter(id),
       { $set: updates },
-      { new: true }
+      { returnDocument: 'after' }
     );
   }
 
@@ -86,7 +86,7 @@ class DriverService {
           status: shouldBlock ? 'Blocked' : 'Active'
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
   }
 
@@ -95,7 +95,7 @@ class DriverService {
     return await Driver.findOneAndUpdate(
       this._buildDriverFilter(id),
       { $set: { documents } },
-      { new: true }
+      { returnDocument: 'after' }
     );
   }
 }

@@ -144,7 +144,7 @@ export const createOrder = async (req, res) => {
 // Assign Driver to Order
 export const assignDriverToOrder = async (req, res) => {
   try {
-    const { driverId } = req.body;
+    const { driverId, isReturn, isReturnPickup } = req.body;
     const orderId = req.params.id;
 
     const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
@@ -166,15 +166,43 @@ export const assignDriverToOrder = async (req, res) => {
       }
     }
 
+    const isReturnTask = Boolean(isReturn || isReturnPickup);
+
+    order.isReturnPickup = isReturnTask;
     order.assignedDriverId = driver.id;
     order.assignedDriverName = driver.fullName;
     order.assignedDriverPhone = driver.phone;
     order.assignedLogisticsUser = driver.fullName;
-    order.status = 'ASSIGNED';
-    order.deliveryStatus = 'driver_notified';
+    order.status = isReturnTask ? 'RETURN_PICKUP' : 'ASSIGNED';
+    order.deliveryStatus = isReturnTask ? 'return_assigned' : 'driver_notified';
     order.assignedAt = new Date().toISOString();
 
     await order.save();
+
+    const cleanNum = (orderId || order.id || '').toString().replace(/[^0-9]/g, '');
+    try {
+      await Order.updateMany(
+        {
+          $or: [
+            { id: order.id },
+            { id: orderId },
+            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+          ]
+        },
+        {
+          $set: {
+            isReturnPickup: isReturnTask,
+            assignedDriverId: driver.id,
+            assignedDriverName: driver.fullName,
+            assignedDriverPhone: driver.phone,
+            assignedLogisticsUser: driver.fullName,
+            status: isReturnTask ? 'RETURN_PICKUP' : 'ASSIGNED',
+            deliveryStatus: isReturnTask ? 'return_assigned' : 'driver_notified',
+            assignedAt: order.assignedAt
+          }
+        }
+      );
+    } catch (_) {}
 
     // Increment driver pendingDeliveries
     driver.pendingDeliveries = (driver.pendingDeliveries || 0) + 1;
@@ -213,7 +241,16 @@ export const assignDriverToOrder = async (req, res) => {
 export const prepareOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
-    const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
+    const cleanNum = orderId ? orderId.toString().replace(/[^0-9]/g, '') : '';
+    let order = await Order.findOne({ id: orderId });
+    if (!order) {
+      try {
+        order = await Order.findById(orderId);
+      } catch (_) {}
+    }
+    if (!order && cleanNum) {
+      order = await Order.findOne({ id: new RegExp(cleanNum, 'i') });
+    }
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
     order.isPrepared = true;
@@ -223,6 +260,27 @@ export const prepareOrder = async (req, res) => {
     order.packedBy = req.user?.fullName || req.body?.packedBy || 'Warehouse Staging Team';
 
     await order.save();
+
+    try {
+      await Order.updateMany(
+        {
+          $or: [
+            { id: order.id },
+            { id: orderId },
+            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+          ]
+        },
+        {
+          $set: {
+            isPrepared: true,
+            status: 'READY_FOR_DISPATCH',
+            deliveryStatus: 'ready_for_dispatch',
+            preparedAt: order.preparedAt,
+            packedBy: order.packedBy
+          }
+        }
+      );
+    } catch (_) {}
 
     await Log.create({
       id: `LOG-${Date.now()}`,
@@ -337,9 +395,12 @@ export const scanAssetBarcode = async (req, res) => {
       order.dispatchedAt = new Date().toISOString();
     } else if (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') {
       // Step 2 Doorstep Handover Barcode Scan -> Confirms physical item presence, unlocks Step 3 Customer OTP
+      order.scannedAtLoading = true;
+      order.scannedAtCheckout = true;
       order.scannedAtDelivery = true;
       order.doorstepScanned = true;
-      order.deliveryStatus = 'out_for_delivery'; // Remains active until Customer Handover OTP is confirmed
+      order.status = 'OUT_FOR_DELIVERY';
+      order.deliveryStatus = 'out_for_delivery';
     } else if (scanType === 'RETURN_PICKUP') {
       order.scannedAtReturn = true;
       order.status = 'RETURNED';
@@ -348,6 +409,69 @@ export const scanAssetBarcode = async (req, res) => {
     }
 
     await order.save();
+
+    const cleanNum = (orderId || order.id || '').toString().replace(/[^0-9]/g, '');
+    try {
+      await Order.updateMany(
+        {
+          $or: [
+            { id: order.id },
+            { id: orderId },
+            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+          ]
+        },
+        {
+          $set: {
+            ...( (scanType === 'RETURN_PICKUP' || scanType === 'PICKUP') ? {
+              scannedAtReturn: true,
+              deliveryStatus: 'returned',
+              status: 'RETURNED',
+              returnedAt: order.returnedAt
+            } : (scanType === 'DELIVERY' || scanType === 'DOORSTEP_SCAN') ? {
+              scannedAtLoading: true,
+              scannedAtCheckout: true,
+              scannedAtDelivery: true,
+              doorstepScanned: true,
+              deliveryStatus: 'out_for_delivery',
+              status: 'OUT_FOR_DELIVERY'
+            } : {
+              scannedAtLoading: true,
+              scannedAtCheckout: true,
+              deliveryStatus: 'out_for_delivery',
+              status: 'OUT_FOR_DELIVERY'
+            })
+          }
+        }
+      );
+
+      // Auto-restore physical assets back to Available warehouse stock
+      if (scanType === 'RETURN_PICKUP' || scanType === 'PICKUP') {
+        const assetIds = [
+          (matchedItem && (matchedItem.assetId || matchedItem.id)),
+          ...(order.items || []).map(it => it.assetId || it.id),
+          ...(order.expectedAssets || []).map(it => it.assetId || it.id)
+        ].filter(Boolean);
+
+        if (assetIds.length > 0) {
+          await Asset.updateMany(
+            {
+              $or: [
+                { id: { $in: assetIds } },
+                { barcode: { $in: [cleanBarcode, ...assetIds] } }
+              ]
+            },
+            {
+              $set: {
+                status: 'Available',
+                currentStatus: 'AVAILABLE',
+                currentCustomer: null,
+                currentOrderId: null
+              }
+            }
+          );
+        }
+      }
+    } catch (_) {}
 
     await Log.create({
       id: `LOG-${Date.now()}`,
@@ -419,44 +543,6 @@ export const acceptOrder = async (req, res) => {
     });
 
     return res.json({ success: true, message: 'Order accepted successfully', data: order });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Cancel Order & Restore Inventory Assets to Available Stock
-export const cancelOrder = async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const { reason } = req.body;
-
-    const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-
-    order.status = 'CANCELLED';
-    order.deliveryStatus = 'cancelled';
-    order.cancellationReason = reason || 'Customer requested cancellation at staging';
-    order.cancelledAt = new Date();
-    await order.save();
-
-    // Restore assets in database
-    if (order.items && order.items.length > 0) {
-      const assetIds = order.items.map(it => it.assetId || it.id).filter(Boolean);
-      if (assetIds.length > 0) {
-        await Asset.updateMany(
-          { $or: [{ id: { $in: assetIds } }, { _id: { $in: assetIds } }] },
-          { $set: { status: 'Available', currentCustomer: null, currentOrderId: null } }
-        );
-      }
-    }
-
-    console.log(`\n🛑 [RentBuddy Order Engine] Order #${orderId} CANCELLED. All items restored to Available stock.`);
-
-    return res.json({
-      success: true,
-      message: `Order #${orderId} cancelled and stock restored to Available inventory`,
-      data: order
-    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -598,8 +684,11 @@ export const getDriverActiveOrders = async (req, res) => {
       ],
       deliveryStatus: ord.deliveryStatus || 'driver_notified',
       status: ord.status || 'ASSIGNED',
-      scannedAtCheckout: ord.scannedAtCheckout || ord.scannedAtLoading || false,
-      scannedAtDelivery: ord.scannedAtDelivery || false,
+      isReturnPickup: Boolean(ord.isReturnPickup || ord.status === 'RETURN_PICKUP' || ord.status === 'Return Pickup' || ord.deliveryStatus === 'return_assigned' || ord.deliveryStatus === 'return_pickup'),
+      scannedAtCheckout: Boolean(ord.scannedAtCheckout || ord.scannedAtLoading),
+      scannedAtDelivery: Boolean(ord.scannedAtDelivery || ord.doorstepScanned),
+      doorstepScanned: Boolean(ord.doorstepScanned || ord.scannedAtDelivery),
+      scannedAtReturn: Boolean(ord.scannedAtReturn),
       deliveryProofPhoto: ord.deliveryProofPhoto || null,
       payableAmount: ord.totalDeposit || ord.totalMonthlyRent || 3000,
       totalAmount: ord.totalDeposit || ord.totalMonthlyRent || 3000,
@@ -712,6 +801,256 @@ export const getDriverOrderHistory = async (req, res) => {
     }));
 
     return res.json({ success: true, data: { orders: formattedOrders }, count: formattedOrders.length });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Rider requests Admin to deposit & restock returned furniture at Warehouse Hub
+export const requestReturnDeposit = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { driverId, driverName, notes } = req.body;
+
+    const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    order.status = 'RETURN_DEPOSIT_PENDING';
+    order.deliveryStatus = 'return_deposit_requested';
+    order.returnDepositRequestedAt = new Date().toISOString();
+    order.isReturnPickup = true;
+    if (notes) order.returnNotes = notes;
+    await order.save();
+
+    const cleanNum = (orderId || order.id || '').toString().replace(/[^0-9]/g, '');
+    try {
+      await Order.updateMany(
+        {
+          $or: [
+            { id: order.id },
+            { id: orderId },
+            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+          ]
+        },
+        {
+          $set: {
+            status: 'RETURN_DEPOSIT_PENDING',
+            deliveryStatus: 'return_deposit_requested',
+            returnDepositRequestedAt: order.returnDepositRequestedAt,
+            isReturnPickup: true
+          }
+        }
+      );
+    } catch (_) {}
+
+    await Log.create({
+      id: `LOG-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      userRole: 'Rider',
+      action: 'RETURN_DEPOSIT_REQUESTED',
+      details: `Rider ${driverName || order.assignedDriverName || 'Rider'} submitted return deposit request for Order #${order.id} at warehouse depot.`
+    });
+
+    await addNotification({
+      title: '📥 Return Deposit Request from Rider',
+      message: `Rider ${driverName || order.assignedDriverName || 'Rider'} has brought back furniture for Order #${order.id} (${order.customerName || 'Customer'}) to ${order.city || 'Depot'}. Please inspect and accept deposit.`,
+      type: 'info',
+      city: order.city || 'Indore (Head Office)',
+      riderName: driverName || order.assignedDriverName || '',
+      orderId: order.id,
+      category: 'logistics'
+    });
+
+    return res.json({
+      success: true,
+      message: `✓ Deposit request sent to Admin! Order #${order.id} awaiting warehouse hub acceptance.`,
+      data: order
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin accepts return deposit and automatically restocks assets to Available in Inventory
+export const acceptReturnDeposit = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const cleanNum = (orderId || '').toString().replace(/[^0-9]/g, '');
+
+    const order = await Order.findOne({
+      $or: [
+        { id: orderId },
+        ...(orderId.length === 24 ? [{ _id: orderId }] : []),
+        ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+      ]
+    });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const returnedTime = new Date().toISOString();
+    order.status = 'RETURNED';
+    order.deliveryStatus = 'returned';
+    order.returnedAt = returnedTime;
+    order.scannedAtReturn = true;
+    await order.save();
+
+    try {
+      await Order.updateMany(
+        {
+          $or: [
+            { id: order.id },
+            { id: orderId },
+            ...(orderId.length === 24 ? [{ _id: orderId }] : []),
+            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+          ]
+        },
+        {
+          $set: {
+            status: 'RETURNED',
+            deliveryStatus: 'returned',
+            returnedAt: returnedTime,
+            scannedAtReturn: true
+          }
+        }
+      );
+    } catch (_) {}
+
+    // Auto-restore physical assets back to Available warehouse stock
+    const assetIds = [
+      ...(order.items || []).map(it => it.assetId || it.id),
+      ...(order.expectedAssets || []).map(it => it.assetId || it.id)
+    ].filter(Boolean);
+
+    if (assetIds.length > 0) {
+      await Asset.updateMany(
+        {
+          $or: [
+            { id: { $in: assetIds } },
+            { _id: { $in: assetIds.filter(id => id.length === 24) } }
+          ]
+        },
+        {
+          $set: {
+            status: 'Available',
+            currentStatus: 'AVAILABLE',
+            currentCustomer: null,
+            currentOrderId: null
+          }
+        }
+      );
+      console.log(`\n\x1b[32m♻️ [RentBuddy Asset Return] All assets for Order #${orderId} marked AVAILABLE in Inventory.\x1b[0m`);
+    }
+
+    await Log.create({
+      id: `LOG-${Date.now()}`,
+      timestamp: returnedTime,
+      userRole: 'Logistics Admin',
+      action: 'RETURN_DEPOSIT_ACCEPTED',
+      details: `Admin accepted return deposit for Order #${order.id}. ${assetIds.length} items restocked to Available in Inventory.`
+    });
+
+    await addNotification({
+      title: '✅ Return Deposit Accepted & Restocked',
+      message: `Return for Order #${order.id} accepted. All items have been returned to Available inventory in ${order.city || 'Depot'}.`,
+      type: 'success',
+      city: order.city || 'Indore (Head Office)',
+      orderId: order.id,
+      category: 'logistics'
+    });
+
+    return res.json({
+      success: true,
+      message: `✓ Return accepted and restocked to Available inventory for Order #${order.id}!`,
+      data: order
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Cancel Order & Restore all furniture assets to Available warehouse stock
+export const cancelOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { reason } = req.body || {};
+    const cleanNum = (orderId || '').toString().replace(/[^0-9]/g, '');
+
+    const order = await Order.findOne({
+      $or: [
+        { id: orderId },
+        ...(orderId && orderId.length === 24 ? [{ _id: orderId }] : []),
+        ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+      ]
+    });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const cancelledTime = new Date().toISOString();
+    order.status = 'Cancelled';
+    order.deliveryStatus = 'cancelled';
+    order.cancellationReason = reason || 'Cancelled by Admin in Logistics Tracker';
+    order.cancelledAt = cancelledTime;
+    await order.save();
+
+    try {
+      await Order.updateMany(
+        {
+          $or: [
+            { id: order.id },
+            { id: orderId },
+            ...(orderId && orderId.length === 24 ? [{ _id: orderId }] : []),
+            ...(cleanNum ? [{ id: new RegExp(cleanNum, 'i') }] : [])
+          ]
+        },
+        {
+          $set: {
+            status: 'Cancelled',
+            deliveryStatus: 'cancelled',
+            cancellationReason: reason || 'Cancelled by Admin in Logistics Tracker',
+            cancelledAt: cancelledTime
+          }
+        }
+      );
+    } catch (_) {}
+
+    // Auto-restore physical assets back to Available warehouse stock
+    const assetIds = [
+      ...(order.items || []).map(it => it.assetId || it.id),
+      ...(order.expectedAssets || []).map(it => it.assetId || it.id)
+    ].filter(Boolean);
+
+    if (assetIds.length > 0) {
+      await Asset.updateMany(
+        {
+          $or: [
+            { id: { $in: assetIds } },
+            { barcode: { $in: assetIds } },
+            { _id: { $in: assetIds.filter(id => id.length === 24) } }
+          ]
+        },
+        {
+          $set: {
+            status: 'Available',
+            currentStatus: 'AVAILABLE',
+            currentCustomer: null,
+            currentOrderId: null
+          }
+        }
+      );
+      console.log(`\n\x1b[32m♻️ [RentBuddy Asset Restored] All assets for Cancelled Order #${order.id} marked AVAILABLE in Inventory.\x1b[0m`);
+    }
+
+    await Log.create({
+      id: `LOG-${Date.now()}`,
+      timestamp: cancelledTime,
+      userRole: 'Logistics Admin',
+      action: 'ORDER_CANCELLED',
+      details: `Order #${order.id} cancelled. ${assetIds.length} items restocked to Available in Inventory. Reason: ${reason || 'Staging cancellation'}`
+    });
+
+    return res.json({
+      success: true,
+      message: `✓ Order #${order.id} cancelled and stock restored to Available inventory!`,
+      data: order
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

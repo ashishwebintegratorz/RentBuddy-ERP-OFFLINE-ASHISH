@@ -12,15 +12,29 @@ class DriverService {
   _buildDriverFilter(idOrPhone) {
     if (!idOrPhone) return { id: '__none__' };
     const str = String(idOrPhone).trim();
-    const cleanPhone = str.replace(/[^0-9]/g, '').slice(-10);
-    const conditions = [{ id: str }, { phone: str }];
-    if (cleanPhone && cleanPhone.length === 10) {
+    const cleanDigits = str.replace(/[^0-9]/g, '');
+    const cleanPhone = cleanDigits.length >= 4 ? cleanDigits.slice(-10) : '';
+
+    const conditions = [
+      { id: str },
+      { phone: str },
+      { id: new RegExp(`^${str}$`, 'i') }
+    ];
+
+    if (str.length === 24 && /^[0-9a-fA-F]{24}$/.test(str)) {
+      conditions.push({ _id: str });
+    }
+
+    if (cleanPhone) {
       conditions.push(
         { phone: cleanPhone },
         { phone: `+91${cleanPhone}` },
-        { phone: `+91-${cleanPhone}` }
+        { phone: `+91-${cleanPhone}` },
+        { phone: new RegExp(cleanPhone, 'i') },
+        { id: `DRV-${cleanPhone.slice(-4)}` }
       );
     }
+
     return { $or: conditions };
   }
 
@@ -67,27 +81,26 @@ class DriverService {
     } else if (status === 'Active') {
       updates.isBlocked = false;
     }
-    return await Driver.findOneAndUpdate(
-      this._buildDriverFilter(id),
-      { $set: updates },
-      { returnDocument: 'after' }
-    );
+    const filter = this._buildDriverFilter(id);
+    await Driver.updateMany(filter, { $set: updates });
+    return await Driver.findOne(filter);
   }
 
   async blockDriver(id, { isBlocked, blockedReason }) {
     if (!getDbStatus()) return { id, isBlocked, blockedReason };
     const shouldBlock = Boolean(isBlocked);
-    return await Driver.findOneAndUpdate(
-      this._buildDriverFilter(id),
+    const filter = this._buildDriverFilter(id);
+    await Driver.updateMany(
+      filter,
       {
         $set: {
           isBlocked: shouldBlock,
           blockedReason: shouldBlock ? (blockedReason || 'Administrative restriction') : '',
           status: shouldBlock ? 'Blocked' : 'Active'
         }
-      },
-      { returnDocument: 'after' }
+      }
     );
+    return await Driver.findOne(filter);
   }
 
   async updateDocuments(id, documents) {

@@ -61,8 +61,16 @@ export const updateDriverStatus = async (req, res) => {
 export const toggleBlockDriver = async (req, res) => {
   try {
     const { id } = req.params;
-    const { isBlocked, blockedReason } = req.body;
-    const updated = await driverService.blockDriver(id, { isBlocked, blockedReason });
+    const { isBlocked, blockedReason, phone } = req.body || {};
+    let updated = await driverService.blockDriver(id, { isBlocked, blockedReason });
+    
+    if (!updated && (id || phone)) {
+      const cleanPhone = String(phone || id).replace(/[^0-9]/g, '').slice(-10);
+      if (cleanPhone) {
+        updated = await driverService.blockDriver(cleanPhone, { isBlocked, blockedReason });
+      }
+    }
+
     return successResponse(
       res,
       isBlocked ? 'Driver blocked successfully' : 'Driver unblocked successfully',

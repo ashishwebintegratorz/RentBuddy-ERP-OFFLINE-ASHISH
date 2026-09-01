@@ -193,6 +193,9 @@ export interface RepairJob {
   assetId: string;
   assetBarcode: string;
   assetName: string;
+  city?: string;
+  defectType?: string;
+  priority?: 'Standard' | 'Urgent' | 'Critical';
   repairCost: number;
   vendor: string;
   technician: string;

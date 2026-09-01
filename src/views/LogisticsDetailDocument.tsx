@@ -62,17 +62,6 @@ export default function LogisticsDetailDocument() {
   const [activeDocTab, setActiveDocTab] = useState<'license' | 'aadhaar' | 'vehicle' | 'profile' | 'account'>('license');
   const [verificationNotesInput, setVerificationNotesInput] = useState('');
 
-  // Sync drivers to MongoDB Atlas so Flutter Rider login always recognizes ERP onboarded drivers
-  React.useEffect(() => {
-    if (drivers && drivers.length > 0) {
-      fetch(`${getApiBaseUrl()}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ drivers })
-      }).catch(() => {});
-    }
-  }, [drivers]);
-
   // Selected driver for view document modal
   const selectedDriver = drivers.find(d => d.id === selectedDriverId || d.phone === selectedDriverId || (d as any)._id === selectedDriverId);
 
@@ -124,8 +113,14 @@ export default function LogisticsDetailDocument() {
     }
   };
 
-  // Filter Drivers
+  // Filter & Deduplicate Drivers
+  const seenDriverKeys = new Set<string>();
   const filteredDrivers = drivers.filter(d => {
+    const cleanPhone = (d.phone || '').replace(/[^0-9]/g, '').slice(-10);
+    const key = cleanPhone || d.id || (d as any)._id;
+    if (key && seenDriverKeys.has(key)) return false;
+    if (key) seenDriverKeys.add(key);
+
     const vNum = d.vehicleNumber || '';
     const dCity = d.city || 'Indore (Head Office)';
     const matchSearch =
@@ -136,11 +131,12 @@ export default function LogisticsDetailDocument() {
       vNum.toLowerCase().includes(search.toLowerCase()) ||
       dCity.toLowerCase().includes(search.toLowerCase());
 
+    const isBlocked = Boolean(d && (d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended'));
     const matchStatus =
       statusFilter === 'All' ||
-      (statusFilter === 'Active' && d.status === 'Active' && !d.isBlocked) ||
+      (statusFilter === 'Active' && !isBlocked && d.status === 'Active') ||
       (statusFilter === 'Pending' && (d.status === 'Pending Verification' || d.verificationStatus === 'Pending')) ||
-      (statusFilter === 'Blocked' && (d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended'));
+      (statusFilter === 'Blocked' && isBlocked);
 
     const matchCity = cityFilter === 'All' || dCity === cityFilter;
 
@@ -148,11 +144,11 @@ export default function LogisticsDetailDocument() {
   });
 
   // Calculate Metrics
-  const totalDriversCount = drivers.length;
-  const activeDriversCount = drivers.filter(d => d.status === 'Active' && !d.isBlocked).length;
-  const pendingKYCCount = drivers.filter(d => d.verificationStatus === 'Pending' || d.status === 'Pending Verification').length;
-  const blockedDriversCount = drivers.filter(d => d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended').length;
-  const totalFleetDelivered = drivers.reduce((acc, curr) => acc + (curr.totalDelivered || 0), 0);
+  const totalDriversCount = filteredDrivers.length;
+  const activeDriversCount = filteredDrivers.filter(d => !Boolean(d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended') && d.status === 'Active').length;
+  const pendingKYCCount = filteredDrivers.filter(d => d.verificationStatus === 'Pending' || d.status === 'Pending Verification').length;
+  const blockedDriversCount = filteredDrivers.filter(d => Boolean(d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended')).length;
+  const totalFleetDelivered = filteredDrivers.reduce((acc, curr) => acc + (curr.totalDelivered || 0), 0);
 
   const handleCreateDriver = (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,6 +257,8 @@ export default function LogisticsDetailDocument() {
     setEditForm(null);
   };
 
+  const isDriverBlocked = (d?: LogisticsDriver | null) => Boolean(d && (d.isBlocked || d.status === 'Blocked' || d.status === 'Suspended'));
+
   const handleOpenBlockModal = (driver: LogisticsDriver) => {
     setDriverToBlock(driver);
     setBlockReasonInput(driver.blockedReason || 'Policy or document compliance violation');
@@ -269,11 +267,17 @@ export default function LogisticsDetailDocument() {
 
   const handleConfirmBlockToggle = () => {
     if (!driverToBlock) return;
-    const newBlockedState = !driverToBlock.isBlocked;
+    const isBlockedCurrently = isDriverBlocked(driverToBlock);
+    const newBlockedState = !isBlockedCurrently;
     const targetId = driverToBlock.id || (driverToBlock as any)._id || driverToBlock.phone;
-    toggleBlockDriver(targetId, newBlockedState, blockReasonInput);
+    const reason = blockReasonInput;
+
+    // Instant modal dismiss (0 latency)
     setShowBlockModal(false);
     setDriverToBlock(null);
+
+    // Persistent state & backend update
+    toggleBlockDriver(targetId, newBlockedState, reason);
   };
 
   return (
@@ -435,7 +439,7 @@ export default function LogisticsDetailDocument() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredDrivers.map((driver) => {
-            const isBlocked = driver.isBlocked || driver.status === 'Blocked' || driver.status === 'Suspended';
+            const isBlocked = isDriverBlocked(driver);
             const isVerified = driver.verificationStatus === 'Verified' && !isBlocked;
 
             return (
@@ -459,16 +463,6 @@ export default function LogisticsDetailDocument() {
                           src={driver.documents?.profilePhoto || SVG_AVATAR_PLACEHOLDER}
                           alt={driver.fullName}
                           className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-700/80 shadow-md group-hover:border-red-400/60 transition-colors"
-                        />
-                        <span
-                          className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 ${
-                            isBlocked
-                              ? 'bg-rose-500'
-                              : isVerified
-                              ? 'bg-emerald-500 animate-pulse'
-                              : 'bg-amber-500'
-                          }`}
-                          title={isBlocked ? 'Blocked' : isVerified ? 'Active & Verified' : 'Pending Verification'}
                         />
                       </div>
 
@@ -542,8 +536,8 @@ export default function LogisticsDetailDocument() {
                     </div>
                   </div>
 
-                  {/* Live Performance Metric Badges (As requested by user) */}
-                  <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800">
+                  {/* Live Performance Metric Badges (Delivered, Pending, Overdue) */}
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800">
                     <div className="bg-slate-800/50 p-2 rounded-xl text-center border border-slate-700/40">
                       <div className="text-[9px] font-bold text-slate-400 uppercase">Delivered</div>
                       <div className="text-sm font-black text-emerald-400 mt-0.5">{driver.totalDelivered || 0}</div>
@@ -559,13 +553,6 @@ export default function LogisticsDetailDocument() {
                       <div className={`text-sm font-black mt-0.5 ${driver.deadlineOverdue > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-400'}`}>
                         {driver.deadlineOverdue || 0}
                       </div>
-                    </div>
-
-                    <div className="bg-slate-800/50 p-2 rounded-xl text-center border border-slate-700/40">
-                      <div className="text-[9px] font-bold text-slate-400 uppercase flex items-center justify-center gap-0.5">
-                        <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" /> Rating
-                      </div>
-                      <div className="text-sm font-black text-amber-400 mt-0.5">{driver.rating || 5.0}</div>
                     </div>
                   </div>
 
@@ -1328,63 +1315,66 @@ export default function LogisticsDetailDocument() {
       {/* ========================================================================= */}
       {/* BLOCK / SUSPEND DRIVER MODAL (Requested specifically by user) */}
       {/* ========================================================================= */}
-      {showBlockModal && driverToBlock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="glass-panel w-full max-w-md rounded-2xl border border-rose-500/30 bg-slate-900 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30">
-                <Ban className="w-6 h-6" />
+      {showBlockModal && driverToBlock && (() => {
+        const currentlyBlocked = isDriverBlocked(driverToBlock);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+            <div className="glass-panel w-full max-w-md rounded-2xl border border-rose-500/30 bg-slate-900 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3 text-rose-400">
+                <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30">
+                  <Ban className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    {currentlyBlocked ? 'Unblock Driver Fleet Partner' : 'Block & Suspend Driver'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {driverToBlock.fullName} ({driverToBlock.id})
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-extrabold text-white">
-                  {driverToBlock.isBlocked ? 'Unblock Driver Fleet Partner' : 'Block & Suspend Driver'}
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {driverToBlock.fullName} ({driverToBlock.id})
-                </p>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {currentlyBlocked
+                  ? 'Unblocking will restore this driver to active logistics duty, allowing delivery assignment and portal access.'
+                  : 'Blocking this driver will immediately suspend their dispatch eligibility and flag their profile in the ERP.'}
+              </p>
+
+              {!currentlyBlocked && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 block">Reason for Blocking *</label>
+                  <input
+                    type="text"
+                    value={blockReasonInput}
+                    onChange={(e) => setBlockReasonInput(e.target.value)}
+                    placeholder="e.g. Expired DL, Damaged Return Asset, Repeated Pickup Delay..."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowBlockModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmBlockToggle}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg ${
+                    currentlyBlocked
+                      ? 'bg-emerald-600 hover:bg-emerald-500'
+                      : 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/50'
+                  }`}
+                >
+                  {currentlyBlocked ? 'Confirm Unblock' : 'Confirm Block Driver'}
+                </button>
               </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              {driverToBlock.isBlocked
-                ? 'Unblocking will restore this driver to active logistics duty, allowing delivery assignment and portal access.'
-                : 'Blocking this driver will immediately suspend their dispatch eligibility and flag their profile in the ERP.'}
-            </p>
-
-            {!driverToBlock.isBlocked && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 block">Reason for Blocking *</label>
-                <input
-                  type="text"
-                  value={blockReasonInput}
-                  onChange={(e) => setBlockReasonInput(e.target.value)}
-                  placeholder="e.g. Expired DL, Damaged Return Asset, Repeated Pickup Delay..."
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-rose-500"
-                />
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowBlockModal(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmBlockToggle}
-                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg ${
-                  driverToBlock.isBlocked
-                    ? 'bg-emerald-600 hover:bg-emerald-500'
-                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/50'
-                }`}
-              >
-                {driverToBlock.isBlocked ? 'Confirm Unblock' : 'Confirm Block Driver'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* HIGH-RES IMAGE ZOOM MODAL */}

@@ -30,11 +30,11 @@ interface RentBuddyState {
   currentUserRole: UserRole;
   currentCity: CityName;
   searchQuery: string;
-  
+
   // Organization Configuration
   organizationConfig: OrganizationConfig;
   updateOrganizationConfig: (updates: Partial<OrganizationConfig>) => void;
-  
+
   // Data Collections
   customers: Customer[];
   inventory: Asset[];
@@ -47,7 +47,7 @@ interface RentBuddyState {
   notifications: SystemNotification[];
   cities: CityName[];
   drivers: LogisticsDriver[];
-  
+
   // Authentication State
   token: string | null;
   currentUser: {
@@ -180,9 +180,15 @@ const genId = (prefix: string) => `${prefix}-${Math.floor(100000 + Math.random()
 
 const BACKEND_URL = getApiBaseUrl();
 
+// Active sync flag & block override tracker to guarantee zero-revert state
+let isSyncingFromServer = false;
+export const recentDriverBlockOverrides = new Map<string, { isBlocked: boolean; timestamp: number }>();
+
 // Debounced & immediate synchronization engine to prevent database flooding and data loss
 let syncTimeout: any = null;
 const syncToDatabase = (state: any, immediate: boolean = false) => {
+  if (isSyncingFromServer) return;
+
   const performSync = async () => {
     try {
       const payload = {
@@ -193,7 +199,6 @@ const syncToDatabase = (state: any, immediate: boolean = false) => {
         repairs: state.repairs,
         auditLogs: state.auditLogs,
         notifications: state.notifications,
-        drivers: state.drivers,
         cities: state.cities,
         currentCity: state.currentCity,
         currentUserRole: state.currentUserRole,
@@ -291,13 +296,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         setCity: (city) => {
           try {
             localStorage.setItem('rentbuddy_active_city', city);
-          } catch (_) {}
+          } catch (_) { }
           set({ currentCity: city });
           fetch(`${BACKEND_URL}/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentCity: city })
-          }).catch(() => {});
+          }).catch(() => { });
         },
         addCity: (city) => {
           set((state) => {
@@ -449,7 +454,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newAsset)
-          }).catch(() => {});
+          }).catch(() => { });
         },
 
         updateAsset: (id, updates) => {
@@ -479,7 +484,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
-          }).catch(() => {});
+          }).catch(() => { });
         },
 
         updateAssetStatus: (id, status) => {
@@ -509,7 +514,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
-          }).catch(() => {});
+          }).catch(() => { });
         },
 
         moveAssetWarehouse: (id, warehouse) => {
@@ -539,7 +544,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ warehouse })
-          }).catch(() => {});
+          }).catch(() => { });
         },
 
         // Checkout / POS Checkout Actions
@@ -561,7 +566,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           const totalDeposit = orderItemsDetails.reduce((sum, item) => sum + item.securityDeposit, 0);
           const totalMonthlyRent = orderItemsDetails.reduce((sum, item) => sum + item.monthlyRentalPrice, 0);
           const totalTenureRent = totalMonthlyRent * checkoutData.durationMonths;
-          
+
           let discountAmount = 0;
           if (checkoutData.discountType === 'percent') {
             discountAmount = Math.round(totalTenureRent * (checkoutData.discountValue / 100));
@@ -641,11 +646,11 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             // Update items status in inventory to Reserved
             const updatedInventory = state.inventory.map((asset) => {
               if (checkoutData.items.some((item) => item.assetId === asset.id || item.assetId === (asset as any)._id || item.assetId === asset.barcode)) {
-                return { 
-                  ...asset, 
+                return {
+                  ...asset,
                   status: 'Reserved' as AssetStatus,
                   currentOrderId: orderId,
-                  currentCustomer: cust.fullName 
+                  currentCustomer: cust.fullName
                 };
               }
               return asset;
@@ -677,21 +682,21 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(newOrder)
-            }).catch(() => {});
+            }).catch(() => { });
 
             // Update each asset on backend
             for (const item of checkoutData.items) {
               fetch(`${BACKEND_URL}/assets/${item.assetId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   status: 'Reserved',
                   currentOrderId: orderId,
                   currentCustomer: cust.fullName
                 })
-              }).catch(() => {});
+              }).catch(() => { });
             }
-          } catch (_) {}
+          } catch (_) { }
 
           // 2. Trigger instant debounced database sync
           syncToDatabase(get());
@@ -1091,8 +1096,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                   lifecycle: {
                     ...a.lifecycle,
                     currentCondition: inspection.result === 'Excellent' ? 'Excellent' as const :
-                                     inspection.result === 'Minor Repair' ? 'Good' as const :
-                                     inspection.result === 'Major Repair' ? 'Fair' as const : 'Poor' as const
+                      inspection.result === 'Minor Repair' ? 'Good' as const :
+                        inspection.result === 'Major Repair' ? 'Fair' as const : 'Poor' as const
                   }
                 };
               }
@@ -1148,40 +1153,47 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         },
 
         logRepairJob: (repair) => {
+          const chosenAsset = get().inventory.find(a => a.id === repair.assetId || a.barcode === (repair as any).assetBarcode);
           const newJob: RepairJob = {
             id: genId('RB-REP'),
             ...repair,
-            assetBarcode: repair.assetId,
-            assetName: get().inventory.find(a => a.id === repair.assetId)?.category || 'Furniture',
+            city: (repair as any).city || chosenAsset?.city || get().currentCity || 'Indore (Head Office)',
+            assetBarcode: (repair as any).assetBarcode || repair.assetId,
+            assetName: (repair as any).assetName || chosenAsset?.category || 'Furniture Unit',
             photos: [],
             status: 'In Progress',
             createdAt: new Date().toISOString(),
           };
 
           set((state) => {
-            const updatedInventory = state.inventory.map(a => a.id === repair.assetId ? { ...a, status: 'Under Repair' as const } : a);
+            const updatedInventory = state.inventory.map(a => 
+              (a.id === repair.assetId || a.barcode === (repair as any).assetBarcode) 
+                ? { ...a, status: 'Under Repair' as const } 
+                : a
+            );
             return {
               repairs: [newJob, ...state.repairs],
               inventory: updatedInventory,
             };
           });
+          syncToDatabase(get(), true);
           get().runSystemAudit();
         },
 
         completeRepairJob: (id) => {
           set((state) => {
-            const job = state.repairs.find(j => j.id === id);
+            const job = state.repairs.find(j => j.id === id || (j as any)._id === id);
             if (!job) return {};
 
-            const updatedRepairs = state.repairs.map(j => j.id === id ? { ...j, status: 'Completed' as const, completedAt: new Date().toISOString() } : j);
+            const updatedRepairs = state.repairs.map(j => (j.id === id || (j as any)._id === id) ? { ...j, status: 'Completed' as const, completedAt: new Date().toISOString() } : j);
             const updatedInventory = state.inventory.map((a) => {
-              if (a.id === job.assetId) {
+              if (a.id === job.assetId || a.barcode === job.assetBarcode) {
                 return {
                   ...a,
                   status: 'Available' as const,
                   lifecycle: {
                     ...a.lifecycle,
-                    repairCost: a.lifecycle.repairCost + job.repairCost,
+                    repairCost: (a.lifecycle?.repairCost || 0) + (job.repairCost || 0),
                     currentCondition: 'Excellent' as const,
                   }
                 };
@@ -1194,11 +1206,11 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               timestamp: new Date().toISOString(),
               userRole: state.currentUserRole,
               userName: `User (${state.currentUserRole})`,
-              city: state.currentCity,
+              city: (job as any).city || state.currentCity,
               action: 'Asset Repair Completed',
               category: 'INVENTORY',
               severity: 'INFO',
-              details: `Asset ${job.assetId} successfully repaired by ${job.vendor}. Repair cost ₹${job.repairCost}. Asset returned to inventory.`,
+              details: `Asset ${job.assetId} (${job.assetBarcode || ''}) successfully repaired by ${job.vendor}. Repair cost ₹${job.repairCost}. Asset returned to inventory.`,
             };
 
             return {
@@ -1207,6 +1219,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               auditLogs: [log, ...state.auditLogs],
             };
           });
+          syncToDatabase(get(), true);
           get().runSystemAudit();
         },
 
@@ -1336,12 +1349,13 @@ export const useRentBuddyStore = create<RentBuddyState>()(
 
         // Logistics Driver & KYC Actions
         addDriver: (driverData) => {
-          const driverId = genId('DRV');
+          const cleanPhone = (driverData.phone || '').replace(/[^0-9]/g, '').slice(-10);
+          const driverId = cleanPhone ? `DRV-${cleanPhone.slice(-4)}` : genId('DRV');
           const newDriver: LogisticsDriver = {
             ...driverData,
             id: driverId,
-            status: driverData.status || 'Pending Verification',
-            verificationStatus: driverData.verificationStatus || 'Pending',
+            status: driverData.status || 'Active',
+            verificationStatus: driverData.verificationStatus || 'Verified',
             totalDelivered: 0,
             pendingDeliveries: 0,
             deadlineOverdue: 0,
@@ -1366,42 +1380,54 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             const notif: SystemNotification = {
               id: genId('NOT'),
               title: 'Driver Onboarded',
-              message: `New driver ${newDriver.fullName} (${driverId}) registered for ${newDriver.city}. Verification pending.`,
+              message: `New driver ${newDriver.fullName} (${driverId}) registered for ${newDriver.city}. Verification completed.`,
               type: 'info',
               timestamp: new Date().toISOString(),
               read: false,
               city: newDriver.city,
             };
 
-            // Immediately persist to backend MongoDB Atlas
-            try {
-              fetch(`${BACKEND_URL}/auth/driver/complete-onboarding`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  name: newDriver.fullName,
-                  fullName: newDriver.fullName,
-                  phone: newDriver.phone,
-                  alternatePhone: newDriver.alternatePhone,
-                  city: newDriver.city,
-                  vehicleNumber: newDriver.vehicleNumber,
-                  vehicleType: newDriver.vehicleType,
-                  upiId: newDriver.upiId,
-                  pin: newDriver.pin || '1234',
-                  profilePhoto: newDriver.documents?.profilePhoto,
-                  aadhaarFront: newDriver.documents?.aadhaarFront,
-                  licenseFront: newDriver.documents?.licenseFront || newDriver.documents?.drivingLicenseFront,
-                  vehiclePhoto: newDriver.documents?.vehiclePhoto
-                })
-              }).catch(() => {});
-            } catch (_) {}
+            const existingIndex = state.drivers.findIndex(d =>
+              (cleanPhone && d.phone && d.phone.replace(/[^0-9]/g, '').slice(-10) === cleanPhone) || d.id === driverId
+            );
+
+            let updatedDrivers = [...state.drivers];
+            if (existingIndex >= 0) {
+              updatedDrivers[existingIndex] = { ...updatedDrivers[existingIndex], ...newDriver };
+            } else {
+              updatedDrivers = [newDriver, ...state.drivers];
+            }
 
             return {
-              drivers: [newDriver, ...state.drivers],
+              drivers: updatedDrivers,
               auditLogs: [audit, ...state.auditLogs],
               notifications: [notif, ...state.notifications],
             };
           });
+
+          // Immediately persist to backend MongoDB Atlas
+          try {
+            const apiBase = getApiBaseUrl();
+            fetch(`${apiBase}/auth/driver/complete-onboarding`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: newDriver.fullName,
+                fullName: newDriver.fullName,
+                phone: newDriver.phone,
+                alternatePhone: newDriver.alternatePhone,
+                city: newDriver.city,
+                vehicleNumber: newDriver.vehicleNumber,
+                vehicleType: newDriver.vehicleType,
+                upiId: newDriver.upiId,
+                pin: newDriver.pin || '1234',
+                profilePhoto: newDriver.documents?.profilePhoto,
+                aadhaarFront: newDriver.documents?.aadhaarFront,
+                licenseFront: newDriver.documents?.licenseFront || newDriver.documents?.drivingLicenseFront,
+                vehiclePhoto: newDriver.documents?.vehiclePhoto
+              })
+            }).catch(() => { });
+          } catch (_) { }
         },
 
         updateDriver: (id, updates) => {
@@ -1417,7 +1443,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ phone: target.phone })
-            }).catch(() => {});
+            }).catch(() => { });
           }
 
           set((state) => ({
@@ -1436,7 +1462,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 verificationStatus: target.verificationStatus,
                 verificationNotes: notes
               })
-            }).catch(() => {});
+            }).catch(() => { });
           }
 
           set((state) => {
@@ -1459,11 +1485,11 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               drivers: state.drivers.map((d) =>
                 d.id === id || (d as any)._id === id || d.phone === id
                   ? {
-                      ...d,
-                      status,
-                      verificationNotes: notes !== undefined ? notes : d.verificationNotes,
-                      isBlocked: status === 'Blocked' || status === 'Suspended',
-                    }
+                    ...d,
+                    status,
+                    verificationNotes: notes !== undefined ? notes : d.verificationNotes,
+                    isBlocked: status === 'Blocked' || status === 'Suspended',
+                  }
                   : d
               ),
               auditLogs: [audit, ...state.auditLogs],
@@ -1487,30 +1513,61 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ documents: docs })
-              }).catch(() => {});
+              }).catch(() => { });
               return newDriver;
             });
             return { drivers: updatedDrivers };
           });
         },
 
-        verifyAllDriverDocuments: (id, status, notes) => {
-          set((state) => {
-            const target = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
-            if (!target) return {};
+        verifyAllDriverDocuments: async (id, status, notes) => {
+          const target = get().drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+          const isApproved = status === 'Verified';
+          const docs = {
+            ...(target?.documents || {}),
+            licenseVerified: isApproved,
+            aadhaarVerified: isApproved,
+            panVerified: isApproved,
+            rcVerified: isApproved,
+            insuranceVerified: isApproved,
+            policeVerified: isApproved,
+          };
 
-            const isApproved = status === 'Verified';
-            const docs = {
-              ...target.documents,
-              licenseVerified: isApproved,
-              aadhaarVerified: isApproved,
-              panVerified: isApproved,
-              rcVerified: isApproved,
-              insuranceVerified: isApproved,
-              policeVerified: isApproved,
+          set((state) => {
+            const foundTarget = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+            if (!foundTarget) return {};
+
+            const audit: AuditLog = {
+              id: genId('RB-AUD'),
+              timestamp: new Date().toISOString(),
+              userRole: state.currentUserRole,
+              userName: `Fleet Admin (${state.currentUserRole})`,
+              city: foundTarget.city,
+              action: 'Bulk Driver Verification',
+              category: 'COMPLIANCE',
+              severity: isApproved ? 'INFO' : 'WARNING',
+              details: `Set verification status to "${status}" for driver ${foundTarget.fullName} (${id}). Notes: ${notes || 'N/A'}`,
             };
 
-            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/status`, {
+            return {
+              drivers: state.drivers.map((d) =>
+                d.id === id || (d as any)._id === id || d.phone === id
+                  ? {
+                    ...d,
+                    verificationStatus: status,
+                    status: isApproved ? 'Active' : 'Pending Verification',
+                    verificationNotes: notes !== undefined ? notes : d.verificationNotes,
+                    documents: docs,
+                  }
+                  : d
+              ),
+              auditLogs: [audit, ...state.auditLogs],
+            };
+          });
+
+          try {
+            const apiBase = getApiBaseUrl();
+            await fetch(`${apiBase}/drivers/${encodeURIComponent(id)}/status`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1518,55 +1575,33 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 verificationStatus: status,
                 verificationNotes: notes
               })
-            }).catch(() => {});
+            });
 
-            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/documents`, {
+            await fetch(`${apiBase}/drivers/${encodeURIComponent(id)}/documents`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ documents: docs })
-            }).catch(() => {});
-
-            const audit: AuditLog = {
-              id: genId('RB-AUD'),
-              timestamp: new Date().toISOString(),
-              userRole: state.currentUserRole,
-              userName: `Fleet Admin (${state.currentUserRole})`,
-              city: target.city,
-              action: 'Bulk Driver Verification',
-              category: 'COMPLIANCE',
-              severity: isApproved ? 'INFO' : 'WARNING',
-              details: `Set verification status to "${status}" for driver ${target.fullName} (${id}). Notes: ${notes || 'N/A'}`,
-            };
-
-            return {
-              drivers: state.drivers.map((d) =>
-                d.id === id || (d as any)._id === id || d.phone === id
-                  ? {
-                      ...d,
-                      verificationStatus: status,
-                      status: isApproved ? 'Active' : 'Pending Verification',
-                      verificationNotes: notes !== undefined ? notes : d.verificationNotes,
-                      documents: docs,
-                    }
-                  : d
-              ),
-              auditLogs: [audit, ...state.auditLogs],
-            };
-          });
+            });
+          } catch (_) { }
         },
 
-        toggleBlockDriver: (id, isBlocked, reason) => {
+        toggleBlockDriver: async (id, isBlocked, reason) => {
           const target = get().drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
-          if (target) {
-            fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/block`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ isBlocked, blockedReason: reason })
-            }).catch(() => {});
-          }
+          const cleanPhone = (target?.phone || id).replace(/[^0-9]/g, '').slice(-10);
+
+          // Record immediate block override to prevent polling race conditions
+          const overrideVal = { isBlocked: Boolean(isBlocked), timestamp: Date.now() };
+          if (id) recentDriverBlockOverrides.set(id, overrideVal);
+          if (target?.id) recentDriverBlockOverrides.set(target.id, overrideVal);
+          if ((target as any)?._id) recentDriverBlockOverrides.set((target as any)._id, overrideVal);
+          if (cleanPhone) recentDriverBlockOverrides.set(cleanPhone, overrideVal);
+          if (target?.phone) recentDriverBlockOverrides.set(target.phone, overrideVal);
 
           set((state) => {
-            const foundTarget = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
+            const foundTarget = state.drivers.find((d) =>
+              d.id === id || (d as any)._id === id || d.phone === id ||
+              (cleanPhone && d.phone && d.phone.replace(/[^0-9]/g, '').slice(-10) === cleanPhone)
+            );
             if (!foundTarget) return {};
 
             const audit: AuditLog = {
@@ -1596,28 +1631,46 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             };
 
             return {
-              drivers: state.drivers.map((d) =>
-                d.id === id || (d as any)._id === id || d.phone === id
-                  ? {
-                      ...d,
-                      isBlocked,
-                      blockedReason: isBlocked ? reason || 'Administrative decision' : '',
-                      status: isBlocked ? 'Blocked' : 'Active',
-                    }
-                  : d
-              ),
+              drivers: state.drivers.map((d) => {
+                const dClean = (d.phone || '').replace(/[^0-9]/g, '').slice(-10);
+                const isMatch = d.id === id || (d as any)._id === id || d.phone === id || (cleanPhone && dClean === cleanPhone);
+                if (isMatch) {
+                  return {
+                    ...d,
+                    isBlocked: Boolean(isBlocked),
+                    blockedReason: isBlocked ? reason || 'Administrative decision' : '',
+                    status: isBlocked ? 'Blocked' : 'Active',
+                  };
+                }
+                return d;
+              }),
               auditLogs: [audit, ...state.auditLogs],
               notifications: [notif, ...state.notifications],
             };
           });
+
+          // Immediately persist to backend MongoDB Atlas on port 5001
+          try {
+            const apiBase = getApiBaseUrl();
+            await fetch(`${apiBase}/drivers/${encodeURIComponent(id)}/block`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isBlocked: Boolean(isBlocked), blockedReason: reason, phone: target?.phone || cleanPhone })
+            });
+          } catch (e) {
+            console.warn("Backend driver block sync deferred:", e);
+          }
         },
 
-        updateDriverDocuments: (id, updatedDocs) => {
-          fetch(`${BACKEND_URL}/drivers/${encodeURIComponent(id)}/documents`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ documents: updatedDocs })
-          }).catch(() => {});
+        updateDriverDocuments: async (id, updatedDocs) => {
+          try {
+            const apiBase = getApiBaseUrl();
+            await fetch(`${apiBase}/drivers/${encodeURIComponent(id)}/documents`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ documents: updatedDocs })
+            });
+          } catch (_) { }
 
           set((state) => {
             const target = state.drivers.find((d) => d.id === id || (d as any)._id === id || d.phone === id);
@@ -1639,9 +1692,9 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               drivers: state.drivers.map((d) =>
                 d.id === id
                   ? {
-                      ...d,
-                      documents: { ...d.documents, ...updatedDocs },
-                    }
+                    ...d,
+                    documents: { ...d.documents, ...updatedDocs },
+                  }
                   : d
               ),
               auditLogs: [audit, ...state.auditLogs],
@@ -1655,8 +1708,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           }));
           try {
             const apiBase = getApiBaseUrl();
-            fetch(`${apiBase}/notifications/${id}/read`, { method: 'PUT' }).catch(() => {});
-          } catch (_) {}
+            fetch(`${apiBase}/notifications/${id}/read`, { method: 'PUT' }).catch(() => { });
+          } catch (_) { }
         },
 
         markAllNotificationsRead: () => {
@@ -1665,16 +1718,16 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           }));
           try {
             const apiBase = getApiBaseUrl();
-            fetch(`${apiBase}/notifications/mark-all-read`, { method: 'PUT' }).catch(() => {});
-          } catch (_) {}
+            fetch(`${apiBase}/notifications/mark-all-read`, { method: 'PUT' }).catch(() => { });
+          } catch (_) { }
         },
 
         clearNotifications: () => {
           set({ notifications: [] });
           try {
             const apiBase = getApiBaseUrl();
-            fetch(`${apiBase}/notifications`, { method: 'DELETE' }).catch(() => {});
-          } catch (_) {}
+            fetch(`${apiBase}/notifications`, { method: 'DELETE' }).catch(() => { });
+          } catch (_) { }
         },
 
         // System Audits
@@ -1732,7 +1785,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 const asset = state.inventory.find(a => a.id === item.assetId);
                 const customer = state.customers.find(c => c.id === o.customerId);
                 if (asset && customer) {
-                  const custCity = state.cities.find(city => 
+                  const custCity = state.cities.find(city =>
                     customer.deliveryAddress.toLowerCase().includes(city.toLowerCase().replace(' (head office)', ''))
                   ) || state.cities[0];
                   if (asset.city !== custCity) {
@@ -1776,7 +1829,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           set((state) => {
             let updatedInventory = [...state.inventory];
             let actionText = '';
-            
+
             if (type === 'duplicate') {
               // Duplicate the barcode of the first asset onto the second asset
               if (updatedInventory.length > 2) {
@@ -1920,6 +1973,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
         },
 
         initializeStore: async () => {
+          isSyncingFromServer = true;
           try {
             const token = get().token;
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1930,7 +1984,7 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             const apiBase = getApiBaseUrl();
             const res = await fetch(`${apiBase}/sync/load`, { headers });
             const data = await res.json();
-            
+
             if (data.success) {
               const db = (data.data && typeof data.data === 'object' && !Array.isArray(data.data) && data.data.drivers)
                 ? data.data
@@ -1942,10 +1996,10 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               const serverOrders = (db.orders || []).map((s: any) => {
                 const local = currentLocalOrders.find((l: any) => l.id === s.id || l.id === s._id);
                 const isPrepared = Boolean(
-                  s.isPrepared === true || 
-                  s.status === 'READY_FOR_DISPATCH' || 
-                  s.status === 'Ready for Dispatch' || 
-                  Boolean(s.preparedAt) || 
+                  s.isPrepared === true ||
+                  s.status === 'READY_FOR_DISPATCH' ||
+                  s.status === 'Ready for Dispatch' ||
+                  Boolean(s.preparedAt) ||
                   (local && (local.isPrepared === true || local.status === 'Ready for Dispatch'))
                 );
                 const proof = s.deliveryProofPhoto || s.deliveryProof?.photos?.[0] || s.deliveryProof?.photoUrl || local?.deliveryProofPhoto || '';
@@ -2014,7 +2068,43 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 });
               });
 
+              const currentLocalRepairs = get().repairs || [];
+              const serverRepairs = (db.repairs || []).map((sr: any) => {
+                const local = currentLocalRepairs.find((l: any) => l.id === sr.id || (l as any)._id === sr._id);
+                const effectiveStatus = (local && local.status === 'Completed') 
+                  ? 'Completed' 
+                  : (sr.status || 'In Progress');
+
+                return {
+                  ...sr,
+                  id: sr.id || sr._id,
+                  status: effectiveStatus,
+                  completedAt: sr.completedAt || (effectiveStatus === 'Completed' ? (local?.completedAt || new Date().toISOString()) : undefined)
+                };
+              });
+              const mergedRepairs = [...serverRepairs];
+              for (const loc of currentLocalRepairs) {
+                if (loc && loc.id && !mergedRepairs.some(s => s.id === loc.id || (s as any)._id === loc.id)) {
+                  mergedRepairs.unshift(loc);
+                }
+              }
+
+              // Active repairs set to keep asset status strictly 'Under Repair' in POS and Inventory
+              const activeRepairAssetIds = new Set<string>();
+              mergedRepairs.forEach((rep: any) => {
+                if (rep.status === 'In Progress' || rep.status === 'Under Repair') {
+                  if (rep.assetId) activeRepairAssetIds.add(rep.assetId);
+                  if (rep.assetBarcode) activeRepairAssetIds.add(rep.assetBarcode);
+                }
+              });
+
               const syncedAssets = (db.assets || []).map((a: any) => {
+                if (activeRepairAssetIds.has(a.id) || activeRepairAssetIds.has(a.barcode) || activeRepairAssetIds.has(a._id)) {
+                  return {
+                    ...a,
+                    status: 'Under Repair' as AssetStatus
+                  };
+                }
                 if (activeOrderAssetMap.has(a.id) || activeOrderAssetMap.has(a._id)) {
                   const activeInfo = activeOrderAssetMap.get(a.id) || activeOrderAssetMap.get(a._id)!;
                   return {
@@ -2031,16 +2121,41 @@ export const useRentBuddyStore = create<RentBuddyState>()(
                 return a;
               });
 
+              const currentLocalDrivers = get().drivers || [];
+              const serverDrivers = (db.drivers || []).map((sd: any) => {
+                const local = currentLocalDrivers.find((l: any) =>
+                  l.id === sd.id || (l as any)._id === sd._id || l.phone === sd.phone
+                );
+                const cleanPhone = (sd.phone || '').replace(/[^0-9]/g, '').slice(-10);
+                const override = recentDriverBlockOverrides.get(sd.id) ||
+                  recentDriverBlockOverrides.get(sd._id) ||
+                  (cleanPhone ? recentDriverBlockOverrides.get(cleanPhone) : null) ||
+                  (sd.phone ? recentDriverBlockOverrides.get(sd.phone) : null);
+
+                // If user toggled block status within last 25 seconds, enforce local override to prevent polling flicker
+                const effectiveBlocked = (override && (Date.now() - override.timestamp < 25000))
+                  ? override.isBlocked
+                  : Boolean(sd.isBlocked || sd.status === 'Blocked' || sd.status === 'Suspended');
+
+                return {
+                  ...sd,
+                  id: sd.id || sd._id,
+                  isBlocked: effectiveBlocked,
+                  status: effectiveBlocked ? 'Blocked' : 'Active',
+                  blockedReason: sd.blockedReason || local?.blockedReason || ''
+                };
+              });
+
               // Overwrite local memory state with synced real MongoDB collections
               set({
                 inventory: syncedAssets,
                 customers: mergedCustomers,
                 orders: serverOrders,
                 invoices: db.invoices || [],
-                repairs: db.repairs || [],
+                repairs: mergedRepairs,
                 auditLogs: db.auditLogs || [],
                 notifications: mergedNotifications,
-                drivers: db.drivers || [],
+                drivers: serverDrivers,
                 cities: db.cities && db.cities.length > 0 ? db.cities : get().cities,
                 currentCity: activeCity,
                 currentUserRole: db.currentUserRole || get().currentUserRole,
@@ -2056,6 +2171,10 @@ export const useRentBuddyStore = create<RentBuddyState>()(
             }
           } catch (err: any) {
             console.warn("MongoDB synchronization offline or error:", err.message);
+          } finally {
+            setTimeout(() => {
+              isSyncingFromServer = false;
+            }, 500);
           }
         }
       };
@@ -2068,7 +2187,9 @@ export const useRentBuddyStore = create<RentBuddyState>()(
 
 // Replicate Zustand store updates to MongoDB Atlas on changes
 useRentBuddyStore.subscribe((state) => {
-  syncToDatabase(state);
+  if (!isSyncingFromServer) {
+    syncToDatabase(state);
+  }
 });
 
 // Notification audio synthesizer using Web Audio API (offline-safe, zero assets needed)
@@ -2077,20 +2198,20 @@ export const playNotificationSound = () => {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-    
+
     const playTone = (freq: number, startTime: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startTime);
-      
+
       gain.gain.setValueAtTime(0.12, startTime);
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
+
       osc.start(startTime);
       osc.stop(startTime + duration);
     };

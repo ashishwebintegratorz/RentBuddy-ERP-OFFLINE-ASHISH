@@ -88,8 +88,12 @@ export const getDamageReports = async (req, res) => {
 
 export const resolveDamageReport = async (req, res) => {
   try {
+    const reportId = String(req.params.id || '').trim();
+    if (!reportId || reportId.length > 100) {
+      return res.status(400).json({ success: false, message: 'Invalid report ID provided' });
+    }
     const { action, adminNotes, estimatedRepairCost } = req.body; // action: 'APPROVED_REPAIR' | 'RETIRED' | 'RESOLVED'
-    const report = await DamageReport.findOne({ id: req.params.id }) || await DamageReport.findById(req.params.id);
+    const report = await DamageReport.findOne({ id: reportId }) || await DamageReport.findById(reportId);
     if (!report) return res.status(404).json({ success: false, message: 'Damage report not found' });
 
     report.status = action || 'RESOLVED';

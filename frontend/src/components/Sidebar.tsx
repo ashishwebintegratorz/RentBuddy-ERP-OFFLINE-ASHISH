@@ -82,11 +82,10 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
 
   return (
     <aside
-      className={`${isCollapsed ? 'w-20' : 'w-64'} flex-shrink-0 ${
-        isDark
+      className={`${isCollapsed ? 'w-20' : 'w-64'} flex-shrink-0 ${isDark
           ? 'bg-gradient-to-b from-[#1a0709] via-[#120507] to-[#0a0d14] text-slate-100 border-r border-red-950/60 shadow-2xl'
           : 'bg-gradient-to-b from-red-600 via-rose-600 to-red-700 text-white border-r border-red-500/40 shadow-xl'
-      } flex flex-col h-full z-10 select-none transition-all duration-300 ease-in-out`}
+        } flex flex-col h-full z-10 select-none transition-all duration-300 ease-in-out`}
     >
       {/* Brand Header with RentBuddy Official Logo */}
       <div className={`p-4 border-b ${isDark ? 'border-red-950/60' : 'border-white/15'} flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
@@ -105,22 +104,20 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
 
       {/* User Profile Card & Logout */}
       {currentUser && !isCollapsed && (
-        <div className={`mx-3 mt-3 p-2.5 rounded-xl flex items-center justify-between gap-2 shadow-2xs ${
-          isDark
+        <div className={`mx-3 mt-3 p-2.5 rounded-xl flex items-center justify-between gap-2 shadow-2xs ${isDark
             ? 'bg-red-950/30 border border-red-900/40 text-slate-200'
             : 'bg-white/15 border border-white/20 text-white'
-        }`}>
+          }`}>
           <div className="min-w-0">
             <h4 className="text-[11px] font-bold truncate text-white">{currentUser.fullName}</h4>
             <p className="text-[9px] text-white/80 truncate">@{currentUser.username}</p>
           </div>
           <button
             onClick={() => logout()}
-            className={`text-[9px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer shadow-2xs hover:scale-[1.02] ${
-              isDark
+            className={`text-[9px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer shadow-2xs hover:scale-[1.02] ${isDark
                 ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30'
                 : 'bg-white text-red-700 hover:bg-white/90 font-black'
-            }`}
+              }`}
           >
             Logout
           </button>
@@ -139,11 +136,10 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
             <select
               value={currentUserRole}
               onChange={(e) => setRole(e.target.value as UserRole)}
-              className={`w-full text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer transition-all shadow-2xs ${
-                isDark
+              className={`w-full text-xs font-semibold rounded-lg px-2.5 py-1.5 cursor-pointer transition-all shadow-2xs ${isDark
                   ? 'bg-slate-900/90 border border-slate-800 text-slate-100 focus:border-red-500'
                   : 'bg-white/15 border border-white/25 text-white focus:bg-white focus:text-slate-900'
-              }`}
+                }`}
             >
               {roles.map((role) => (
                 <option key={role} value={role} className="text-slate-900 bg-white py-1">
@@ -165,15 +161,14 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
               <button
                 onClick={() => setCity('All Cities')}
                 title="All Cities (Global View)"
-                className={`col-span-2 text-[10px] py-1.5 px-2 rounded-lg border transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
-                  currentCity === 'All Cities' || currentCity === 'All'
+                className={`col-span-2 text-[10px] py-1.5 px-2 rounded-lg border transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${currentCity === 'All Cities' || currentCity === 'All'
                     ? isDark
                       ? 'bg-red-600 text-white font-bold border-red-500 shadow-md'
                       : 'bg-white text-red-700 font-bold border-white shadow-md'
                     : isDark
                       ? 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800 font-medium'
                       : 'bg-white/10 text-white hover:bg-white/20 border-white/20 font-medium'
-                }`}
+                  }`}
               >
                 <Globe className="w-3 h-3 text-cyan-300" />
                 <span>All Cities (Global View)</span>
@@ -183,15 +178,14 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
                   key={city}
                   onClick={() => setCity(city)}
                   title={city}
-                  className={`text-[10px] py-1.5 px-1 rounded-lg border transition-all text-center truncate cursor-pointer ${
-                    currentCity === city
+                  className={`text-[10px] py-1.5 px-1 rounded-lg border transition-all text-center truncate cursor-pointer ${currentCity === city
                       ? isDark
                         ? 'bg-red-600 text-white font-bold border-red-500 shadow-md'
                         : 'bg-white text-red-700 font-bold border-white shadow-md'
                       : isDark
                         ? 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border-slate-800 font-medium'
                         : 'bg-white/10 text-white hover:bg-white/20 border-white/20 font-medium'
-                  }`}
+                    }`}
                 >
                   {city.replace(' (Head Office)', ' (HO)')}
                 </button>
@@ -218,19 +212,17 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
                     type="text"
                     name="newCityName"
                     placeholder="+ Add new city..."
-                    className={`flex-1 rounded px-2 py-1 text-[10px] placeholder-white/60 focus:outline-none shadow-2xs ${
-                      isDark
+                    className={`flex-1 rounded px-2 py-1 text-[10px] placeholder-white/60 focus:outline-none shadow-2xs ${isDark
                         ? 'bg-slate-900 border border-slate-800 text-slate-200 focus:border-red-500'
                         : 'bg-white/15 border border-white/25 text-white placeholder-white/60 focus:bg-white/25'
-                    }`}
+                      }`}
                   />
                   <button
                     type="submit"
-                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors shadow-2xs ${
-                      isDark
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors shadow-2xs ${isDark
                         ? 'bg-red-600 hover:bg-red-700 text-white'
                         : 'bg-white text-red-700 hover:bg-white/90'
-                    }`}
+                      }`}
                   >
                     Add
                   </button>
@@ -251,21 +243,19 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
               key={item.id}
               onClick={() => setView(item.id)}
               title={item.label}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-3 py-2'} rounded-xl text-xs transition-all duration-200 cursor-pointer ${
-                isActive
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-3 py-2'} rounded-xl text-xs transition-all duration-200 cursor-pointer ${isActive
                   ? isDark
                     ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold shadow-lg shadow-red-900/40 border border-red-500/40'
                     : 'bg-white text-red-700 font-bold shadow-md'
                   : isDark
                     ? 'text-slate-400 hover:bg-red-950/20 hover:text-red-300 font-medium'
                     : 'text-white/90 hover:bg-white/15 hover:text-white font-medium'
-              }`}
+                }`}
             >
-              <Icon className={`w-4 h-4 shrink-0 ${
-                isActive
+              <Icon className={`w-4 h-4 shrink-0 ${isActive
                   ? isDark ? 'text-white' : 'text-red-700'
                   : isDark ? 'text-slate-400' : 'text-white/90'
-              }`} />
+                }`} />
               {!isCollapsed && <span className="truncate">{item.label}</span>}
               {!isCollapsed && item.id === 'dashboard' && expectedVsActualAudit.fraudAlertCount > 0 && (
                 <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>

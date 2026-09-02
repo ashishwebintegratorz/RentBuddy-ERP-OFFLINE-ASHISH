@@ -47,11 +47,7 @@ export async function seedAdminUser(UserModel) {
         role: DEFAULT_ADMIN.role,
         city: DEFAULT_ADMIN.city
       });
-      console.log("------------------------------------------------------------------");
-      console.log("ADMIN ACCOUNT SEEDED:");
-      console.log(`Username: ${DEFAULT_ADMIN.username}`);
-      console.log(`Password: ${DEFAULT_ADMIN.password}`);
-      console.log("------------------------------------------------------------------");
+      console.log(`[DB] Default Admin user (${DEFAULT_ADMIN.username}) successfully seeded.`);
     }
   } catch (err) {
     console.error("❌ [DB] Failed to seed administrator account:", err.message);

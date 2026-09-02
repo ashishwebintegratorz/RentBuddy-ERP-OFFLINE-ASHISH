@@ -60,11 +60,10 @@ export default function BarcodeStickerModal({ asset, onClose }: BarcodeStickerMo
 
   // Generate 100% Solid Vector SVG Barcode
   const generateSvgBarcodeString = (code: string) => {
-    const chars = code.split('');
+    const safeCode = (code || 'RB-001').slice(0, 24);
     let currentX = 10;
     const barHeight = 44;
     const totalWidth = 340;
-
     let barsHtml = '';
 
     // Guard Start
@@ -73,15 +72,22 @@ export default function BarcodeStickerModal({ asset, onClose }: BarcodeStickerMo
     barsHtml += `<rect x="${currentX}" y="0" width="2" height="${barHeight}" fill="#000000" />`;
     currentX += 6;
 
-    chars.forEach((char, index) => {
-      const codeVal = char.charCodeAt(0);
-      const pattern = [(codeVal % 3) + 1.5, (codeVal % 2) + 1, ((codeVal + 1) % 3) + 2, (codeVal % 2) + 1.5];
+    for (let i = 0; i < safeCode.length; i++) {
+      const codeVal = safeCode.charCodeAt(i);
+      const w1 = (codeVal % 3) + 1.5;
+      const w2 = (codeVal % 2) + 1;
+      const w3 = ((codeVal + 1) % 3) + 2;
+      const w4 = (codeVal % 2) + 1.5;
 
-      pattern.forEach((w, pIdx) => {
-        barsHtml += `<rect x="${currentX}" y="0" width="${w * 1.6}" height="${barHeight}" fill="#000000" />`;
-        currentX += (w * 1.6) + ((pIdx % 2 === 0) ? 3 : 2);
-      });
-    });
+      barsHtml += `<rect x="${currentX}" y="0" width="${w1 * 1.6}" height="${barHeight}" fill="#000000" />`;
+      currentX += (w1 * 1.6) + 3;
+      barsHtml += `<rect x="${currentX}" y="0" width="${w2 * 1.6}" height="${barHeight}" fill="#000000" />`;
+      currentX += (w2 * 1.6) + 2;
+      barsHtml += `<rect x="${currentX}" y="0" width="${w3 * 1.6}" height="${barHeight}" fill="#000000" />`;
+      currentX += (w3 * 1.6) + 3;
+      barsHtml += `<rect x="${currentX}" y="0" width="${w4 * 1.6}" height="${barHeight}" fill="#000000" />`;
+      currentX += (w4 * 1.6) + 2;
+    }
 
     // Guard End
     barsHtml += `<rect x="${currentX}" y="0" width="2" height="${barHeight}" fill="#000000" />`;
@@ -519,7 +525,7 @@ export default function BarcodeStickerModal({ asset, onClose }: BarcodeStickerMo
 
   // Pure SVG barcode for in-modal preview
   const renderSvgBarcodePreview = (code: string) => {
-    const chars = code.split('');
+    const safeCode = (code || 'RB-001').slice(0, 24);
     let currentX = 10;
     const barHeight = 44;
     const totalWidth = 340;
@@ -532,24 +538,22 @@ export default function BarcodeStickerModal({ asset, onClose }: BarcodeStickerMo
     bars.push(<rect key="g2" x={currentX} y={0} width={2} height={barHeight} fill="#000000" />);
     currentX += 6;
 
-    chars.forEach((char, index) => {
-      const codeVal = char.charCodeAt(0);
-      const pattern = [(codeVal % 3) + 1.5, (codeVal % 2) + 1, ((codeVal + 1) % 3) + 2, (codeVal % 2) + 1.5];
+    for (let i = 0; i < safeCode.length; i++) {
+      const codeVal = safeCode.charCodeAt(i);
+      const w1 = (codeVal % 3) + 1.5;
+      const w2 = (codeVal % 2) + 1;
+      const w3 = ((codeVal + 1) % 3) + 2;
+      const w4 = (codeVal % 2) + 1.5;
 
-      pattern.forEach((w, pIdx) => {
-        bars.push(
-          <rect
-            key={`b-${index}-${pIdx}`}
-            x={currentX}
-            y={0}
-            width={w * 1.6}
-            height={barHeight}
-            fill="#000000"
-          />
-        );
-        currentX += (w * 1.6) + ((pIdx % 2 === 0) ? 3 : 2);
-      });
-    });
+      bars.push(<rect key={`b-${i}-0`} x={currentX} y={0} width={w1 * 1.6} height={barHeight} fill="#000000" />);
+      currentX += (w1 * 1.6) + 3;
+      bars.push(<rect key={`b-${i}-1`} x={currentX} y={0} width={w2 * 1.6} height={barHeight} fill="#000000" />);
+      currentX += (w2 * 1.6) + 2;
+      bars.push(<rect key={`b-${i}-2`} x={currentX} y={0} width={w3 * 1.6} height={barHeight} fill="#000000" />);
+      currentX += (w3 * 1.6) + 3;
+      bars.push(<rect key={`b-${i}-3`} x={currentX} y={0} width={w4 * 1.6} height={barHeight} fill="#000000" />);
+      currentX += (w4 * 1.6) + 2;
+    }
 
     // Guard End
     bars.push(<rect key="g3" x={currentX} y={0} width={2} height={barHeight} fill="#000000" />);

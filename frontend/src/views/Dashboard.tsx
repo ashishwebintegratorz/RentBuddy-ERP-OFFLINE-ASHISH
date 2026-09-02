@@ -68,11 +68,11 @@ export default function Dashboard({ setView }: DashboardProps) {
   const newCustomersThisMonth = cityCustomers.length;
 
   const totalAssets = cityAssets.length;
-  const assetsRentedCount = cityAssets.filter(a => a.status === 'Rented').length || 
+  const assetsRentedCount = cityAssets.filter(a => a.status === 'Rented').length ||
     cityOrders.filter(o => (o.status || '').toLowerCase() === 'delivered').flatMap(o => o.items || []).length;
   const assetsRented = Math.min(totalAssets, assetsRentedCount);
   const assetsAvailable = Math.max(0, totalAssets - assetsRented);
-  const assetsRepair = cityAssets.filter(a => a.status === 'Under Repair').length || 
+  const assetsRepair = cityAssets.filter(a => a.status === 'Under Repair').length ||
     (repairs || []).filter(r => r.status === 'In Progress' && (isGlobal ? true : matchCityContext((r as any).city, currentCity))).length;
   const assetsLost = cityAssets.filter(a => a.status === 'Lost' || a.status === 'Scrapped').length;
 
@@ -106,7 +106,7 @@ export default function Dashboard({ setView }: DashboardProps) {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const now = new Date();
   const currentMonthIdx = now.getMonth();
-  
+
   const last6Months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), currentMonthIdx - (5 - i), 1);
     return {
@@ -216,8 +216,8 @@ export default function Dashboard({ setView }: DashboardProps) {
             onClick={handleRunAudit}
             disabled={auditing}
             className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-md ${auditSuccess
-                ? 'bg-emerald-500/25 border border-emerald-500/40 text-emerald-300'
-                : 'bg-[#00ab55] hover:bg-[#008f44] text-white shadow-emerald-500/10'
+              ? 'bg-emerald-500/25 border border-emerald-500/40 text-emerald-300'
+              : 'bg-[#00ab55] hover:bg-[#008f44] text-white shadow-emerald-500/10'
               }`}
           >
             {auditing ? (
@@ -567,7 +567,7 @@ export default function Dashboard({ setView }: DashboardProps) {
               <line x1="0" y1="10" x2="100" y2="10" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
               <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
               <line x1="0" y1="40" x2="100" y2="40" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-              
+
               {/* Dynamic Path Area & Line */}
               {(() => {
                 const pts = last6Months.map((m, idx) => {

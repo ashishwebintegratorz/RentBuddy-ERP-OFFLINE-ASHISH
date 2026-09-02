@@ -1058,12 +1058,13 @@ export default function LogisticsLog() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {returnOrders.map((order) => {
                       const duration = order.durationMonths || 3;
-                      const startDate = order.startDate ? new Date(order.startDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : '26 Aug 2026';
-                      const endDate = order.endDate 
-                        ? new Date(order.endDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
-                        : new Date(Date.now() + duration * 30 * 24 * 60 * 60 * 1000).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+                      const safeStart = order.startDate ? new Date(order.startDate) : null;
+                      const startDate = safeStart && !isNaN(safeStart.getTime()) ? safeStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '26 Aug 2026';
                       
-                      const daysLeft = Math.ceil((new Date(order.endDate || (Date.now() + duration * 30 * 24 * 60 * 60 * 1000)).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      const targetEnd = order.endDate ? new Date(order.endDate) : new Date(Date.now() + duration * 30 * 86400000);
+                      const endDate = targetEnd && !isNaN(targetEnd.getTime()) ? targetEnd.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '26 Nov 2026';
+                      
+                      const daysLeft = Math.ceil((targetEnd.getTime() - Date.now()) / 86400000);
                       const itemTitle = (order.items || [])[0] ? ((order.items[0] as any).name || (order.items[0] as any).assetName || order.items[0].category || 'Furniture Suite') : 'Furniture Suite';
                       const assetBarcode = (order.items || [])[0]?.assetId || 'RB-AST-101';
 

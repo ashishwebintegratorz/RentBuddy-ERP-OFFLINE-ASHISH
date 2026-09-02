@@ -19,7 +19,11 @@ export const getOrders = async (req, res) => {
 
 export const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findOne({ id: req.params.id }) || await Order.findById(req.params.id);
+    const orderId = String(req.params.id || '').trim();
+    if (!orderId || orderId.length > 100) {
+      return res.status(400).json({ success: false, message: 'Invalid order ID provided' });
+    }
+    const order = await Order.findOne({ id: orderId }) || await Order.findById(orderId);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
     return res.json({ success: true, data: order });
   } catch (error) {

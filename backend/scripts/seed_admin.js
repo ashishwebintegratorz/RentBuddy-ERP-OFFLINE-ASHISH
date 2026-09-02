@@ -45,13 +45,7 @@ async function seedAdmin() {
       { upsert: true, returnDocument: 'after' }
     );
 
-    console.log('======================================================');
-    console.log('✅ Admin Account Configured in MongoDB Atlas:');
-    console.log(`👤 Username : ${adminUsername}`);
-    console.log('🔑 Password : [CONFIGURED SECURELY]');
-    console.log('🛡️  Role     : Super Admin');
-    console.log('🏙️  City     : Indore (Head Office)');
-    console.log('======================================================');
+    console.log(`[Seed] Admin user (${adminUsername}) successfully configured.`);
 
     await mongoose.disconnect();
   } catch (err) {

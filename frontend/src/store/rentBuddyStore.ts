@@ -1166,9 +1166,9 @@ export const useRentBuddyStore = create<RentBuddyState>()(
           };
 
           set((state) => {
-            const updatedInventory = state.inventory.map(a => 
-              (a.id === repair.assetId || a.barcode === (repair as any).assetBarcode) 
-                ? { ...a, status: 'Under Repair' as const } 
+            const updatedInventory = state.inventory.map(a =>
+              (a.id === repair.assetId || a.barcode === (repair as any).assetBarcode)
+                ? { ...a, status: 'Under Repair' as const }
                 : a
             );
             return {
@@ -2071,8 +2071,8 @@ export const useRentBuddyStore = create<RentBuddyState>()(
               const currentLocalRepairs = get().repairs || [];
               const serverRepairs = (db.repairs || []).map((sr: any) => {
                 const local = currentLocalRepairs.find((l: any) => l.id === sr.id || (l as any)._id === sr._id);
-                const effectiveStatus = (local && local.status === 'Completed') 
-                  ? 'Completed' 
+                const effectiveStatus = (local && local.status === 'Completed')
+                  ? 'Completed'
                   : (sr.status || 'In Progress');
 
                 return {

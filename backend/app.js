@@ -35,10 +35,19 @@ app.use(sanitizeInputs);
 
 // 6. Quiet logger (Keeps terminal clean for critical events & OTP banners)
 
-// 7. Apply rate limiting across general API endpoints
+// 7. Health Check & Load Balancer Probes
+app.get(['/healthz', '/health', '/api/health'], (req, res) => {
+  res.status(200).json({
+    status: 'UP',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 8. Apply rate limiting across general API endpoints
 app.use('/api', apiLimiter);
 
-// 8. Mount Modular API Routes
+// 9. Mount Modular API Routes
 app.use('/api', routes);
 
 // Global 404 Not Found Handler

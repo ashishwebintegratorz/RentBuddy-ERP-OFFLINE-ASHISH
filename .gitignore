@@ -7,20 +7,27 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Node dependencies (Root & Nested Frontend)
+node_modules/
+**/node_modules/
+frontend/node_modules/
+
+# Production build artifacts
+dist/
+dist-ssr/
+frontend/dist/
 *.local
 
-# Editor directories and files
+# Editor & OS files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.sw?
+
+# Environment & Secrets (Never commit secrets)
 .env
 .env.*
 .env.local
+*.env
 inspect-db.js
-
-

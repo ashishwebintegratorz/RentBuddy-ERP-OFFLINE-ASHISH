@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listUsers, createUser, resetUserPassword } from '../../controllers/user.controller.js';
+import { listUsers, createUser, resetUserPassword, updateUserPermissions, deleteUser } from '../../controllers/user.controller.js';
 import { changeSelfPassword, getProfile } from '../../controllers/auth.controller.js';
 import { authenticateToken, requireSuperAdmin } from '../../middlewares/auth.middleware.js';
 
@@ -12,6 +12,8 @@ router.put('/self/password', authenticateToken, changeSelfPassword);
 // All user management routes require Super Admin privileges
 router.get('/', authenticateToken, requireSuperAdmin, listUsers);
 router.post('/', authenticateToken, requireSuperAdmin, createUser);
+router.put('/:username/permissions', authenticateToken, requireSuperAdmin, updateUserPermissions);
 router.put('/:username/password', authenticateToken, requireSuperAdmin, resetUserPassword);
+router.delete('/:username', authenticateToken, requireSuperAdmin, deleteUser);
 
 export default router;

@@ -8,6 +8,57 @@ export type UserRole =
   | 'Customer Support'
   | 'Read-only Auditor';
 
+export type ERPSectionKey =
+  | 'dashboard'
+  | 'customers'
+  | 'inventory'
+  | 'barcode'
+  | 'pos'
+  | 'orders'
+  | 'logistics'
+  | 'logistic-docs'
+  | 'inspection'
+  | 'repair'
+  | 'packages'
+  | 'finance'
+  | 'reports'
+  | 'quotations';
+
+export interface ERPSectionMeta {
+  id: ERPSectionKey;
+  label: string;
+  category: 'Core Operations' | 'Inventory & Logistics' | 'Service & Quality' | 'Commercial & Reporting';
+  description: string;
+}
+
+export const ERP_SECTIONS_LIST: ERPSectionMeta[] = [
+  { id: 'dashboard', label: 'Dashboard & Live Analytics', category: 'Core Operations', description: 'Real-time KPIs, active rental metrics, revenue statistics, and map hubs' },
+  { id: 'customers', label: 'Customer KYC & Directory', category: 'Core Operations', description: 'Customer profiles, Aadhaar/PAN document verification, and blacklist checks' },
+  { id: 'pos', label: 'Point of Sale (POS)', category: 'Core Operations', description: 'Quick rental checkout, dynamic security deposit computation, and receipt generation' },
+  { id: 'orders', label: 'Rental Orders & Lifecycle', category: 'Core Operations', description: 'End-to-end rental order tracking, status transition, and delivery proofs' },
+  { id: 'inventory', label: 'Inventory & Asset Master', category: 'Inventory & Logistics', description: 'Warehouse stock catalog, product specifications, and asset status controls' },
+  { id: 'barcode', label: 'Barcode & QR Scanning', category: 'Inventory & Logistics', description: 'Asset barcode sticker generator, camera scanning, and stock auditing' },
+  { id: 'logistics', label: 'Logistics Tasks & Fleet', category: 'Inventory & Logistics', description: 'Driver dispatch, delivery route assignment, and real-time transit status' },
+  { id: 'logistic-docs', label: 'Logistic Driver Documents', category: 'Inventory & Logistics', description: 'Driver onboarding verification, driving license, and RC vehicle checks' },
+  { id: 'inspection', label: 'Quality Inspection (QC)', category: 'Service & Quality', description: 'Returned asset health audits, damage grading, and scrap classification' },
+  { id: 'repair', label: 'Repair Workshop & Vendors', category: 'Service & Quality', description: 'Internal servicing work orders, external vendor tracking, and parts replacement' },
+  { id: 'packages', label: 'Rental Bundles & Packages', category: 'Commercial & Reporting', description: 'Appliance and furniture combo bundles with special discount packages' },
+  { id: 'finance', label: 'Finance & Invoicing Portal', category: 'Commercial & Reporting', description: 'GST invoices, monthly rental recurring billing, and security deposit refunds' },
+  { id: 'reports', label: 'Reports & Audit Export', category: 'Commercial & Reporting', description: 'Financial ledger, asset valuation summaries, and CSV/Excel downloads' },
+  { id: 'quotations', label: 'Quotations & Estimates', category: 'Commercial & Reporting', description: 'Formal commercial quotations with custom item tariffs and tax calculations' },
+];
+
+export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, ERPSectionKey[]> = {
+  'Super Admin': ['dashboard', 'customers', 'inventory', 'barcode', 'pos', 'orders', 'logistics', 'logistic-docs', 'inspection', 'repair', 'packages', 'finance', 'reports', 'quotations'],
+  'Operations Manager': ['dashboard', 'customers', 'inventory', 'pos', 'orders', 'logistics', 'inspection', 'packages', 'finance', 'reports', 'quotations'],
+  'Warehouse Manager': ['dashboard', 'inventory', 'barcode', 'inspection'],
+  'Logistics Team': ['dashboard', 'barcode', 'logistics', 'logistic-docs'],
+  'Repair Team': ['dashboard', 'repair'],
+  'Finance': ['dashboard', 'orders', 'finance', 'reports'],
+  'Customer Support': ['dashboard', 'customers', 'pos', 'quotations'],
+  'Read-only Auditor': ['dashboard', 'inventory', 'reports'],
+};
+
 export type CityName = string;
 
 export type CustomerStatus = 'Good Customer' | 'Verified' | 'VIP' | 'Defaulter' | 'High Risk' | 'Blacklisted';

@@ -6,7 +6,8 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   fullName: { type: String, required: true },
   role: { type: String, required: true },
-  city: { type: String, required: true }
+  city: { type: String, required: true },
+  permissions: { type: [String], default: [] }
 }, { timestamps: true });
 
 // Driver Schema (Fleet & Logistics)

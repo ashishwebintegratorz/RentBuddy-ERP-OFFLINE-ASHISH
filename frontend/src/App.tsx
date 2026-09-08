@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import GlobalSearch from './components/GlobalSearch';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 // Views
 import Dashboard from './views/Dashboard';
@@ -27,7 +28,28 @@ function App() {
   const [currentView, setView] = useState('dashboard');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { runSystemAudit, theme, initializeStore, token } = useRentBuddyStore();
+  const { runSystemAudit, theme, initializeStore, token, currentUser, currentUserRole } = useRentBuddyStore();
+
+  const isSuperAdmin = currentUserRole === 'Super Admin' || currentUser?.role === 'Super Admin' || (Boolean(currentUser?.permissions?.includes('*')) || Boolean(currentUser?.permissions?.includes('all')));
+
+  // Check if active view is permitted for this user
+  const isPermitted = useMemo(() => {
+    if (isSuperAdmin) return true;
+    if (currentView === 'settings') return false;
+    if (currentUser?.permissions && Array.isArray(currentUser.permissions) && currentUser.permissions.length > 0) {
+      return currentUser.permissions.includes(currentView);
+    }
+    return true;
+  }, [isSuperAdmin, currentView, currentUser?.permissions]);
+
+  // First available view for non-admin users
+  const firstAllowedView = useMemo(() => {
+    if (isSuperAdmin) return 'dashboard';
+    if (currentUser?.permissions && Array.isArray(currentUser.permissions) && currentUser.permissions.length > 0) {
+      return currentUser.permissions[0];
+    }
+    return 'dashboard';
+  }, [isSuperAdmin, currentUser?.permissions]);
 
   // Run initial compliance audit and sync state from MongoDB Atlas
   useEffect(() => {
@@ -81,6 +103,27 @@ function App() {
   };
 
   const renderActiveView = () => {
+    if (!isPermitted) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8 glass-card rounded-3xl border border-slate-800 space-y-4 max-w-lg mx-auto mt-12">
+          <div className="p-4 rounded-full bg-rose-500/10 border border-rose-500/25 text-rose-400">
+            <ShieldAlert className="w-10 h-10" />
+          </div>
+          <h2 className="text-lg font-black text-white">Section Access Restricted</h2>
+          <p className="text-xs text-slate-400 font-medium leading-relaxed">
+            This ERP module has not been handed over to your staff account. Contact your Super Administrator to request permission for this section.
+          </p>
+          <button
+            onClick={() => setView(firstAllowedView)}
+            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-red-900/40"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Go to My Permitted Section</span>
+          </button>
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'dashboard':
         return <Dashboard setView={setView} />;

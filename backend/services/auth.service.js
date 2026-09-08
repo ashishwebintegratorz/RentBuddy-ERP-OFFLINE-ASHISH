@@ -19,7 +19,8 @@ class AuthService {
           userId: 'local-admin-id',
           username: DEFAULT_ADMIN.username,
           role: DEFAULT_ADMIN.role,
-          city: DEFAULT_ADMIN.city
+          city: DEFAULT_ADMIN.city,
+          permissions: ['*']
         });
         return {
           token,
@@ -27,7 +28,8 @@ class AuthService {
             username: DEFAULT_ADMIN.username,
             fullName: `${DEFAULT_ADMIN.fullName} (Offline)`,
             role: DEFAULT_ADMIN.role,
-            city: DEFAULT_ADMIN.city
+            city: DEFAULT_ADMIN.city,
+            permissions: ['*']
           }
         };
       }
@@ -44,11 +46,16 @@ class AuthService {
       throw new Error('Invalid username or password');
     }
 
+    const permissions = (user.role === 'Super Admin')
+      ? ['*']
+      : (Array.isArray(user.permissions) ? user.permissions : []);
+
     const token = this.generateToken({
       userId: user._id,
       username: user.username,
       role: user.role,
-      city: user.city
+      city: user.city,
+      permissions
     });
 
     return {
@@ -57,14 +64,15 @@ class AuthService {
         username: user.username,
         fullName: user.fullName,
         role: user.role,
-        city: user.city
+        city: user.city,
+        permissions
       }
     };
   }
 
-  async createUser({ username, password, fullName, role, city }) {
+  async createUser({ username, password, fullName, role, city, permissions = [] }) {
     if (!getDbStatus()) {
-      return { username, fullName, role, city };
+      return { username, fullName, role, city, permissions };
     }
 
     const cleanUsername = username.toLowerCase().trim();
@@ -74,20 +82,56 @@ class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const assignedPermissions = (role === 'Super Admin') ? ['*'] : (Array.isArray(permissions) ? permissions : []);
+
     const newUser = await User.create({
       username: cleanUsername,
       password: hashedPassword,
       fullName,
       role,
-      city
+      city,
+      permissions: assignedPermissions
     });
 
     return {
       username: newUser.username,
       fullName: newUser.fullName,
       role: newUser.role,
-      city: newUser.city
+      city: newUser.city,
+      permissions: newUser.permissions
     };
+  }
+
+  async updateUserPermissions(targetUsername, permissions = []) {
+    if (!getDbStatus()) return true;
+
+    const cleanUsername = targetUsername.toLowerCase().trim();
+    const user = await User.findOne({ username: cleanUsername });
+    if (!user) throw new Error('User not found');
+
+    user.permissions = Array.isArray(permissions) ? permissions : [];
+    await user.save();
+
+    return {
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      city: user.city,
+      permissions: user.permissions
+    };
+  }
+
+  async deleteUser(targetUsername) {
+    if (!getDbStatus()) return true;
+
+    const cleanUsername = targetUsername.toLowerCase().trim();
+    if (cleanUsername === DEFAULT_ADMIN.username.toLowerCase().trim()) {
+      throw new Error('Cannot delete primary system Super Admin account');
+    }
+
+    const user = await User.findOneAndDelete({ username: cleanUsername });
+    if (!user) throw new Error('User not found');
+    return true;
   }
 
   async resetPassword(targetUsername, newPassword) {
@@ -127,6 +171,7 @@ class AuthService {
           fullName: DEFAULT_ADMIN.fullName,
           role: DEFAULT_ADMIN.role,
           city: DEFAULT_ADMIN.city,
+          permissions: ['*'],
           createdAt: new Date().toISOString()
         }
       ];

@@ -55,6 +55,7 @@ interface RentBuddyState {
     fullName: string;
     role: UserRole;
     city: CityName;
+    permissions?: string[];
   } | null;
   loginError: string | null;
 

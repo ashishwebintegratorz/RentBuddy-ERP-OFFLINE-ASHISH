@@ -56,6 +56,8 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
     'Read-only Auditor',
   ];
 
+  const isSuperAdmin = currentUserRole === 'Super Admin' || currentUser?.role === 'Super Admin' || (Boolean(currentUser?.permissions?.includes('*')) || Boolean(currentUser?.permissions?.includes('all')));
+
   // Role-based route definitions
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['*'] },
@@ -72,13 +74,18 @@ export default function Sidebar({ currentView, setView, isCollapsed = false }: S
     { id: 'finance', label: 'Finance Portal', icon: CreditCard, roles: ['Super Admin', 'Operations Manager', 'Finance'] },
     { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet, roles: ['Super Admin', 'Operations Manager', 'Read-only Auditor'] },
     { id: 'quotations', label: 'Quotations', icon: FileText, roles: ['*'] },
-    { id: 'settings', label: 'Settings', icon: Settings, roles: ['*'] },
+    { id: 'settings', label: 'Settings & Delegation', icon: Settings, roles: ['Super Admin'] },
   ];
 
-  // Filter items matching role
-  const filteredMenuItems = menuItems.filter(
-    (item) => item.roles.includes('*') || item.roles.includes(currentUserRole)
-  );
+  // Filter items matching role or granular user permissions
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (isSuperAdmin) return true;
+    if (item.id === 'settings') return false; // Settings is strictly Super Admin exclusive
+    if (currentUser?.permissions && Array.isArray(currentUser.permissions) && currentUser.permissions.length > 0) {
+      return currentUser.permissions.includes(item.id);
+    }
+    return item.roles.includes('*') || item.roles.includes(currentUserRole);
+  });
 
   return (
     <aside

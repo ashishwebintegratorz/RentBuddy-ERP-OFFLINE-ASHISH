@@ -36,7 +36,7 @@ export const USER_ROLES = [
 
 export const DEFAULT_ADMIN = {
   username: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
-  password: process.env.DEFAULT_ADMIN_PASSWORD || '',
+  password: process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@123',
   fullName: process.env.DEFAULT_ADMIN_NAME || 'RentBuddy Administrator',
   role: 'Super Admin',
   city: 'Indore (Head Office)'

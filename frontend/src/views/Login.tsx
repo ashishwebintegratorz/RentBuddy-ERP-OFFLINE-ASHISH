@@ -9,6 +9,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showForgotNotice, setShowForgotNotice] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,20 +84,43 @@ export default function Login() {
           </div>
         )}
 
+        {/* Forgot password notification */}
+        {showForgotNotice && (
+          <div className="mb-5 bg-slate-900/90 border border-slate-700/80 text-slate-300 rounded-xl p-3.5 text-[11px] leading-relaxed relative animate-fadeIn">
+            <div className="font-bold text-white mb-1 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-red-400" />
+              Administrative Password Reset
+            </div>
+            <p className="text-slate-400 text-[10px]">
+              Password resets for operational staff and administrators are managed centrally by the IT Security Officer. Please contact the administrator desk or use the ERP Management Console.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowForgotNotice(false)}
+              className="mt-2 text-[10px] font-bold text-red-400 hover:text-red-300 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Username */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Username</label>
+            <label htmlFor="login-username" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Username</label>
             <div className="relative group">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 group-focus-within:text-red-400 transition-colors">
                 <User className="w-4.5 h-4.5" />
               </span>
               <input
+                id="login-username"
+                name="username"
                 type="text"
+                autoComplete="username"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter admin username"
+                placeholder="Enter username"
                 className="w-full pl-10 pr-4 py-3 bg-slate-950/70 border border-slate-800 hover:border-slate-700/80 focus:border-red-500 rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-red-500/30 transition-all font-sans"
               />
             </div>
@@ -105,15 +129,24 @@ export default function Login() {
           {/* Password */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Password</label>
-              <a href="#" className="text-[10px] font-bold text-red-400 hover:underline">Forgot?</a>
+              <label htmlFor="login-password" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Password</label>
+              <button
+                type="button"
+                onClick={() => setShowForgotNotice(true)}
+                className="text-[10px] font-bold text-red-400 hover:text-red-300 hover:underline cursor-pointer"
+              >
+                Forgot?
+              </button>
             </div>
             <div className="relative group">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 group-focus-within:text-red-400 transition-colors">
                 <KeyRound className="w-4.5 h-4.5" />
               </span>
               <input
+                id="login-password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -122,6 +155,7 @@ export default function Login() {
               />
               <button
                 type="button"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
               >
@@ -143,7 +177,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-extrabold py-3.5 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-red-950/40 cursor-pointer flex items-center justify-center gap-2 border border-red-500/30"
+            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-extrabold py-3.5 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-red-950/40 cursor-pointer flex items-center justify-center gap-2 border border-red-500/30 disabled:opacity-50"
           >
             {loading ? (
               <div className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin"></div>
